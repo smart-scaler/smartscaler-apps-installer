@@ -25,6 +25,26 @@ smartscaler-apps-installer/
     └── process_execution_order.yml   # Main execution orchestrator
 ```
 
+## Prerequisites
+
+Before running the installer, ensure you have:
+
+1. Kubernetes cluster access with proper permissions
+2. `kubectl` installed and configured
+3. `helm` v3.x installed
+4. NGC API credentials (API key and Docker API key)
+5. Python 3.x and pip installed
+
+## Required Environment Variables
+
+The following environment variables are required:
+
+```bash
+# NGC API Credentials
+export NGC_API_KEY="your-ngc-api-key"
+export NGC_DOCKER_API_KEY="your-ngc-docker-api-key"
+```
+
 ## Components
 
 ### 1. GPU Operator
@@ -57,6 +77,29 @@ smartscaler-apps-installer/
 - Chart: `nvidia-instance-manager`
 - Purpose: GPU instance management
 
+## Roles
+
+### 1. helm_chart_install
+Handles the installation and configuration of Helm charts.
+- Supports chart version specification
+- Handles namespace creation
+- Manages chart values
+- Supports chart repository management
+
+### 2. manifest_install
+Manages Kubernetes manifest deployments.
+- Supports template variables
+- Handles namespace management
+- Validates manifests before application
+- Supports wait conditions
+
+### 3. command_exec
+Executes shell commands with enhanced features.
+- Environment variable support
+- Error handling and retries
+- Conditional execution
+- Kubeconfig and context management
+
 ## Configuration
 
 ### User Input Configuration
@@ -70,7 +113,8 @@ execution_order:
   - pushgateway_manifest
   - keda_chart
   - nim_operator_chart
-  - "Create NGC secrets"
+  - create_ngc_secrets
+  - verify_ngc_secrets
 
 # Component configurations
 helm_charts:
@@ -88,126 +132,11 @@ manifests:
     ...
 
 command_exec:
-  - name: "Create NGC secrets"
+  - name: "create_ngc_secrets"
+    ...
+  - name: "verify_ngc_secrets"
     ...
 ```
-
-## Managing Vault Secrets
-
-This project uses Ansible Vault to securely manage sensitive information like NGC API keys.
-
-### Initial Setup
-
-1. Create a vault password file (this file should NEVER be committed):
-```bash
-echo "your-secure-vault-password" > .vault_pass
-chmod 600 .vault_pass
-```
-
-2. Create the vault file structure:
-```bash
-# Create the directory if it doesn't exist
-mkdir -p group_vars/all
-
-# Create an empty vault file
-touch group_vars/all/vault.yml
-```
-
-3. Add your secrets to the vault file BEFORE encrypting:
-```yaml
-# NGC API credentials - NEVER store these in plain text
-ngc_docker_api_key: "your-docker-api-key"
-ngc_api_key: "your-ngc-api-key"
-
-# Other sensitive information
-other_secret: "sensitive-value"
-```
-
-4. Encrypt the vault file:
-```bash
-ansible-vault encrypt group_vars/all/vault.yml
-```
-
-### ⚠️ Important: Plain Text vs Encrypted Values
-
-NEVER store sensitive information in plain text:
-
-❌ INCORRECT (Plain text in version control):
-```yaml
-# DO NOT DO THIS
-ngc_docker_api_key: "ngc-docker-key-123"
-ngc_api_key: "ngc-api-key-456"
-```
-
-✅ CORRECT (Encrypted vault file):
-1. First, create/edit the vault with:
-```bash
-ansible-vault edit group_vars/all/vault.yml
-```
-
-2. Add your secrets inside the encrypted file:
-```yaml
-ngc_docker_api_key: "ngc-docker-key-123"
-ngc_api_key: "ngc-api-key-456"
-```
-
-3. Save and exit (the file remains encrypted)
-
-### Managing NGC Credentials
-
-To safely manage NGC credentials:
-
-1. Edit the encrypted vault file:
-```bash
-ansible-vault edit group_vars/all/vault.yml
-```
-
-2. View the contents (if needed):
-```bash
-ansible-vault view group_vars/all/vault.yml
-```
-
-3. Verify the file is encrypted:
-```bash
-# Should show encrypted content
-cat group_vars/all/vault.yml
-```
-
-### Security Best Practices
-
-- Never commit unencrypted sensitive data
-- Never store the vault password in version control
-- Never share vault passwords through unsecured channels
-- Keep your vault password secure
-- Regularly rotate your NGC API keys
-- Use different API keys for different environments
-- Always verify files containing secrets are encrypted before committing
-- Use `.gitignore` to prevent accidental commits:
-```
-# Add to .gitignore
-.vault_pass
-**/vault.yml.bak
-**/vault.yml~
-```
-
-### Troubleshooting
-
-If you see permission errors:
-```bash
-chmod 600 .vault_pass
-chmod 600 group_vars/all/vault.yml
-```
-
-If you need to decrypt the file (be careful!):
-```bash
-ansible-vault decrypt group_vars/all/vault.yml
-```
-
-If you accidentally committed sensitive data:
-1. Immediately revoke and rotate the exposed credentials
-2. Remove the sensitive data from git history
-3. Re-encrypt the vault file
-4. Update all systems using the old credentials
 
 ## Installation
 
@@ -217,11 +146,101 @@ git clone https://github.com/smart-scaler/smartscaler-apps-installer.git
 cd smartscaler-apps-installer
 ```
 
-2. Set up vault secrets as described above
-
-3. Run the installation:
+2. Set up Python virtual environment (recommended):
 ```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+3. Set required environment variables:
+```bash
+export NGC_API_KEY="your-ngc-api-key"
+export NGC_DOCKER_API_KEY="your-ngc-docker-api-key"
+```
+
+4. Place your kubeconfig file:
+```bash
+cp /path/to/your/kubeconfig files/kubeconfig
+```
+
+5. Run the installation:
+```bash
+# Basic execution
 ansible-playbook site.yml
+
+# With NGC credentials from environment variables
+ansible-playbook site.yml -e "ngc_api_key=$NGC_API_KEY" -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY"
+
+# With verbose output for debugging
+ansible-playbook site.yml -e "ngc_api_key=$NGC_API_KEY" -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" -vvvv
+```
+
+## Execution Process
+
+The installer follows this process:
+
+1. **Initialization**
+   - Validates prerequisites
+   - Loads configuration from `user_input.yml`
+   - Sets up environment variables
+
+2. **Component Installation**
+   - Follows the order specified in `execution_order`
+   - For each component:
+     - Determines component type (helm/manifest/command)
+     - Executes appropriate role
+     - Validates successful installation
+
+3. **NGC Secret Management**
+   - Creates/updates NGC secrets in the `nim` namespace
+   - Verifies secret creation
+   - Handles secret rotation if needed
+
+4. **Verification**
+   - Checks all components are installed
+   - Validates component health
+   - Ensures proper configuration
+
+## Troubleshooting
+
+### Common Issues
+
+1. NGC Secret Creation Fails
+```bash
+# Check NGC environment variables
+echo $NGC_API_KEY
+echo $NGC_DOCKER_API_KEY
+
+# Verify nim namespace exists
+kubectl get ns nim
+
+# Check existing secrets
+kubectl get secrets -n nim
+```
+
+2. Helm Chart Installation Fails
+```bash
+# Check Helm repositories
+helm repo list
+
+# Update Helm repositories
+helm repo update
+
+# Verify chart version availability
+helm search repo <chart-name> --versions
+```
+
+3. Manifest Application Fails
+```bash
+# Check manifest syntax
+kubectl apply --dry-run=client -f files/pushgateway.yaml
+
+# Verify namespace exists
+kubectl get ns <namespace>
+
+# Check for existing resources
+kubectl get all -n <namespace>
 ```
 
 ## Contributing
