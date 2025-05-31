@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ smart_scaler_name | default('smart-scaler-llm-inf') }}
+  namespace: {{ smart_scaler_namespace | default('smart-scaler') }}
+  labels:
+    service: {{ smart_scaler_labels.service | default('inference-tenant-app') }}
+    cluster-name: {{ smart_scaler_labels.cluster_name | default('nim-llama') }}
+    tenant-id: {{ smart_scaler_labels.tenant_id | default('tenant-b200-local') }}
+    app-name: {{ smart_scaler_labels.app_name | default('nim-llama') }}
+    app-version: "{{ smart_scaler_labels.app_version | default('1.0') }}"
+spec:
+  replicas: {{ smart_scaler_replicas | default(1) }}
+  selector:
+    matchLabels:
+      service: {{ smart_scaler_labels.service | default('inference-tenant-app') }}
+      cluster-name: {{ smart_scaler_labels.cluster_name | default('nim-llama') }}
+      tenant-id: {{ smart_scaler_labels.tenant_id | default('tenant-b200-local') }}
+      app-name: {{ smart_scaler_labels.app_name | default('nim-llama') }}
+      app-version: "{{ smart_scaler_labels.app_version | default('1.0') }}"
+  template:
+    metadata:
+      labels:
+        service: {{ smart_scaler_labels.service | default('inference-tenant-app') }}
+        cluster-name: {{ smart_scaler_labels.cluster_name | default('nim-llama') }}
+        tenant-id: {{ smart_scaler_labels.tenant_id | default('tenant-b200-local') }}
+        app-name: {{ smart_scaler_labels.app_name | default('nim-llama') }}
+        app-version: "{{ smart_scaler_labels.app_version | default('1.0') }}"
+    spec:
+      automountServiceAccountToken: {{ smart_scaler_automount_sa | default(true) }}
+      restartPolicy: {{ smart_scaler_restart_policy | default('Always') }}
+      volumes:
+        - name: {{ smart_scaler_config_volume_name | default('data') }}
+          configMap:
+            name: {{ smart_scaler_config_map_name | default('mesh-config') }}
+      containers:
+        - name: {{ smart_scaler_container_name | default('inference') }}
+          image: {{ smart_scaler_image | default('aveshasystems/smart-scaler-llm-inference-benchmark:v1.0.0') }}
+          imagePullPolicy: {{ smart_scaler_image_pull_policy | default('IfNotPresent') }}
+          command: {{ smart_scaler_command | default(['/bin/sh', '-c']) | to_json }}
+          args:
+            {{ smart_scaler_args | default(['wandb disabled && python policy/inference_script.py -c /data/config-inference.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May']) | to_json }}
+          resources:
+            requests:
+              memory: {{ smart_scaler_resources.requests.memory | default('1.5Gi') }}
+              cpu: {{ smart_scaler_resources.requests.cpu | default('100m') }}
+          volumeMounts:
+            - name: {{ smart_scaler_config_volume_name | default('data') }}
+              mountPath: {{ smart_scaler_config_mount_path | default('/data') }}
+          ports:
+{% for port in smart_scaler_ports | default([9900, 8265, 4321, 6379]) %}
+            - containerPort: {{ port }}
+{% endfor %}
+      imagePullSecrets:
+        - name: {{ smart_scaler_image_pull_secret | default('avesha-test') }}
+      tolerations: {{ smart_scaler_tolerations | default([{'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'}]) }} 

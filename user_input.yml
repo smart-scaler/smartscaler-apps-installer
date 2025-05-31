@@ -40,6 +40,8 @@ execution_order:
   - nim_service_manifest
   - keda_scaled_object_manifest
   - create_inference_pod_configmap
+  - smart_scaler_inference
+  - create_locust_configmap
 
 helm_charts:
   gpu_operator_chart:
@@ -261,6 +263,51 @@ manifests:
       keda_scaled_object_query: >-
         smartscaler_hpa_num_pods{job="pushgateway", kubernetes_pod_name="meta-llama3-8b-instruct->nim->nim-llama", ss_deployment_name="meta-llama3-8b-instruct"}
 
+  smart_scaler_inference:
+    name: smart-scaler-inference-setup
+    manifest_file: "files/smart-scaler-inference.yaml.j2"
+    namespace: smart-scaler
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 600
+    wait_condition:
+      type: Available
+      status: "True"
+    validate: true
+    strict_validation: true
+    variables:
+      smart_scaler_name: "smart-scaler-llm-inf"
+      smart_scaler_namespace: "smart-scaler"
+      smart_scaler_labels:
+        service: "inference-tenant-app"
+        cluster-name: "nim-llama"
+        tenant-id: "tenant-b200-local"
+        app-name: "nim-llama"
+        app-version: "1.0"
+      smart_scaler_tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      smart_scaler_resources:
+        requests:
+          memory: "1.5Gi"
+          cpu: "100m"
+      smart_scaler_replicas: 1
+      smart_scaler_automount_sa: true
+      smart_scaler_restart_policy: "Always"
+      smart_scaler_config_volume_name: "data"
+      smart_scaler_config_map_name: "mesh-config"
+      smart_scaler_container_name: "inference"
+      smart_scaler_image: "aveshasystems/smart-scaler-llm-inference-benchmark:v1.0.0"
+      smart_scaler_image_pull_policy: "IfNotPresent"
+      smart_scaler_command: ["/bin/sh", "-c"]
+      smart_scaler_args:
+        - "wandb disabled && python policy/inference_script.py -c /data/config-inference.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
+      smart_scaler_config_mount_path: "/data"
+      smart_scaler_ports: [9900, 8265, 4321, 6379]
+      smart_scaler_image_pull_secret: "avesha-systems"
+
 # Command execution configuration
 command_exec:
   - name: "create_ngc_secrets"
@@ -372,4 +419,27 @@ command_exec:
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
             create configmap -n smart-scaler mesh-config --from-file=files/inference-pod.json
+
+  - name: "create_locust_configmap"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            create namespace nim-load-test --dry-run=client -o yaml | \
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f -
+          if kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            -n nim-load-test get configmap locustfile >/dev/null 2>&1; then
+            echo "ConfigMap locustfile exists, replacing..."
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+              --context={{ kubecontext | default(global_kubecontext) }} \
+              -n nim-load-test delete configmap locustfile
+          fi
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            -n nim-load-test create configmap locustfile --from-file=locustfile.py=files/locust.py
 
