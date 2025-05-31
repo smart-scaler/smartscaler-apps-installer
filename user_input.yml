@@ -418,7 +418,7 @@ command_exec:
             apply -f -
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            create configmap -n smart-scaler mesh-config --from-file=files/inference-pod.json
+            create configmap -n smart-scaler mesh-config --from-file=files/config-inference.json
 
   - name: "create_locust_configmap"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
