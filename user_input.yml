@@ -19,12 +19,11 @@ global_repo_username: ""
 global_repo_password: ""
 readd_helm_repos: true
 
-# NGC credentials can be provided via:
-# 1. Environment variables (NGC_API_KEY, NGC_DOCKER_API_KEY)
-# 2. Ansible vault
-# 3. Direct configuration (not recommended for production)
+# NGC and Avesha credentials from environment variables
 ngc_api_key: "{{ lookup('env', 'NGC_API_KEY') }}"
 ngc_docker_api_key: "{{ lookup('env', 'NGC_DOCKER_API_KEY') }}"
+avesha_docker_username: "{{ lookup('env', 'AVESHA_DOCKER_USERNAME') }}"
+avesha_docker_password: "{{ lookup('env', 'AVESHA_DOCKER_PASSWORD') }}"
 
 # Execution configuration
 execution_order:
@@ -281,10 +280,10 @@ manifests:
       smart_scaler_namespace: "smart-scaler"
       smart_scaler_labels:
         service: "inference-tenant-app"
-        cluster-name: "nim-llama"
-        tenant-id: "tenant-b200-local"
-        app-name: "nim-llama"
-        app-version: "1.0"
+        cluster_name: "nim-llama"
+        tenant_id: "tenant-b200-local"
+        app_name: "nim-llama"
+        app_version: "1.0"
       smart_scaler_tolerations:
         - key: "nvidia.com/gpu"
           operator: "Exists"
