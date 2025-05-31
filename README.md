@@ -97,6 +97,10 @@ The following environment variables are required:
 # NGC API Credentials
 export NGC_API_KEY="your-ngc-api-key"
 export NGC_DOCKER_API_KEY="your-ngc-docker-api-key"
+
+# Avesha Systems Docker Registry Credentials
+export AVESHA_DOCKER_USERNAME="your-avesha-username"
+export AVESHA_DOCKER_PASSWORD="your-avesha-password"
 ```
 
 ## Components
@@ -288,10 +292,19 @@ cp /path/to/your/kubeconfig files/kubeconfig
 ansible-playbook site.yml
 
 # With NGC credentials from environment variables
-ansible-playbook site.yml -e "ngc_api_key=$NGC_API_KEY" -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY"
+ansible-playbook site.yml \
+  -e "ngc_api_key=$NGC_API_KEY" \
+  -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
+  -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \
+  -e "avesha_docker_password=$AVESHA_DOCKER_PASSWORD"
 
 # With verbose output for debugging
-ansible-playbook site.yml -e "ngc_api_key=$NGC_API_KEY" -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" -vvvv
+ansible-playbook site.yml \
+  -e "ngc_api_key=$NGC_API_KEY" \
+  -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
+  -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \
+  -e "avesha_docker_password=$AVESHA_DOCKER_PASSWORD" \
+  -vvvv
 ```
 
 ## Execution Process

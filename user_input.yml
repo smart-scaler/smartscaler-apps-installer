@@ -35,7 +35,11 @@ execution_order:
   - nim_operator_chart
   - create_ngc_secrets
   - verify_ngc_secrets
+  - create_avesha_secret
   - nim_cache_manifest
+  - nim_service_manifest
+  - keda_scaled_object_manifest
+  - create_inference_pod_configmap
 
 helm_charts:
   gpu_operator_chart:
@@ -132,6 +136,8 @@ manifests:
     name: pushgateway-setup
     manifest_file: "files/pushgateway.yaml"
     namespace: pushgateway-system
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
     variables:
       namespace: monitoring
     wait: true
@@ -146,6 +152,8 @@ manifests:
     name: nim-cache-setup
     manifest_file: "files/nim-cache.yaml.j2"
     namespace: nim
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
     wait: true
     wait_timeout: 600
     wait_condition:
@@ -175,11 +183,89 @@ manifests:
       nim_cache_volume_access_mode: "ReadWriteOnce"
       nim_cache_resources: {}
 
+  nim_service_manifest:
+    name: nim-service-setup
+    manifest_file: "files/nim-service.yaml.j2"
+    namespace: nim
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 600
+    wait_condition:
+      type: Available
+      status: "True"
+    validate: true
+    strict_validation: true
+    variables:
+      nim_service_name: "meta-llama3-8b-instruct"
+      nim_service_namespace: "nim"
+      nim_service_runtime_class: "nvidia"
+      nim_service_env:
+        - name: "LOG_LEVEL"
+          value: "INFO"
+        - name: "VLLM_LOG_LEVEL"
+          value: "INFO"
+        - name: "NIM_LOG_LEVEL"
+          value: "INFO"
+        - name: "OMP_NUM_THREADS"
+          value: "8"
+        - name: "MAX_NUM_SEQS"
+          value: "128"
+      nim_service_tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      nim_service_image_repository: "nvcr.io/nim/meta/llama-3.1-8b-instruct"
+      nim_service_image_tag: "1.8.4"
+      nim_service_image_pull_policy: "IfNotPresent"
+      nim_service_image_pull_secrets:
+        - "ngc-secret"
+      nim_service_auth_secret: "ngc-api-secret"
+      nim_service_metrics:
+        enabled: true
+        service_monitor:
+          additional_labels:
+            release: "prometheus"
+      nim_service_storage_cache_name: "meta-llama3-8b-instruct"
+      nim_service_storage_cache_profile: "4f904d571fe60ff24695b5ee2aa42da58cb460787a968f1e8a09f5a7e862728d"
+      nim_service_replicas: 1
+      nim_service_resources:
+        limits:
+          nvidia.com/gpu: 1
+      nim_service_expose_type: "ClusterIP"
+      nim_service_expose_port: 8000
+
+  keda_scaled_object_manifest:
+    name: keda-scaled-object-setup
+    manifest_file: "files/keda-scaled-object.yaml.j2"
+    namespace: nim
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: Available
+      status: "True"
+    validate: true
+    strict_validation: true
+    variables:
+      keda_scaled_object_name: "llm-demo-keda"
+      keda_scaled_object_namespace: "nim"
+      keda_scaled_object_target_name: "meta-llama3-8b-instruct"
+      keda_scaled_object_polling_interval: 30
+      keda_scaled_object_min_replicas: 1
+      keda_scaled_object_max_replicas: 8
+      keda_scaled_object_prometheus_address: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+      keda_scaled_object_metric_name: "smartscaler_hpa_num_pods"
+      keda_scaled_object_threshold: "1"
+      keda_scaled_object_query: >-
+        smartscaler_hpa_num_pods{job="pushgateway", kubernetes_pod_name="meta-llama3-8b-instruct->nim->nim-llama", ss_deployment_name="meta-llama3-8b-instruct"}
+
 # Command execution configuration
 command_exec:
   - name: "create_ngc_secrets"
-    kubeconfig: "{{ global_kubeconfig }}"
-    kubecontext: "{{ global_kubecontext }}"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
     commands:
       # First check if secrets exist
       - cmd: |
@@ -232,4 +318,58 @@ command_exec:
           KUBECONFIG: "{{ global_kubeconfig }}"
           KUBECONTEXT: "{{ global_kubecontext }}"
         ignore_errors: true 
+
+  - name: "create_avesha_secret"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          if kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            -n smart-scaler get secret avesha-systems >/dev/null 2>&1; then
+            echo "Secret avesha-systems exists, replacing..."
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+              --context={{ kubecontext | default(global_kubecontext) }} \
+              -n smart-scaler delete secret avesha-systems
+          fi
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            -n smart-scaler create secret docker-registry avesha-systems \
+            --docker-username="${AVESHA_DOCKER_USERNAME}" \
+            --docker-password="${AVESHA_DOCKER_PASSWORD}"
+        env:
+          AVESHA_DOCKER_USERNAME: "{{ avesha_docker_username }}"
+          AVESHA_DOCKER_PASSWORD: "{{ avesha_docker_password }}"
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
+
+  - name: "verify_avesha_secret"
+    commands:
+      - cmd: "kubectl get secret avesha-systems -n smart-scaler -o jsonpath={.metadata.name} --kubeconfig={{ global_kubeconfig }} --context={{ global_kubecontext }}"
+        env:
+          KUBECONFIG: "{{ global_kubeconfig }}"
+          KUBECONTEXT: "{{ global_kubecontext }}"
+        ignore_errors: true
+
+  - name: "create_inference_pod_configmap"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          if kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            -n smart-scaler get configmap mesh-config >/dev/null 2>&1; then
+            echo "ConfigMap mesh-config exists, replacing..."
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+              --context={{ kubecontext | default(global_kubecontext) }} \
+              -n smart-scaler delete configmap mesh-config
+          fi
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            create namespace smart-scaler --dry-run=client -o yaml | \
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f -
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            create configmap -n smart-scaler mesh-config --from-file=files/inference-pod.json
 

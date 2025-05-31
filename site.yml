@@ -7,30 +7,76 @@
   vars_files:
     - "{{ lookup('env', 'VARS_FILE', default='user_input.yml') }}"
 
-  vars:
-    # Check if vault file exists
-    vault_file_exists: "{{ lookup('ansible.builtin.file', 'group_vars/all/vault.yml', errors='ignore') != '' }}"
-    
-    # Default empty values - only load vault if file exists
-    vault_ngc_api_key: "{{ lookup('ansible.builtin.vars', 'vault_ngc_api_key', default='') if vault_file_exists else '' }}"
-    vault_ngc_docker_api_key: "{{ lookup('ansible.builtin.vars', 'vault_ngc_docker_api_key', default='') if vault_file_exists else '' }}"
-    
-    # Priority order: CLI vars (-e) > Environment vars > Vault vars > Defaults
-    ngc_api_key: "{{ ngc_api_key | default(lookup('env', 'NGC_API_KEY') | default(vault_ngc_api_key | default(''))) }}"
-    ngc_docker_api_key: "{{ ngc_docker_api_key | default(lookup('env', 'NGC_DOCKER_API_KEY') | default(vault_ngc_docker_api_key | default(''))) }}"
-
   pre_tasks:
+    - name: Check if vault file exists
+      stat:
+        path: group_vars/all/vault.yml
+      register: vault_file
+
+    - name: Include vault file if it exists
+      include_vars:
+        file: group_vars/all/vault.yml
+      when: vault_file.stat.exists
+      ignore_errors: true
+
+    - name: Set NGC API key
+      set_fact:
+        ngc_api_key: "{{ ngc_api_key | default(lookup('env', 'NGC_API_KEY')) | default(vault_ngc_api_key | default('')) }}"
+
+    - name: Set NGC Docker API key
+      set_fact:
+        ngc_docker_api_key: "{{ ngc_docker_api_key | default(lookup('env', 'NGC_DOCKER_API_KEY')) | default(vault_ngc_docker_api_key | default('')) }}"
+
+    - name: Set Avesha Docker username
+      set_fact:
+        avesha_docker_username: "{{ avesha_docker_username | default(lookup('env', 'AVESHA_DOCKER_USERNAME')) | default(vault_avesha_docker_username | default('')) }}"
+
+    - name: Set Avesha Docker password
+      set_fact:
+        avesha_docker_password: "{{ avesha_docker_password | default(lookup('env', 'AVESHA_DOCKER_PASSWORD')) | default(vault_avesha_docker_password | default('')) }}"
+
+    - name: Debug variable values
+      debug:
+        msg: |
+          NGC API Key: {{ 'set' if ngc_api_key else 'not set' }}
+          NGC Docker API Key: {{ 'set' if ngc_docker_api_key else 'not set' }}
+          Avesha Docker Username: {{ 'set' if avesha_docker_username else 'not set' }}
+          Avesha Docker Password: {{ 'set' if avesha_docker_password else 'not set' }}
+
     - name: Verify required variables
       fail:
-        msg: "Required variables are not set. Please check configuration."
-      when: not ngc_api_key or not ngc_docker_api_key
+        msg: |
+          The following required variables are not set:
+          {% if not ngc_api_key %}
+          - NGC_API_KEY
+          {% endif %}
+          {% if not ngc_docker_api_key %}
+          - NGC_DOCKER_API_KEY
+          {% endif %}
+          {% if not avesha_docker_username %}
+          - AVESHA_DOCKER_USERNAME
+          {% endif %}
+          {% if not avesha_docker_password %}
+          - AVESHA_DOCKER_PASSWORD
+          {% endif %}
+          
+          Please set these variables using one of:
+          1. Environment variables
+          2. Command line arguments (-e)
+          3. Vault file (group_vars/all/vault.yml)
+      when: not ngc_api_key or not ngc_docker_api_key or not avesha_docker_username or not avesha_docker_password
 
     - name: Show credential source
       debug:
         msg: >-
           Using NGC credentials from: 
           {%- if ngc_api_key == lookup('env', 'NGC_API_KEY') %} environment variables
-          {%- else %} command line arguments
+          {%- else %} command line arguments or vault
+          {%- endif %}
+          
+          Using Avesha Systems credentials from:
+          {%- if avesha_docker_username == lookup('env', 'AVESHA_DOCKER_USERNAME') %} environment variables
+          {%- else %} command line arguments or vault
           {%- endif %}
 
   tasks:
@@ -40,3 +86,5 @@
         execution_vars:
           ngc_api_key: "{{ ngc_api_key }}"
           ngc_docker_api_key: "{{ ngc_docker_api_key }}"
+          avesha_docker_username: "{{ avesha_docker_username }}"
+          avesha_docker_password: "{{ avesha_docker_password }}"
