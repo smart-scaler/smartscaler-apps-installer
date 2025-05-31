@@ -52,5 +52,5 @@ spec:
             - containerPort: {{ port }}
 {% endfor %}
       imagePullSecrets:
-        - name: {{ smart_scaler_image_pull_secret | default('avesha-test') }}
+        - name: {{ smart_scaler_image_pull_secret | default('avesha-systems') }}
       tolerations: {{ smart_scaler_tolerations | default([{'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'}]) }} 
