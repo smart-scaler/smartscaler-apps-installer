@@ -20,6 +20,8 @@ smartscaler-apps-installer/
 ├── files/
 │   ├── kubeconfig           # Kubernetes configuration
 │   └── pushgateway.yaml     # Pushgateway manifest
+├── requirements.txt          # Python package dependencies
+├── requirements.yml          # Ansible Galaxy collections
 └── tasks/
     ├── process_execution_item.yml    # Task execution handler
     └── process_execution_order.yml   # Main execution orchestrator
@@ -34,6 +36,58 @@ Before running the installer, ensure you have:
 3. `helm` v3.x installed
 4. NGC API credentials (API key and Docker API key)
 5. Python 3.x and pip installed
+
+### Setting Up Python Environment
+
+1. Create and activate a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Linux/Mac
+# or
+.\venv\Scripts\activate  # On Windows
+```
+
+2. Install Python dependencies:
+```bash
+# Install Python packages
+pip install -r requirements.txt
+
+# The requirements include:
+# - ansible>=2.10
+# - openshift
+# - kubernetes
+# - PyYAML
+# - kubernetes-validate>=1.28.0
+```
+
+### Installing Ansible Collections
+
+Install required Ansible collections from Galaxy:
+```bash
+# Install collections from requirements.yml
+ansible-galaxy collection install -r requirements.yml
+
+# Collections included:
+# - community.general
+# - kubernetes.core
+```
+
+### Verifying Installation
+
+Verify the installation of required components:
+```bash
+# Check Python packages
+pip list | grep -E "ansible|kubernetes|openshift|PyYAML"
+
+# Check Ansible collections
+ansible-galaxy collection list | grep -E "community.general|kubernetes.core"
+
+# Check kubectl version
+kubectl version --client
+
+# Check helm version
+helm version
+```
 
 ## Required Environment Variables
 
@@ -72,9 +126,9 @@ export NGC_DOCKER_API_KEY="your-ngc-docker-api-key"
 - Chart: `keda`
 - Purpose: Kubernetes Event-driven Autoscaling
 
-### 5. NIM (NVIDIA Instance Manager)
+### 5. NIM (NVIDIA NIM Operator)
 - Namespace: `nim`
-- Chart: `nvidia-instance-manager`
+- Chart: `k8s-nim-operator`
 - Purpose: GPU instance management
 
 ## Roles
