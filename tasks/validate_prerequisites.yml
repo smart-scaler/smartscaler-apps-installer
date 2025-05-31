@@ -1,0 +1,57 @@
+---
+- name: Load and display user_input.yml content
+  debug:
+    var: user_input
+    verbosity: 1
+
+- name: Validate required environment variables
+  fail:
+    msg: |
+      The following required variables are not set:
+      {% if not ngc_api_key %}
+      - NGC_API_KEY
+      {% endif %}
+      {% if not ngc_docker_api_key %}
+      - NGC_DOCKER_API_KEY
+      {% endif %}
+      {% if not avesha_docker_username %}
+      - AVESHA_DOCKER_USERNAME
+      {% endif %}
+      {% if not avesha_docker_password %}
+      - AVESHA_DOCKER_PASSWORD
+      {% endif %}
+      
+      Please set these variables using one of:
+      1. Environment variables
+      2. Command line arguments (-e)
+      3. Vault file (group_vars/all/vault.yml)
+  when: not ngc_api_key or not ngc_docker_api_key or not avesha_docker_username or not avesha_docker_password
+
+- name: Validate kubeconfig settings
+  block:
+    - name: Check if kubeconfig file exists
+      stat:
+        path: "{{ global_kubeconfig }}"
+      register: kubeconfig_stat
+      when: global_kubeconfig is defined
+
+    - name: Fail if kubeconfig doesn't exist
+      fail:
+        msg: "Kubeconfig file {{ global_kubeconfig }} does not exist. Please provide a valid kubeconfig file path in user_input.yml (global_kubeconfig)."
+      when: 
+        - global_kubeconfig is defined
+        - not kubeconfig_stat.stat.exists
+
+    - name: Get cluster info
+      kubernetes.core.k8s_cluster_info:
+        kubeconfig: "{{ global_kubeconfig }}"
+        context: "{{ global_kubecontext | default(omit) }}"
+      register: k8s_cluster_info
+
+    - name: Debug cluster info
+      debug:
+        msg: |
+          Successfully connected to Kubernetes cluster:
+          - API Server: {{ k8s_cluster_info.connection.host }}
+          - Context: {{ global_kubecontext | default("current-context") }}
+          - Server Version: {{ k8s_cluster_info.version.server.kubernetes.gitVersion }} 

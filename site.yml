@@ -80,6 +80,9 @@
           {%- endif %}
 
   tasks:
+    - name: Validate prerequisites
+      include_tasks: "tasks/validate_prerequisites.yml"
+
     - name: Include execution order
       include_tasks: "tasks/process_execution_order.yml"
       vars:

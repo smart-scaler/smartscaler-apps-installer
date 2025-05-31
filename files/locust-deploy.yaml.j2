@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ locust_name | default('locust-load') }}
+  namespace: {{ locust_namespace | default('nim-load-test') }}
+  labels:
+    app: {{ locust_name | default('locust-load') }}
+spec:
+  replicas: {{ locust_replicas | default(1) }}
+  selector:
+    matchLabels:
+      app: {{ locust_name | default('locust-load') }}
+  template:
+    metadata:
+      labels:
+        app: {{ locust_name | default('locust-load') }}
+    spec:
+      containers:
+        - name: locust
+          image: {{ locust_image | default('locustio/locust:2.15.1') }}
+          command: ["locust"]
+          args:
+            - "-f"
+            - "/locust/locustfile.py"
+            - "--headless"
+            - "--host"
+            - "{{ locust_target_host | default('http://meta-llama3-8b-instruct.nim.svc.cluster.local:8000') }}"
+          volumeMounts:
+            - name: locustfile
+              mountPath: /locust
+          resources:
+            requests:
+              cpu: {{ locust_cpu_request | default('1') }}
+              memory: {{ locust_memory_request | default('1Gi') }}
+            limits:
+              cpu: {{ locust_cpu_limit | default('2') }}
+              memory: {{ locust_memory_limit | default('2Gi') }}
+      volumes:
+        - name: locustfile
+          configMap:
+            name: {{ locust_configmap_name | default('locustfile') }} 

@@ -41,6 +41,7 @@ execution_order:
   - create_inference_pod_configmap
   - smart_scaler_inference
   - create_locust_configmap
+  - locust_manifest
 
 helm_charts:
   gpu_operator_chart:
@@ -306,6 +307,31 @@ manifests:
       smart_scaler_config_mount_path: "/data"
       smart_scaler_ports: [9900, 8265, 4321, 6379]
       smart_scaler_image_pull_secret: "avesha-systems"
+
+  locust_manifest:
+    name: locust-setup
+    manifest_file: "files/locust-deploy.yaml.j2"
+    namespace: nim-load-test
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: Available
+      status: "True"
+    validate: true
+    strict_validation: true
+    variables:
+      locust_name: "locust-load"
+      locust_namespace: "nim-load-test"
+      locust_replicas: 1
+      locust_image: "locustio/locust:2.15.1"
+      locust_target_host: "http://meta-llama3-8b-instruct.nim.svc.cluster.local:8000"
+      locust_cpu_request: "1"
+      locust_memory_request: "1Gi"
+      locust_cpu_limit: "2"
+      locust_memory_limit: "2Gi"
+      locust_configmap_name: "locustfile"
 
 # Command execution configuration
 command_exec:

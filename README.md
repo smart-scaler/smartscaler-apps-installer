@@ -204,6 +204,8 @@ command_exec:
     ...
   - name: "verify_ngc_secrets"
     ...
+
+
 ```
 
 ### NIM Cache Configuration
@@ -286,7 +288,14 @@ export NGC_DOCKER_API_KEY="your-ngc-docker-api-key"
 cp /path/to/your/kubeconfig files/kubeconfig
 ```
 
-5. Run the installation:
+5. Update kubeconfig settings in user_input.yml:
+```yaml
+# Kubeconfig settings
+global_kubeconfig: "files/kubeconfig"
+global_kubecontext: "your-cluster-context"
+```
+
+6. Run the installation:
 ```bash
 # Basic execution
 ansible-playbook site.yml
