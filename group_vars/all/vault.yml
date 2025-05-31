@@ -1,0 +1,4 @@
+---
+# NGC API credentials
+ngc_docker_api_key: ""  # Your NGC Docker API key
+ngc_api_key: ""        # Your NGC API key 

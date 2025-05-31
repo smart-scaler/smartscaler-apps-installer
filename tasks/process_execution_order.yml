@@ -1,8 +1,7 @@
 ---
-- name: Process each item in execution_order
+# Process each item in execution order
+- name: Process execution items
   include_tasks: tasks/process_execution_item.yml
   vars:
-    item_name: "{{ item }}"
-  loop: "{{ execution_order }}"
-
-    # Add similar blocks for manifests and commands as needed 
+    execution_item: "{{ item }}"
+  loop: "{{ execution_order }}" 

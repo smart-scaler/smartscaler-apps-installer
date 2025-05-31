@@ -1,6 +1,5 @@
 # user_input.yml
-# Example user-provided variables for Ansible
-
+---
 # Global image pull secret settings
 global_image_pull_secret:
   repository: "https://index.docker.io/v1/"
@@ -20,12 +19,22 @@ global_repo_username: ""
 global_repo_password: ""
 readd_helm_repos: true
 
+# NGC credentials can be provided via:
+# 1. Environment variables (NGC_API_KEY, NGC_DOCKER_API_KEY)
+# 2. Ansible vault
+# 3. Direct configuration (not recommended for production)
+ngc_api_key: "{{ lookup('env', 'NGC_API_KEY') }}"
+ngc_docker_api_key: "{{ lookup('env', 'NGC_DOCKER_API_KEY') }}"
+
+# Execution configuration
 execution_order:
   - gpu_operator_chart
   - prometheus_stack
   - pushgateway_manifest
   - keda_chart
   - nim_operator_chart
+  - create_ngc_secrets
+  - verify_ngc_secrets
 
 helm_charts:
   gpu_operator_chart:
@@ -80,8 +89,6 @@ helm_charts:
 
       prometheusOperator:
         enabled: true
-        # nodeSelector:
-        # tolerations:
         admissionWebhooks:
           enabled: true
           patch:
@@ -108,7 +115,7 @@ helm_charts:
     create_namespace: true
     wait: true
     chart_repo_url: "https://kedacore.github.io/charts"
-    chart_version: "2.12.1"  # Using the latest stable version
+    chart_version: "2.12.1"
 
   nim_operator_chart:
     release_name: nim
@@ -117,7 +124,7 @@ helm_charts:
     create_namespace: true
     wait: true
     chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
-    chart_version: "v1.0.1"  # Using a stable version
+    chart_version: "v1.0.1"
 
 manifests:
   pushgateway_manifest:
@@ -132,4 +139,63 @@ manifests:
       type: Available
       status: "True"
     validate: true
-    strict_validation: true 
+    strict_validation: true
+
+# Command execution configuration
+command_exec:
+  - name: "create_ngc_secrets"
+    kubeconfig: "{{ global_kubeconfig }}"
+    kubecontext: "{{ global_kubecontext }}"
+    commands:
+      # First check if secrets exist
+      - cmd: |
+          if kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            -n nim get secret ngc-secret >/dev/null 2>&1; then
+            echo "Secret ngc-secret exists, replacing..."
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+              --context={{ kubecontext | default(global_kubecontext) }} \
+              -n nim delete secret ngc-secret
+          fi
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            -n nim create secret docker-registry ngc-secret \
+            --docker-server=nvcr.io \
+            --docker-username='$oauthtoken' \
+            --docker-password="${NGC_DOCKER_API_KEY}" \
+            --docker-email='your.email@solo.io'
+        env:
+          NGC_DOCKER_API_KEY: "{{ ngc_docker_api_key }}"
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
+      
+      # Handle ngc-api-secret
+      - cmd: |
+          if kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            get secret ngc-api-secret -n nim >/dev/null 2>&1; then
+            echo "Secret ngc-api-secret exists, replacing..."
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+              --context={{ kubecontext | default(global_kubecontext) }} \
+              delete secret ngc-api-secret -n nim
+          fi
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            create secret generic ngc-api-secret -n nim\
+            --from-literal=NGC_API_KEY="${NGC_API_KEY}"
+        env:
+          NGC_API_KEY: "{{ ngc_api_key }}"
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}" 
+
+  - name: "verify_ngc_secrets"
+    commands:
+      - cmd: "kubectl get secret ngc-secret -n nim -o jsonpath={.metadata.name} --kubeconfig={{ global_kubeconfig }} --context={{ global_kubecontext }}"
+        env:
+          KUBECONFIG: "{{ global_kubeconfig }}"
+          KUBECONTEXT: "{{ global_kubecontext }}"
+        ignore_errors: true
+      - cmd: "kubectl get secret ngc-api-secret -n nim -o jsonpath={.metadata.name} --kubeconfig={{ global_kubeconfig }} --context={{ global_kubecontext }}"
+        env:
+          KUBECONFIG: "{{ global_kubeconfig }}"
+          KUBECONTEXT: "{{ global_kubecontext }}"
+        ignore_errors: true 
+

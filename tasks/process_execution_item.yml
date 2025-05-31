@@ -1,21 +1,77 @@
 ---
-- name: Check if item is a helm chart
+# Determine item type and load configuration
+- name: Load item configuration
   set_fact:
-    helm_chart_item: "{{ helm_charts[item_name] if item_name in helm_charts else None }}"
-    manifest_item: "{{ manifests[item_name] if item_name in manifests else None }}"
+    current_item: >-
+      {{
+        helm_charts[execution_item] if (helm_charts is defined and execution_item in helm_charts)
+        else manifests[execution_item] if (manifests is defined and execution_item in manifests)
+        else kubectl_commands | selectattr('name', 'equalto', execution_item) | first
+        if (kubectl_commands is defined and kubectl_commands | selectattr('name', 'equalto', execution_item) | list | length > 0)
+        else (command_exec | default([]) | selectattr('name', 'equalto', execution_item) | first)
+        if (command_exec is defined and command_exec | default([]) | selectattr('name', 'equalto', execution_item) | list | length > 0)
+        else {}
+      }}
+    item_type: >-
+      {{
+        'helm' if (helm_charts is defined and execution_item in helm_charts)
+        else 'manifest' if (manifests is defined and execution_item in manifests)
+        else 'kubectl' if (kubectl_commands is defined and kubectl_commands | selectattr('name', 'equalto', execution_item) | list | length > 0)
+        else 'command' if (command_exec is defined and command_exec | default([]) | selectattr('name', 'equalto', execution_item) | list | length > 0)
+        else 'unknown'
+      }}
 
-- name: Install Helm chart if applicable
+# Process based on type
+- name: Process helm chart
   include_role:
     name: helm_chart_install
   vars:
-    item: "{{ helm_chart_item }}"
-  when: helm_chart_item is not none and helm_chart_item != ""
+    item: "{{ current_item }}"
+  when: item_type == 'helm'
 
-- name: Apply manifest if applicable
+- name: Process manifest
   include_role:
     name: manifest_install
   vars:
-    item: "{{ manifest_item }}"
-  when: manifest_item is not none and manifest_item != ""
+    item: "{{ current_item }}"
+  when: item_type == 'manifest'
 
-# Add similar blocks for manifests and commands as needed 
+- name: Process kubectl commands
+  include_role:
+    name: kubectl_command
+  vars:
+    item: "{{ current_item }}"
+  when: item_type == 'kubectl'
+
+- name: Process command
+  when: item_type == 'command'
+  block:
+    - name: Set command variables
+      set_fact:
+        kubeconfig: "{{ current_item.kubeconfig | default(global_kubeconfig) }}"
+        kubecontext: "{{ current_item.kubecontext | default(global_kubecontext) }}"
+
+    - name: Verify kubeconfig exists
+      stat:
+        path: "{{ kubeconfig }}"
+      register: kubeconfig_stat
+      when: kubeconfig is defined and kubeconfig != ''
+
+    - name: Fail if kubeconfig doesn't exist
+      fail:
+        msg: "Kubeconfig file {{ kubeconfig }} does not exist"
+      when: kubeconfig is defined and kubeconfig != '' and not kubeconfig_stat.stat.exists
+
+    - name: Execute command
+      shell: "{{ cmd_item.cmd }}"
+      environment: "{{ cmd_item.env | default({}) | combine({'KUBECONFIG': kubeconfig}) }}"
+      loop: "{{ current_item.commands }}"
+      loop_control:
+        loop_var: cmd_item
+      register: cmd_result
+      failed_when: 
+        - cmd_result.rc != 0 
+        - not cmd_item.ignore_errors | default(false)
+      changed_when: cmd_result.rc == 0
+
+# Handle other types (helm, manifests, etc) here if needed 

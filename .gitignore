@@ -47,3 +47,33 @@ kubeconfig
 files/kubeconfig
 .kube/
 .kube/config
+
+# Ansible Vault files
+.vault_pass
+vault.pass
+*.vault_pass
+*vault_pass*
+
+# Environment variables and secrets
+.env
+*.env
+.env.*
+.envrc
+
+# NGC credentials and secrets
+*ngc*.key
+*ngc*.secret
+*ngc*.token
+*ngc*.json
+
+# Temporary files
+*.tmp
+*~
+*.bak
+*.swp
+*.swo
+
+# Local development files
+local.*
+*.local
+*.local.*

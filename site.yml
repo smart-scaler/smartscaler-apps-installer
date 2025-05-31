@@ -1,10 +1,42 @@
 # site.yml
 # Master playbook for smartscaler-apps-installer
 ---
-- hosts: localhost
-  gather_facts: false
+- name: Deploy Smart Scaler Components
+  hosts: localhost
+  gather_facts: true
   vars_files:
-    - user_input.yml
+    - "{{ lookup('env', 'VARS_FILE', default='user_input.yml') }}"
+
+  vars:
+    # Check if vault file exists
+    vault_file_exists: "{{ lookup('ansible.builtin.file', 'group_vars/all/vault.yml', errors='ignore') != '' }}"
+    
+    # Default empty values - only load vault if file exists
+    vault_ngc_api_key: "{{ lookup('ansible.builtin.vars', 'vault_ngc_api_key', default='') if vault_file_exists else '' }}"
+    vault_ngc_docker_api_key: "{{ lookup('ansible.builtin.vars', 'vault_ngc_docker_api_key', default='') if vault_file_exists else '' }}"
+    
+    # Priority order: CLI vars (-e) > Environment vars > Vault vars > Defaults
+    ngc_api_key: "{{ ngc_api_key | default(lookup('env', 'NGC_API_KEY') | default(vault_ngc_api_key | default(''))) }}"
+    ngc_docker_api_key: "{{ ngc_docker_api_key | default(lookup('env', 'NGC_DOCKER_API_KEY') | default(vault_ngc_docker_api_key | default(''))) }}"
+
+  pre_tasks:
+    - name: Verify required variables
+      fail:
+        msg: "Required variables are not set. Please check configuration."
+      when: not ngc_api_key or not ngc_docker_api_key
+
+    - name: Show credential source
+      debug:
+        msg: >-
+          Using NGC credentials from: 
+          {%- if ngc_api_key == lookup('env', 'NGC_API_KEY') %} environment variables
+          {%- else %} command line arguments
+          {%- endif %}
+
   tasks:
-    - name: Process execution order
-      include_tasks: tasks/process_execution_order.yml
+    - name: Include execution order
+      include_tasks: "tasks/process_execution_order.yml"
+      vars:
+        execution_vars:
+          ngc_api_key: "{{ ngc_api_key }}"
+          ngc_docker_api_key: "{{ ngc_docker_api_key }}"

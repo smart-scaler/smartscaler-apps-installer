@@ -1,0 +1,12 @@
+---
+# Execute shell commands with environment variables
+- name: Execute command
+  shell: "{{ command.cmd }}"
+  environment: "{{ command.env | default({}) }}"
+  register: command_output
+  when: command.cmd is defined
+
+- name: Debug command output
+  debug:
+    var: command_output
+  when: command.debug | default(false) | bool 
