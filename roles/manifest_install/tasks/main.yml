@@ -1,0 +1,80 @@
+---
+- name: Set effective variables with global fallback
+  set_fact:
+    effective_kubeconfig: "{{ item.kubeconfig | default(global_kubeconfig) }}"
+    effective_kubecontext: "{{ item.kubecontext | default(global_kubecontext) }}"
+    effective_namespace: "{{ item.namespace | default('default') }}"
+
+- name: Check if namespace exists
+  kubernetes.core.k8s_info:
+    kind: Namespace
+    name: "{{ effective_namespace }}"
+    kubeconfig: "{{ effective_kubeconfig }}"
+    context: "{{ effective_kubecontext }}"
+  register: namespace_check
+  when: effective_namespace != 'default'
+
+- name: Create namespace if not exists
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ effective_namespace }}"
+        labels:
+          name: "{{ effective_namespace }}"
+    kubeconfig: "{{ effective_kubeconfig }}"
+    context: "{{ effective_kubecontext }}"
+  when: effective_namespace != 'default' and (namespace_check.resources | length == 0)
+
+- name: Create temporary manifest file for inline content
+  copy:
+    content: "{{ item.manifest_content | to_yaml }}"
+    dest: "/tmp/{{ item.name }}-manifest.yaml"
+  when: item.manifest_content is defined and item.manifest_content != None
+  register: temp_manifest
+
+- name: Set template variables
+  set_fact:
+    template_vars: "{{ item.variables | default({}) | combine({'namespace': item.variables.namespace}) }}"
+  when: item.variables is defined and item.variables.namespace is defined
+
+- name: Create temporary manifest file from template
+  template:
+    src: "{{ item.manifest_file }}"
+    dest: "/tmp/{{ item.name }}-rendered-manifest.yaml"
+  vars:
+    namespace: "{{ item.variables.namespace | default('default') }}"
+  when: item.manifest_file is defined and item.manifest_file != None
+  register: temp_rendered_manifest
+
+- name: Apply manifest from file
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ temp_rendered_manifest.dest if (temp_rendered_manifest is defined and temp_rendered_manifest.dest is defined) else (item.manifest_file if item.manifest_file is defined else temp_manifest.dest) }}"
+    kubeconfig: "{{ effective_kubeconfig }}"
+    context: "{{ effective_kubecontext }}"
+    namespace: "{{ effective_namespace }}"
+    wait: "{{ item.wait | default(false) }}"
+    wait_timeout: "{{ item.wait_timeout | default(300) }}"
+    validate:
+      fail_on_error: "{{ item.validate | default(true) }}"
+      strict: "{{ item.strict_validation | default(true) }}"
+  register: manifest_result
+  when: (temp_rendered_manifest is defined and temp_rendered_manifest.dest is defined) or 
+        (item.manifest_file is defined and item.manifest_file != None) or 
+        (temp_manifest is defined and temp_manifest.dest is defined)
+
+- name: Remove temporary manifest files
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - "{{ temp_manifest.dest | default('') }}"
+    - "{{ temp_rendered_manifest.dest | default('') }}"
+  when: item != ''
+
+- name: Debug manifest result
+  debug:
+    var: manifest_result 

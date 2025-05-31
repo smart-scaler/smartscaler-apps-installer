@@ -1,0 +1,21 @@
+---
+- name: Check if item is a helm chart
+  set_fact:
+    helm_chart_item: "{{ helm_charts[item_name] if item_name in helm_charts else None }}"
+    manifest_item: "{{ manifests[item_name] if item_name in manifests else None }}"
+
+- name: Install Helm chart if applicable
+  include_role:
+    name: helm_chart_install
+  vars:
+    item: "{{ helm_chart_item }}"
+  when: helm_chart_item is not none and helm_chart_item != ""
+
+- name: Apply manifest if applicable
+  include_role:
+    name: manifest_install
+  vars:
+    item: "{{ manifest_item }}"
+  when: manifest_item is not none and manifest_item != ""
+
+# Add similar blocks for manifests and commands as needed 

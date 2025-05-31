@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pushgateway
+  namespace: {{ namespace }}
+  labels:
+    function: pushgateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      function: pushgateway
+  template:
+    metadata:
+      labels:
+        function: pushgateway
+    spec:
+      containers:
+      - name: pushgateway
+        image: prom/pushgateway
+        imagePullPolicy: IfNotPresent
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: 'pushgateway'
+  namespace: {{ namespace }}
+  labels:
+    function: 'pushgateway-target'
+spec:
+  type: 'ClusterIP'
+  selector:
+    function: 'pushgateway'
+  ports:
+    # 'name' is important, it will be referred by ServiceMonitor configuration
+    - name: 'pushgateway'
+      protocol: 'TCP'
+      port: 9091
+      targetPort: 9091
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pushgateway
+  namespace: {{ namespace }}
+  labels:
+    release: prometheus
+spec:
+  endpoints:
+  - port: 'pushgateway' # must match the label from Service declaration
+    path: /metrics
+    interval: 5s
+  namespaceSelector:
+    matchNames:
+    - {{ namespace }}
+  selector:
+    matchLabels:
+      function: 'pushgateway-target' 

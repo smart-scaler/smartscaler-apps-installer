@@ -1,0 +1,49 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches
+.cache/
+
+# Ansible specific
+*.retry
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# SSH files
+*.pem
+*.key
+
+# Inventory files that are generated
+inventory/*.ini
+inventory/*.yaml
+inventory/*.yml
+
+# Vault password files
+.vault_pass.txt
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project 
+
+# Python virtual environments
+.venv/
+venv/
+ENV/
+
+# Kubernetes config files
+kubeconfig
+**/kubeconfig
+files/kubeconfig
+.kube/
+.kube/config

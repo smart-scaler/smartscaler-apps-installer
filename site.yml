@@ -1,0 +1,10 @@
+# site.yml
+# Master playbook for smartscaler-apps-installer
+---
+- hosts: localhost
+  gather_facts: false
+  vars_files:
+    - user_input.yml
+  tasks:
+    - name: Process execution order
+      include_tasks: tasks/process_execution_order.yml

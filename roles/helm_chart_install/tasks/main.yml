@@ -1,0 +1,44 @@
+---
+- name: Set effective Helm variables with global fallback
+  set_fact:
+    effective_kubeconfig: "{{ item.kubeconfig | default(global_kubeconfig) }}"
+    effective_kubecontext: "{{ item.kubecontext | default(global_kubecontext) }}"
+    effective_chart_repo_url: "{{ item.chart_repo_url | default(global_chart_repo_url) }}"
+    effective_repo_username: "{{ item.repo_username | default(global_repo_username) }}"
+    effective_repo_password: "{{ item.repo_password | default(global_repo_password) }}"
+    effective_use_local_chart: "{{ item.use_local_chart | default(use_local_charts) }}"
+    effective_local_chart_path: "{{ item.local_chart_path | default(local_charts_path) }}"
+    effective_readd_helm_repo: "{{ item.readd_helm_repo | default(readd_helm_repos) }}"
+
+- name: Generate random string for temporary repo name
+  set_fact:
+    temp_repo_name: "{{ 999999999 | random | string }}"
+  when: not effective_use_local_chart
+
+- name: Add Helm repository
+  kubernetes.core.helm_repository:
+    name: "{{ temp_repo_name }}"
+    repo_url: "{{ effective_chart_repo_url }}"
+    username: "{{ effective_repo_username }}"
+    password: "{{ effective_repo_password }}"
+    repo_state: present
+  when: not effective_use_local_chart and effective_readd_helm_repo
+
+- name: Install/Upgrade Helm chart
+  kubernetes.core.helm:
+    name: "{{ item.release_name }}"
+    chart_ref: "{{ temp_repo_name + '/' + item.chart_ref if not effective_use_local_chart else effective_local_chart_path + '/' + item.chart_ref }}"
+    chart_version: "{{ item.chart_version | default(omit) }}"
+    release_namespace: "{{ item.release_namespace }}"
+    create_namespace: "{{ item.create_namespace | default(true) }}"
+    kubeconfig: "{{ effective_kubeconfig }}"
+    context: "{{ effective_kubecontext }}"
+    wait: "{{ item.wait | default(false) }}"
+    values: "{{ item.release_values | default({}) }}"
+    state: present
+
+- name: Remove temporary Helm repository
+  kubernetes.core.helm_repository:
+    name: "{{ temp_repo_name }}"
+    repo_state: absent
+  when: not effective_use_local_chart and effective_readd_helm_repo 

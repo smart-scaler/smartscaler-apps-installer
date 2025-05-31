@@ -1,0 +1,8 @@
+---
+- name: Process each item in execution_order
+  include_tasks: tasks/process_execution_item.yml
+  vars:
+    item_name: "{{ item }}"
+  loop: "{{ execution_order }}"
+
+    # Add similar blocks for manifests and commands as needed 

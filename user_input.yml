@@ -1,0 +1,135 @@
+# user_input.yml
+# Example user-provided variables for Ansible
+
+# Global image pull secret settings
+global_image_pull_secret:
+  repository: "https://index.docker.io/v1/"
+  username: ""
+  password: ""
+
+# Kubeconfig settings
+global_kubeconfig: "files/kubeconfig"
+global_kubecontext: "lke462675-ctx"
+use_global_context: true
+
+# Helm repository settings
+use_local_charts: false
+local_charts_path: "charts"
+global_chart_repo_url: ""
+global_repo_username: ""
+global_repo_password: ""
+readd_helm_repos: true
+
+execution_order:
+  - gpu_operator_chart
+  - prometheus_stack
+  - pushgateway_manifest
+  - keda_chart
+  - nim_operator_chart
+
+helm_charts:
+  gpu_operator_chart:
+    release_name: gpu-operator
+    chart_ref: gpu-operator
+    release_namespace: gpu-operator
+    create_namespace: true
+    wait: true
+    chart_version: v25.3.0
+    release_values:
+      mig:
+        strategy: none
+      dcgm:
+        enabled: true
+      driver:
+        enabled: false
+    chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
+
+  prometheus_stack:
+    release_name: prometheus
+    chart_ref: kube-prometheus-stack
+    release_namespace: monitoring
+    create_namespace: true
+    wait: true
+    chart_repo_url: "https://prometheus-community.github.io/helm-charts"
+    chart_version: "55.5.0"
+    release_values:
+      kubeEtcd:
+        enabled: false
+
+      prometheus:
+        prometheusSpec:
+          retention: 15d
+          additionalScrapeConfigs:
+            - job_name: gpu-metrics
+              scrape_interval: 1s
+              metrics_path: /metrics
+              scheme: http
+              kubernetes_sd_configs:
+                - role: endpoints
+                  namespaces:
+                    names:
+                      - monitoring
+                      - gpu-operator
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_endpoints_name]
+                  action: drop
+                  regex: .*-node-feature-discovery-master
+                - source_labels: [__meta_kubernetes_pod_node_name]
+                  action: replace
+                  target_label: kubernetes_node
+
+      prometheusOperator:
+        enabled: true
+        # nodeSelector:
+        # tolerations:
+        admissionWebhooks:
+          enabled: true
+          patch:
+            enabled: true
+
+      kubelet:
+        serviceMonitor:
+          https: false
+
+      grafana:
+        enabled: true
+        persistence:
+          enabled: true
+          size: 1Gi
+
+      defaultRules:
+        rules:
+          etcd: false
+
+  keda_chart:
+    release_name: keda
+    chart_ref: keda
+    release_namespace: keda
+    create_namespace: true
+    wait: true
+    chart_repo_url: "https://kedacore.github.io/charts"
+    chart_version: "2.12.1"  # Using the latest stable version
+
+  nim_operator_chart:
+    release_name: nim
+    chart_ref: k8s-nim-operator
+    release_namespace: nim
+    create_namespace: true
+    wait: true
+    chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
+    chart_version: "v1.0.1"  # Using a stable version
+
+manifests:
+  pushgateway_manifest:
+    name: pushgateway-setup
+    manifest_file: "files/pushgateway.yaml"
+    namespace: pushgateway-system
+    variables:
+      namespace: monitoring
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: Available
+      status: "True"
+    validate: true
+    strict_validation: true 
