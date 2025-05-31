@@ -131,6 +131,16 @@ export NGC_DOCKER_API_KEY="your-ngc-docker-api-key"
 - Chart: `k8s-nim-operator`
 - Purpose: GPU instance management
 
+### 6. NIM Cache
+- Namespace: `nim`
+- Type: Custom manifest
+- Purpose: Download and prep LLM models with NIM Cache
+- Features:
+  - Parameterized configuration
+  - GPU-aware scheduling
+  - NGC integration
+  - Persistent volume management
+
 ## Roles
 
 ### 1. helm_chart_install
@@ -191,6 +201,60 @@ command_exec:
   - name: "verify_ngc_secrets"
     ...
 ```
+
+### NIM Cache Configuration
+The NIM Cache manifest (`files/nim-cache.yaml.j2`) is highly parameterized and can be customized through `user_input.yml`:
+
+```yaml
+nim_cache_manifest:
+  name: nim-cache-setup
+  manifest_file: "files/nim-cache.yaml.j2"
+  namespace: nim
+  variables:
+    # Basic Configuration
+    nim_cache_name: "meta-llama3-8b-instruct"
+    nim_cache_namespace: "nim"
+    
+    # Runtime Configuration
+    nim_cache_runtime_class: "nvidia"
+    nim_cache_tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+    
+    # Model Configuration
+    nim_cache_model_puller: "nvcr.io/nim/meta/llama-3.1-8b-instruct:1.8.4"
+    nim_cache_model_engine: "vllm"
+    nim_cache_tensor_parallelism: "1"
+    nim_cache_qos_profile: "throughput"
+    
+    # Storage Configuration
+    nim_cache_pvc_create: true
+    nim_cache_storage_class: "local-path"
+    nim_cache_pvc_size: "200Gi"
+    nim_cache_volume_access_mode: "ReadWriteOnce"
+```
+
+#### Customization Options:
+1. **Basic Settings**
+   - `nim_cache_name`: Name of the NIM Cache resource
+   - `nim_cache_namespace`: Target namespace
+
+2. **Runtime Settings**
+   - `nim_cache_runtime_class`: Kubernetes runtime class
+   - `nim_cache_tolerations`: Node tolerations for GPU scheduling
+
+3. **Model Settings**
+   - `nim_cache_model_puller`: NGC model image
+   - `nim_cache_model_engine`: Model engine (e.g., vllm)
+   - `nim_cache_tensor_parallelism`: Tensor parallelism degree
+   - `nim_cache_qos_profile`: Quality of service profile
+
+4. **Storage Settings**
+   - `nim_cache_pvc_create`: Whether to create a new PVC
+   - `nim_cache_storage_class`: Storage class for PVC
+   - `nim_cache_pvc_size`: PVC size
+   - `nim_cache_volume_access_mode`: Volume access mode
 
 ## Installation
 
@@ -305,6 +369,3 @@ kubectl get all -n <namespace>
 4. Push to the branch
 5. Create a Pull Request
 
-## License
-
-[Add your license information here]

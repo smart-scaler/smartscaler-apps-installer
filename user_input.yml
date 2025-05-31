@@ -35,6 +35,7 @@ execution_order:
   - nim_operator_chart
   - create_ngc_secrets
   - verify_ngc_secrets
+  - nim_cache_manifest
 
 helm_charts:
   gpu_operator_chart:
@@ -140,6 +141,39 @@ manifests:
       status: "True"
     validate: true
     strict_validation: true
+
+  nim_cache_manifest:
+    name: nim-cache-setup
+    manifest_file: "files/nim-cache.yaml.j2"
+    namespace: nim
+    wait: true
+    wait_timeout: 600
+    wait_condition:
+      type: Available
+      status: "True"
+    validate: true
+    strict_validation: true
+    variables:
+      nim_cache_name: "meta-llama3-8b-instruct"
+      nim_cache_namespace: "nim"
+      nim_cache_runtime_class: "nvidia"
+      nim_cache_tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      nim_cache_model_puller: "nvcr.io/nim/meta/llama-3.1-8b-instruct:1.8.4"
+      nim_cache_pull_secret: "ngc-secret"
+      nim_cache_auth_secret: "ngc-api-secret"
+      nim_cache_model_engine: "vllm"
+      nim_cache_tensor_parallelism: "1"
+      nim_cache_qos_profile: "throughput"
+      nim_cache_model_profiles:
+        - "4f904d571fe60ff24695b5ee2aa42da58cb460787a968f1e8a09f5a7e862728d"
+      nim_cache_pvc_create: true
+      nim_cache_storage_class: "local-path"
+      nim_cache_pvc_size: "200Gi"
+      nim_cache_volume_access_mode: "ReadWriteOnce"
+      nim_cache_resources: {}
 
 # Command execution configuration
 command_exec:
