@@ -3,7 +3,7 @@
 # Kubernetes Deployment Configuration
 # Controls the setup and configuration of the Kubernetes cluster using Kubespray
 kubernetes_deployment:
-  enabled: true                               # Enable/disable Kubernetes cluster deployment
+  enabled: false                               # Enable/disable Kubernetes cluster deployment
   
   # Firewall Configuration
   firewall:
@@ -26,7 +26,7 @@ kubernetes_deployment:
   # Define the control plane (master) nodes for the Kubernetes cluster
   control_plane_nodes:                         # List of control plane nodes
     - name: master-k8s                        # Hostname/identifier for the node
-      ansible_host: 172.232.119.246          # IP address or DNS name of the node
+      ansible_host: 127.0.0.1          # IP address or DNS name of the node
       ansible_user: root                      # SSH user for this specific node
   
   # Kubernetes Components Configuration
@@ -42,7 +42,7 @@ global_image_pull_secret:
 
 # Kubeconfig settings
 global_kubeconfig: "files/kubeconfig"
-global_kubecontext: "lke462675-ctx"
+global_kubecontext: "kubecontext" 
 use_global_context: true
 
 # Helm repository settings
@@ -61,10 +61,10 @@ avesha_docker_password: "{{ lookup('env', 'AVESHA_DOCKER_PASSWORD') }}"
 
 # Validation Configuration
 validate_prerequisites:
-  enabled: false            
+  enabled: true            
 
 # Execution Configuration
-execution_order_enabled: false               # Enable/disable execution order tasks
+execution_order_enabled: true               # Enable/disable execution order tasks
 
 # Execution configuration
 execution_order:
