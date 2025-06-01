@@ -1,18 +1,26 @@
 # user_input.yml
 ---
 # Kubernetes Deployment Configuration
+# Controls the setup and configuration of the Kubernetes cluster using Kubespray
 kubernetes_deployment:
-  enabled: true
-  # SSH configuration
-  ssh_key_path: "/home/user/.ssh/k8s_rsa"  # Absolute Path to the SSH private key
-  default_ansible_user: "root"     # Default user for SSH connections
-  control_plane_nodes:
-    - name: master-k8s
-      ansible_host: 172.232.122.188
-      ansible_user: root 
-  network_plugin: calico
-  container_runtime: containerd
-  dns_mode: coredns
+  enabled: false                               # Enable/disable Kubernetes cluster deployment
+  
+  # SSH Configuration
+  # Required for Kubespray to access and configure nodes
+  ssh_key_path: "/home/user/.ssh/k8s_rsa"     # Absolute Path to SSH private key for node access
+  default_ansible_user: "root"                 # Default SSH user for node access
+  
+  # Node Configuration
+  # Define the control plane (master) nodes for the Kubernetes cluster
+  control_plane_nodes:                         # List of control plane nodes
+    - name: master-k8s                        # Hostname/identifier for the node
+      ansible_host: 127.0.0.1          # IP address or DNS name of the node
+      ansible_user: root                      # SSH user for this specific node
+  
+  # Kubernetes Components Configuration
+  network_plugin: calico                       # CNI plugin for pod networking (options: calico, flannel, etc.)
+  container_runtime: containerd                # Container runtime (options: containerd, docker)
+  dns_mode: coredns                           # DNS service for the cluster
 
 # Global image pull secret settings
 global_image_pull_secret:
@@ -38,6 +46,13 @@ ngc_api_key: "{{ lookup('env', 'NGC_API_KEY') }}"
 ngc_docker_api_key: "{{ lookup('env', 'NGC_DOCKER_API_KEY') }}"
 avesha_docker_username: "{{ lookup('env', 'AVESHA_DOCKER_USERNAME') }}"
 avesha_docker_password: "{{ lookup('env', 'AVESHA_DOCKER_PASSWORD') }}"
+
+# Validation Configuration
+validate_prerequisites:
+  enabled: true            
+
+# Execution Configuration
+execution_order_enabled: true                  # Enable/disable execution order tasks
 
 # Execution configuration
 execution_order:
