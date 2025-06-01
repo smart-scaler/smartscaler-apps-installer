@@ -17,6 +17,8 @@ k8s_workers: "{{ kubernetes_deployment.worker_nodes | default([]) }}"
 deploy_kubernetes: "{{ 'kubernetes' in execution_order }}"
 
 # SSH and connection settings
+ssh_key_path: "{{ user_input.kubernetes_deployment.ssh_key_path | default('~/.ssh/k8s_rsa') }}"
+default_ansible_user: "{{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}"
 ansible_ssh_common_args: '-o ControlMaster=auto -o ControlPersist=30m -o ConnectionAttempts=100'
 ansible_ssh_pipelining: true
 
@@ -44,4 +46,8 @@ kubespray_env:
 
 # Additional configurations that can be overridden
 kubespray_extra_args: ""
-kubespray_extra_env: {} 
+kubespray_extra_env: {}
+
+# Inventory and playbook paths
+inventory_dir: "{{ playbook_dir }}/inventory"
+kubespray_dir: "{{ playbook_dir }}/kubespray" 
