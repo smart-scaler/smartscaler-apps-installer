@@ -35,13 +35,14 @@ Before running the installer, ensure you have:
 2. `kubectl` installed and configured
 3. `helm` v3.x installed
 4. NGC API credentials (API key and Docker API key)
-5. Python 3.x and pip installed
+5. AVESHA Docker Credentials 
+6. Python 3.x and pip installed
 
 ### Setting Up Python Environment
 
 1. Create and activate a virtual environment:
 ```bash
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # On Linux/Mac
 # or
 .\venv\Scripts\activate  # On Windows
