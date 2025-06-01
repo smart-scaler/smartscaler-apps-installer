@@ -2,9 +2,9 @@
 ---
 # Kubernetes Deployment Configuration
 kubernetes_deployment:
-  enabled: false
+  enabled: true
   control_plane_nodes:
-    - name: master1
+    - name: master-k8s
       ansible_host: 172.232.122.188
       ansible_user: root 
   network_plugin: calico
