@@ -2,7 +2,7 @@
 # Master playbook for smartscaler-apps-installer
 ---
 - name: Deploy Smart Scaler Components
-  hosts: localhost
+  hosts: "{{ 'all' if kubernetes_deployment.kubeconfig.use_remote | default(false) else 'localhost' }}"
   gather_facts: true
   vars_files:
     - "{{ lookup('env', 'VARS_FILE', default='user_input.yml') }}"
@@ -12,28 +12,51 @@
       stat:
         path: group_vars/all/vault.yml
       register: vault_file
+      delegate_to: localhost
+      run_once: true
 
     - name: Include vault file if it exists
       include_vars:
         file: group_vars/all/vault.yml
       when: vault_file.stat.exists
       ignore_errors: true
+      delegate_to: localhost
+      run_once: true
 
     - name: Set NGC API key
       set_fact:
         ngc_api_key: "{{ ngc_api_key | default(lookup('env', 'NGC_API_KEY')) | default(vault_ngc_api_key | default('')) }}"
+      delegate_to: localhost
+      run_once: true
 
     - name: Set NGC Docker API key
       set_fact:
         ngc_docker_api_key: "{{ ngc_docker_api_key | default(lookup('env', 'NGC_DOCKER_API_KEY')) | default(vault_ngc_docker_api_key | default('')) }}"
+      delegate_to: localhost
+      run_once: true
 
     - name: Set Avesha Docker username
       set_fact:
         avesha_docker_username: "{{ avesha_docker_username | default(lookup('env', 'AVESHA_DOCKER_USERNAME')) | default(vault_avesha_docker_username | default('')) }}"
+      delegate_to: localhost
+      run_once: true
 
     - name: Set Avesha Docker password
       set_fact:
         avesha_docker_password: "{{ avesha_docker_password | default(lookup('env', 'AVESHA_DOCKER_PASSWORD')) | default(vault_avesha_docker_password | default('')) }}"
+      delegate_to: localhost
+      run_once: true
+
+    # Set up remote kubectl if using remote execution
+    - name: Set remote kubectl prefix
+      set_fact:
+        remote_kubectl: "KUBECONFIG={{ kubernetes_deployment.kubeconfig.remote_path | default('/etc/kubernetes/admin.conf') }}"
+      when: kubernetes_deployment.kubeconfig.use_remote | default(false)
+
+    - name: Set local kubectl prefix
+      set_fact:
+        remote_kubectl: "KUBECONFIG={{ global_kubeconfig }}"
+      when: not kubernetes_deployment.kubeconfig.use_remote | default(false)
 
     - name: Debug variable values
       debug:
@@ -42,6 +65,11 @@
           NGC Docker API Key: {{ 'set' if ngc_docker_api_key else 'not set' }}
           Avesha Docker Username: {{ 'set' if avesha_docker_username else 'not set' }}
           Avesha Docker Password: {{ 'set' if avesha_docker_password else 'not set' }}
+          Using Remote Execution: {{ 'yes' if kubernetes_deployment.kubeconfig.use_remote | default(false) else 'no' }}
+          Target Host: {{ inventory_hostname }}
+          Environment: {{ remote_kubectl }}
+      delegate_to: localhost
+      run_once: true
 
     - name: Verify required variables
       fail:
@@ -65,6 +93,8 @@
           2. Command line arguments (-e)
           3. Vault file (group_vars/all/vault.yml)
       when: not ngc_api_key or not ngc_docker_api_key or not avesha_docker_username or not avesha_docker_password
+      delegate_to: localhost
+      run_once: true
 
     - name: Show credential source
       debug:
@@ -78,18 +108,39 @@
           {%- if avesha_docker_username == lookup('env', 'AVESHA_DOCKER_USERNAME') %} environment variables
           {%- else %} command line arguments or vault
           {%- endif %}
+      delegate_to: localhost
+      run_once: true
+
+    - name: Include user input
+      include_vars:
+        file: user_input.yml
+      delegate_to: localhost
+      run_once: true
+
+    # Ensure kubeconfig permissions before validation
+    - name: Ensure kubeconfig permissions
+      include_tasks: tasks/ensure_kubeconfig_permissions.yml
+        
+    - name: Validate prerequisites
+      include_tasks: tasks/validate_prerequisites.yml
+      
+    - name: Get master kubeconfig
+      include_tasks: tasks/get_master_kubeconfig.yml
+      when: kubernetes_deployment is defined and kubernetes_deployment.enabled | default(false)
 
   tasks:
-    - name: Validate prerequisites
-      include_tasks: "tasks/validate_prerequisites.yml"
-      when: validate_prerequisites.enabled | default(true)
+    - name: Debug execution configuration
+      debug:
+        msg: |
+          Execution Configuration:
+          - Execution Order Enabled: {{ execution_order_enabled | default(true) }}
+          - Execution Order Items: {{ execution_order | default([]) | to_nice_json }}
+          - Remote Execution: {{ kubernetes_deployment.kubeconfig.use_remote | default(false) }}
+          - Target Host: {{ inventory_hostname }}
+          - Environment: {{ remote_kubectl }}
+      delegate_to: localhost
+      run_once: true
 
-    - name: Include execution order
-      include_tasks: "tasks/process_execution_order.yml"
-      vars:
-        execution_vars:
-          ngc_api_key: "{{ ngc_api_key }}"
-          ngc_docker_api_key: "{{ ngc_docker_api_key }}"
-          avesha_docker_username: "{{ avesha_docker_username }}"
-          avesha_docker_password: "{{ avesha_docker_password }}"
-      when: execution_order_enabled | default(true)
+    - name: Process execution order
+      include_tasks: tasks/process_execution_order.yml
+      when: execution_order_enabled | default(true) and execution_order is defined and execution_order | length > 0

@@ -27,7 +27,8 @@
       3. Vault file (group_vars/all/vault.yml)
   when: not ngc_api_key or not ngc_docker_api_key or not avesha_docker_username or not avesha_docker_password
 
-- name: Validate kubeconfig settings
+# Local validation path
+- name: Validate local kubeconfig settings
   block:
     - name: Check if kubeconfig file exists
       stat:
@@ -42,16 +43,64 @@
         - global_kubeconfig is defined
         - not kubeconfig_stat.stat.exists
 
-    - name: Get cluster info
+    - name: Get cluster info (local)
       kubernetes.core.k8s_cluster_info:
         kubeconfig: "{{ global_kubeconfig }}"
         context: "{{ global_kubecontext | default(omit) }}"
       register: k8s_cluster_info
 
-    - name: Debug cluster info
+    - name: Debug cluster info (local)
       debug:
         msg: |
           Successfully connected to Kubernetes cluster:
           - API Server: {{ k8s_cluster_info.connection.host }}
           - Context: {{ global_kubecontext | default("current-context") }}
-          - Server Version: {{ k8s_cluster_info.version.server.kubernetes.gitVersion }} 
+          - Server Version: {{ k8s_cluster_info.version.server.kubernetes.gitVersion }}
+  when: not kubernetes_deployment.kubeconfig.use_remote | default(false)
+
+# Remote validation path
+- name: Validate remote kubeconfig settings
+  block:
+    - name: Get cluster info (remote)
+      command: kubectl version --output=json
+      environment:
+        KUBECONFIG: "{{ kubernetes_deployment.kubeconfig.remote_path | default('/etc/kubernetes/admin.conf') }}"
+      register: remote_version
+      ignore_errors: true
+      become: true
+
+    - name: Get cluster context (remote)
+      command: kubectl config current-context
+      environment:
+        KUBECONFIG: "{{ kubernetes_deployment.kubeconfig.remote_path | default('/etc/kubernetes/admin.conf') }}"
+      register: remote_context
+      ignore_errors: true
+      become: true
+
+    - name: Get API server (remote)
+      shell: kubectl cluster-info | grep "Kubernetes control plane" | awk '{print $NF}'
+      environment:
+        KUBECONFIG: "{{ kubernetes_deployment.kubeconfig.remote_path | default('/etc/kubernetes/admin.conf') }}"
+      register: remote_api_server
+      ignore_errors: true
+      become: true
+
+    - name: Debug cluster info (remote)
+      debug:
+        msg: |
+          Successfully connected to remote Kubernetes cluster:
+          - API Server: {{ remote_api_server.stdout if remote_api_server.rc == 0 else 'Not available' }}
+          - Context: {{ remote_context.stdout if remote_context.rc == 0 else 'Not available' }}
+          - Server Version: {{ (remote_version.stdout | from_json).serverVersion.gitVersion if remote_version.rc == 0 else 'Not available' }}
+      when: remote_version.rc == 0 or remote_context.rc == 0 or remote_api_server.rc == 0
+
+    - name: Warn about connection issues
+      debug:
+        msg: |
+          Warning: Could not fully validate remote Kubernetes cluster connection.
+          Please check:
+          1. SSH connectivity to {{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}
+          2. Sudo permissions for {{ kubernetes_deployment.default_ansible_user }}
+          3. Kubeconfig exists at {{ kubernetes_deployment.kubeconfig.remote_path | default("/etc/kubernetes/admin.conf") }}
+      when: remote_version.rc != 0 and remote_context.rc != 0 and remote_api_server.rc != 0
+  when: kubernetes_deployment.kubeconfig.use_remote | default(false) 

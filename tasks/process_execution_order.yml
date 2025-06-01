@@ -1,7 +1,77 @@
 ---
+# Debug execution order configuration
+- name: Debug execution order configuration
+  debug:
+    msg: |
+      Execution Order Configuration:
+      - Enabled: {{ execution_order_enabled | default(true) }}
+      - Items: {{ execution_order | default([]) }}
+      - Remote Execution: {{ kubernetes_deployment.kubeconfig.use_remote | default(false) }}
+
+# Debug execution mode
+- name: Debug execution mode
+  debug:
+    msg: |
+      Execution Mode:
+      - Mode: {{ "Remote" if kubernetes_deployment.kubeconfig.use_remote | default(false) else "Local" }}
+      - Target Host: {{ kubernetes_deployment.control_plane_nodes[0].ansible_host if kubernetes_deployment.kubeconfig.use_remote | default(false) else 'localhost' }}
+      - SSH Key: {{ kubernetes_deployment.ssh_key_path if kubernetes_deployment.kubeconfig.use_remote | default(false) else 'N/A' }}
+      - User: {{ kubernetes_deployment.default_ansible_user if kubernetes_deployment.kubeconfig.use_remote | default(false) else 'local' }}
+      - Kubeconfig: {{ kubernetes_deployment.kubeconfig.remote_path if kubernetes_deployment.kubeconfig.use_remote | default(false) else global_kubeconfig }}
+
+# Verify helm is installed
+- name: Check helm installation (local)
+  shell: which helm
+  register: helm_check_local
+  ignore_errors: true
+  when: not kubernetes_deployment.kubeconfig.use_remote | default(false)
+
+- name: Check helm installation (remote)
+  shell: which helm
+  register: helm_check_remote
+  ignore_errors: true
+  when: kubernetes_deployment.kubeconfig.use_remote | default(false)
+
+- name: Debug helm check
+  debug:
+    msg: |
+      Helm Installation Status:
+      - Mode: {{ "Remote" if kubernetes_deployment.kubeconfig.use_remote | default(false) else "Local" }}
+      - Installed: {{ (helm_check_remote.rc == 0 if kubernetes_deployment.kubeconfig.use_remote else helm_check_local.rc == 0) | default(false) }}
+      - Path: {{ (helm_check_remote.stdout if kubernetes_deployment.kubeconfig.use_remote else helm_check_local.stdout) | default('Not found') }}
+      - Error: {{ (helm_check_remote.stderr if kubernetes_deployment.kubeconfig.use_remote else helm_check_local.stderr) | default('') }}
+
+# Set kubeconfig command prefix if using remote
+- name: Set remote kubectl prefix
+  set_fact:
+    kubectl_prefix: "KUBECONFIG={{ kubernetes_deployment.kubeconfig.remote_path | default('/etc/kubernetes/admin.conf') }}"
+  when: kubernetes_deployment.kubeconfig.use_remote | default(false)
+
+- name: Set local kubectl prefix
+  set_fact:
+    kubectl_prefix: "KUBECONFIG={{ global_kubeconfig }}"
+  when: not kubernetes_deployment.kubeconfig.use_remote | default(false)
+
+# Set target host for execution
+- name: Set target host
+  set_fact:
+    target_host: "{{ inventory_hostname }}"
+
+# Verify execution order is defined
+- name: Verify execution order
+  fail:
+    msg: "Execution order is not defined or empty"
+  when: execution_order is not defined or execution_order | length == 0
+
 # Process each item in execution order
 - name: Process execution items
   include_tasks: tasks/process_execution_item.yml
   vars:
     execution_item: "{{ item }}"
-  loop: "{{ execution_order }}" 
+    remote_kubectl: "{{ kubectl_prefix }}"
+    delegate_host: "{{ target_host }}"
+  loop: "{{ execution_order }}"
+  when: execution_order_enabled | default(true)
+  tags:
+    - always
+    - "{{ item }}" 

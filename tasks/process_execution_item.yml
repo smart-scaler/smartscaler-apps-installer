@@ -1,77 +1,183 @@
 ---
-# Determine item type and load configuration
-- name: Load item configuration
-  set_fact:
-    current_item: >-
-      {{
-        helm_charts[execution_item] if (helm_charts is defined and execution_item in helm_charts)
-        else manifests[execution_item] if (manifests is defined and execution_item in manifests)
-        else kubectl_commands | selectattr('name', 'equalto', execution_item) | first
-        if (kubectl_commands is defined and kubectl_commands | selectattr('name', 'equalto', execution_item) | list | length > 0)
-        else (command_exec | default([]) | selectattr('name', 'equalto', execution_item) | first)
-        if (command_exec is defined and command_exec | default([]) | selectattr('name', 'equalto', execution_item) | list | length > 0)
-        else {}
-      }}
-    item_type: >-
-      {{
-        'helm' if (helm_charts is defined and execution_item in helm_charts)
-        else 'manifest' if (manifests is defined and execution_item in manifests)
-        else 'kubectl' if (kubectl_commands is defined and kubectl_commands | selectattr('name', 'equalto', execution_item) | list | length > 0)
-        else 'command' if (command_exec is defined and command_exec | default([]) | selectattr('name', 'equalto', execution_item) | list | length > 0)
-        else 'unknown'
-      }}
-
-# Process based on type
-- name: Process helm chart
-  include_role:
-    name: helm_chart_install
-  vars:
-    item: "{{ current_item }}"
-  when: item_type == 'helm'
-
-- name: Process manifest
-  include_role:
-    name: manifest_install
-  vars:
-    item: "{{ current_item }}"
-  when: item_type == 'manifest'
-
-- name: Process kubectl commands
-  include_role:
-    name: kubectl_command
-  vars:
-    item: "{{ current_item }}"
-  when: item_type == 'kubectl'
-
-- name: Process command
-  when: item_type == 'command'
+# Process execution item with proper delegation
+- name: Process execution item with delegation
   block:
-    - name: Set command variables
+    # Debug current execution item
+    - name: Debug execution item
+      debug:
+        msg: |
+          Processing Execution Item:
+          - Name: {{ execution_item }}
+          - Remote Execution: {{ kubernetes_deployment.kubeconfig.use_remote | default(false) }}
+          - Environment: {{ remote_kubectl }}
+          - Target Host: {{ delegate_host }}
+
+    # Determine item type and load configuration
+    - name: Load item configuration
       set_fact:
-        kubeconfig: "{{ current_item.kubeconfig | default(global_kubeconfig) }}"
-        kubecontext: "{{ current_item.kubecontext | default(global_kubecontext) }}"
+        current_item: >-
+          {{
+            helm_charts[execution_item] if (helm_charts is defined and execution_item in helm_charts)
+            else manifests[execution_item] if (manifests is defined and execution_item in manifests)
+            else kubectl_commands | selectattr('name', 'equalto', execution_item) | first
+            if (kubectl_commands is defined and kubectl_commands | selectattr('name', 'equalto', execution_item) | list | length > 0)
+            else (command_exec | default([]) | selectattr('name', 'equalto', execution_item) | first)
+            if (command_exec is defined and command_exec | default([]) | selectattr('name', 'equalto', execution_item) | list | length > 0)
+            else {}
+          }}
+        item_type: >-
+          {{
+            'helm' if (helm_charts is defined and execution_item in helm_charts)
+            else 'manifest' if (manifests is defined and execution_item in manifests)
+            else 'kubectl' if (kubectl_commands is defined and kubectl_commands | selectattr('name', 'equalto', execution_item) | list | length > 0)
+            else 'command' if (command_exec is defined and command_exec | default([]) | selectattr('name', 'equalto', execution_item) | list | length > 0)
+            else 'unknown'
+          }}
+      tags:
+        - always
+        - "{{ execution_item }}"
 
-    - name: Verify kubeconfig exists
-      stat:
-        path: "{{ kubeconfig }}"
-      register: kubeconfig_stat
-      when: kubeconfig is defined and kubeconfig != ''
+    # Debug determined configuration
+    - name: Debug item configuration
+      debug:
+        msg: |
+          Item Configuration:
+          - Type: {{ item_type }}
+          - Details: {{ current_item | to_nice_json }}
+          - Helm Charts Defined: {{ helm_charts is defined }}
+          - Manifests Defined: {{ manifests is defined }}
+          - Item in Helm Charts: {{ helm_charts[execution_item] is defined if helm_charts is defined else False }}
+          - Item in Manifests: {{ manifests[execution_item] is defined if manifests is defined else False }}
+          - Target Host: {{ delegate_host }}
 
-    - name: Fail if kubeconfig doesn't exist
+    # Fail if type is unknown
+    - name: Fail if item type is unknown
       fail:
-        msg: "Kubeconfig file {{ kubeconfig }} does not exist"
-      when: kubeconfig is defined and kubeconfig != '' and not kubeconfig_stat.stat.exists
+        msg: |
+          Unknown item type for {{ execution_item }}. Please check configuration.
+          Available configurations:
+          - Helm Charts: {{ helm_charts.keys() | list if helm_charts is defined else [] }}
+          - Manifests: {{ manifests.keys() | list if manifests is defined else [] }}
+          - Kubectl Commands: {{ kubectl_commands | map(attribute='name') | list if kubectl_commands is defined else [] }}
+          - Command Exec: {{ command_exec | map(attribute='name') | list if command_exec is defined else [] }}
+          - Target Host: {{ delegate_host }}
+      when: item_type == 'unknown'
 
-    - name: Execute command
-      shell: "{{ cmd_item.cmd }}"
-      environment: "{{ cmd_item.env | default({}) | combine({'KUBECONFIG': kubeconfig}) }}"
-      loop: "{{ current_item.commands }}"
-      loop_control:
-        loop_var: cmd_item
-      register: cmd_result
-      failed_when: 
-        - cmd_result.rc != 0 
-        - not cmd_item.ignore_errors | default(false)
-      changed_when: cmd_result.rc == 0
+    # Process based on type
+    - name: Process helm chart
+      block:
+        - name: Debug helm chart processing
+          debug:
+            msg: |
+              Processing helm chart: {{ execution_item }}
+              Chart Details:
+              - Release Name: {{ current_item.release_name }}
+              - Chart Ref: {{ current_item.chart_ref }}
+              - Namespace: {{ current_item.release_namespace }}
+              - Version: {{ current_item.chart_version | default('latest') }}
+              - Repo URL: {{ current_item.chart_repo_url }}
+              - Target Host: {{ delegate_host }}
+              - Environment: {{ remote_kubectl }}
+        
+        - name: Include helm chart role
+          include_role:
+            name: helm_chart_install
+          vars:
+            item: "{{ current_item }}"
+            remote_execution: "{{ kubernetes_deployment.kubeconfig.use_remote | default(false) }}"
+            remote_kubectl: "{{ remote_kubectl }}"
+            environment:
+              KUBECONFIG: "{{ kubernetes_deployment.kubeconfig.remote_path if kubernetes_deployment.kubeconfig.use_remote else global_kubeconfig }}"
+      when: item_type == 'helm'
+      environment:
+        KUBECONFIG: "{{ kubernetes_deployment.kubeconfig.remote_path if kubernetes_deployment.kubeconfig.use_remote else global_kubeconfig }}"
+      tags:
+        - "{{ execution_item }}"
 
-# Handle other types (helm, manifests, etc) here if needed 
+    - name: Process manifest
+      block:
+        - name: Debug manifest processing
+          debug:
+            msg: |
+              Processing manifest: {{ execution_item }}
+              Manifest Details:
+              - Name: {{ current_item.name }}
+              - File: {{ current_item.manifest_file }}
+              - Namespace: {{ current_item.namespace }}
+              - Target Host: {{ delegate_host }}
+              - Environment: {{ remote_kubectl }}
+        
+        - name: Include manifest role
+          include_role:
+            name: manifest_install
+          vars:
+            item: "{{ current_item }}"
+            remote_execution: "{{ kubernetes_deployment.kubeconfig.use_remote | default(false) }}"
+            remote_kubectl: "{{ remote_kubectl }}"
+            environment:
+              KUBECONFIG: "{{ kubernetes_deployment.kubeconfig.remote_path if kubernetes_deployment.kubeconfig.use_remote else global_kubeconfig }}"
+      when: item_type == 'manifest'
+      environment:
+        KUBECONFIG: "{{ kubernetes_deployment.kubeconfig.remote_path if kubernetes_deployment.kubeconfig.use_remote else global_kubeconfig }}"
+      tags:
+        - "{{ execution_item }}"
+
+    - name: Process kubectl commands
+      block:
+        - name: Debug kubectl processing
+          debug:
+            msg: |
+              Processing kubectl command: {{ execution_item }}
+              Target Host: {{ delegate_host }}
+              Environment: {{ remote_kubectl }}
+        
+        - name: Include kubectl role
+          include_role:
+            name: kubectl_command
+          vars:
+            item: "{{ current_item }}"
+            remote_execution: "{{ kubernetes_deployment.kubeconfig.use_remote | default(false) }}"
+            remote_kubectl: "{{ remote_kubectl }}"
+            environment:
+              KUBECONFIG: "{{ kubernetes_deployment.kubeconfig.remote_path if kubernetes_deployment.kubeconfig.use_remote else global_kubeconfig }}"
+      when: item_type == 'kubectl'
+      environment:
+        KUBECONFIG: "{{ kubernetes_deployment.kubeconfig.remote_path if kubernetes_deployment.kubeconfig.use_remote else global_kubeconfig }}"
+      tags:
+        - "{{ execution_item }}"
+
+    - name: Process command
+      when: item_type == 'command'
+      block:
+        - name: Debug command processing
+          debug:
+            msg: |
+              Processing command: {{ execution_item }}
+              Target Host: {{ delegate_host }}
+              Environment: {{ remote_kubectl }}
+
+        - name: Set command variables
+          set_fact:
+            kubeconfig: "{{ current_item.kubeconfig | default(global_kubeconfig) }}"
+            kubecontext: "{{ current_item.kubecontext | default(global_kubecontext) }}"
+          tags:
+            - "{{ execution_item }}"
+
+        - name: Execute command
+          shell: "{{ cmd_item.cmd }}"
+          environment: "{{ cmd_item.env | default({}) | combine({'KUBECONFIG': kubernetes_deployment.kubeconfig.remote_path if kubernetes_deployment.kubeconfig.use_remote else global_kubeconfig}) }}"
+          loop: "{{ current_item.commands }}"
+          loop_control:
+            loop_var: cmd_item
+          register: cmd_result
+          failed_when: 
+            - cmd_result.rc != 0 
+            - not cmd_item.ignore_errors | default(false)
+          changed_when: cmd_result.rc == 0
+          tags:
+            - "{{ execution_item }}"
+      environment:
+        KUBECONFIG: "{{ kubernetes_deployment.kubeconfig.remote_path if kubernetes_deployment.kubeconfig.use_remote else global_kubeconfig }}"
+  delegate_to: "{{ delegate_host }}"
+  environment:
+    KUBECONFIG: "{{ kubernetes_deployment.kubeconfig.remote_path if kubernetes_deployment.kubeconfig.use_remote else global_kubeconfig }}" 
