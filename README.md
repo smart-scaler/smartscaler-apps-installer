@@ -68,9 +68,11 @@ Install required Ansible collections from Galaxy:
 # Install collections from requirements.yml
 ansible-galaxy collection install -r requirements.yml
 
-# Collections included:
-# - community.general
-# - kubernetes.core
+#collections:
+#  - name: community.general
+#  - name: kubernetes.core
+#  - name: ansible.posix
+#   -name: community.crypto 
 ```
 
 ### Verifying Installation
@@ -270,7 +272,52 @@ nim_cache_manifest:
    - `nim_cache_pvc_size`: PVC size
    - `nim_cache_volume_access_mode`: Volume access mode
 
+
+## SSH User Configuration for Kubernetes Deployment
+
+### Default Configuration
+The default configuration uses:
+- SSH User: `avesha`
+- Privilege Escalation: Using `sudo` to `root`
+- Location: Configured in `user_input.yml`
+
+### User Options
+You can configure the SSH access in two ways:
+
+1. **Default (Recommended)**: Using non-root user with sudo
+   ```yaml
+   ansible_user: avesha
+   ansible_become: true
+   ansible_become_method: sudo
+   ansible_become_user: root
+   ```
+   This is the more secure approach as it:
+   - Follows security best practices
+   - Provides audit trail for privileged actions
+   - Reduces risk of accidental system-wide changes
+
+2. **Alternative**: Direct root access
+   ```yaml
+   ansible_user: root
+   ```
+   While simpler, this is not recommended for production environments.
+
+### Important Notes
+- The default `avesha` user must have sudo privileges
+- No password prompt for sudo (NOPASSWD in sudoers)
+- SSH key-based authentication is required
+- The user must have access to `/etc/kubernetes` and other system directories
+
+### Troubleshooting
+If you encounter permission issues:
+1. Verify sudo privileges: `sudo -l`
+2. Check SSH key permissions
+3. Ensure sudoers configuration is correct
+
+## Installation
+
 ## (Optional) Kubernetes Installation
+
 
 ⚠️ **IMPORTANT**: The **ONLY** supported method for installing Kubernetes is through the `setup_kubernetes.sh` script. This script handles all necessary setup steps and validations.
 
