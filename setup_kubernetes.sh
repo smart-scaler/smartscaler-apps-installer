@@ -12,6 +12,24 @@ INVENTORY_DIR="inventory/kubespray"
 INVENTORY_FILE="$INVENTORY_DIR/inventory.ini"
 TEMPLATES_DIR="templates"
 
+# Setup locale
+echo "Setting up locale..."
+if ! locale -a | grep -q "en_US.utf8"; then
+    if [ "$EUID" -ne 0 ]; then
+        echo -e "${RED}Please run as root to setup locale${NC}"
+        exit 1
+    fi
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y locales
+    locale-gen en_US.UTF-8
+    update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+fi
+
+# Export locale variables
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
 echo "Checking if Kubernetes deployment is enabled..."
 
 # Check if kubernetes deployment is enabled
@@ -177,6 +195,12 @@ echo -e "\n${GREEN}SSH connectivity test passed for all nodes.${NC}"
 
 # Run the Ansible playbook
 echo -e "\nStarting Kubernetes deployment..."
+
+# Ensure locale is set for Ansible
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+export LC_CTYPE=en_US.UTF-8
+
 ansible-playbook kubernetes.yml -i "$INVENTORY_FILE" -vv
 
 if [ $? -ne 0 ]; then

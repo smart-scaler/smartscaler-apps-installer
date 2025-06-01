@@ -1,0 +1,122 @@
+---
+- name: Check if NVIDIA runtime configuration is enabled
+  debug:
+    msg: "NVIDIA runtime configuration is disabled. Skipping..."
+  when: not kubernetes_deployment.nvidia_runtime.enabled | default(false)
+
+# Get all nodes from the deployment configuration
+- name: Combine control plane and worker nodes
+  set_fact:
+    k8s_nodes: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+
+# Node-specific tasks that need to run on each K8s node
+- name: Configure NVIDIA runtime on each node
+  block:
+    # Check NVIDIA Container Toolkit first
+    - name: Check if NVIDIA Container Runtime is installed
+      command: which nvidia-container-runtime
+      register: nvidia_runtime_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Install NVIDIA Container Toolkit
+      block:
+        - name: Update apt cache
+          apt:
+            update_cache: yes
+        
+        - name: Install NVIDIA Container Toolkit
+          apt:
+            name: nvidia-container-toolkit
+            state: present
+      when: nvidia_runtime_check.rc != 0
+
+    # Configure containerd
+    - name: Ensure containerd config directory exists
+      file:
+        path: /etc/containerd
+        state: directory
+        mode: '0755'
+
+    - name: Check if containerd config exists
+      stat:
+        path: /etc/containerd/config.toml
+      register: config_stat
+
+    - name: Generate default containerd config if not exists
+      shell: containerd config default | tee /etc/containerd/config.toml > /dev/null
+      when: not config_stat.stat.exists
+
+    - name: Check if NVIDIA runtime is already configured
+      command: grep -q "nvidia" /etc/containerd/config.toml
+      register: nvidia_grep
+      ignore_errors: true
+      changed_when: false
+
+    - name: Add NVIDIA runtime to containerd config
+      block:
+        - name: Add NVIDIA runtime configuration
+          lineinfile:
+            path: /etc/containerd/config.toml
+            insertafter: '^\[plugins."io.containerd.grpc.v1.cri".containerd.runtimes\]'
+            line: |
+              [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+                runtime_type = "io.containerd.runc.v2"
+        
+        - name: Restart containerd after config change
+          systemd:
+            name: containerd
+            state: restarted
+      when: nvidia_grep.rc != 0
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ k8s_nodes }}"
+  when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+
+# RuntimeClass tasks that only need to run once (on control plane)
+- name: Configure RuntimeClass on control plane
+  block:
+    - name: Set kubeconfig fact
+      set_fact:
+        kubeconfig_path: "/etc/kubernetes/admin.conf"
+
+    - name: Check if kubeconfig exists
+      stat:
+        path: "{{ kubeconfig_path }}"
+      register: kubeconfig_stat
+
+    - name: Fail if kubeconfig not found
+      fail:
+        msg: "Kubeconfig not found at {{ kubeconfig_path }}. Ensure Kubernetes deployment completed successfully."
+      when: not kubeconfig_stat.stat.exists
+
+    - name: Set KUBECONFIG environment variable
+      set_fact:
+        ansible_environment: "{{ ansible_environment | default({}) | combine({'KUBECONFIG': kubeconfig_path}) }}"
+
+    - name: Check if NVIDIA RuntimeClass exists
+      kubernetes.core.k8s_info:
+        kind: RuntimeClass
+        name: nvidia
+        kubeconfig: "{{ kubeconfig_path }}"
+      register: runtime_class
+      ignore_errors: true
+
+    - name: Create NVIDIA RuntimeClass if not exists
+      kubernetes.core.k8s:
+        state: present
+        kubeconfig: "{{ kubeconfig_path }}"
+        definition:
+          apiVersion: node.k8s.io/v1
+          kind: RuntimeClass
+          metadata:
+            name: nvidia
+          handler: nvidia
+      when: runtime_class.resources | length == 0
+  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+
+- name: Display completion message
+  debug:
+    msg: "NVIDIA runtime configuration completed successfully on all nodes"
+  when: kubernetes_deployment.nvidia_runtime.enabled | default(false) 

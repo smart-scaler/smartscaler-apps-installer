@@ -1,0 +1,60 @@
+---
+# Configure firewall rules for Kubernetes NVIDIA runtime communication
+- name: Combine all node IPs
+  set_fact:
+    all_node_ips: >-
+      {{ 
+        (kubernetes_deployment.control_plane_nodes | map(attribute='ansible_host') | list) +
+        (kubernetes_deployment.worker_nodes | default([]) | map(attribute='ansible_host') | list)
+      }}
+  when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+
+- name: Configure NVIDIA Container Runtime ports
+  ufw:
+    rule: allow
+    from_ip: "{{ item.0 }}"
+    to_ip: "{{ item.1 }}"
+    port: "{{ item.2 }}"
+    proto: tcp
+    comment: "NVIDIA Container Runtime"
+  loop: "{{ all_node_ips | product(all_node_ips) | product(['8080', '3476']) | list }}"
+  when: 
+    - item.0 != item.1  # Skip same source and destination IP
+    - kubernetes_deployment.nvidia_runtime.enabled | default(false)
+  delegate_to: "{{ item.1 }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+- name: Allow containerd communication
+  ufw:
+    rule: allow
+    from_ip: "{{ item.0 }}"
+    port: 10250
+    proto: tcp
+    comment: "Containerd for NVIDIA Runtime"
+  loop: "{{ all_node_ips }}"
+  when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+  delegate_to: "{{ item.ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+- name: Reload UFW
+  ufw:
+    state: reloaded
+  when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8 

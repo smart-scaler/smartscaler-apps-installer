@@ -1,0 +1,191 @@
+---
+# Define common SSH vars to be used by all tasks
+- name: Set SSH connection facts
+  set_fact:
+    ssh_connection_vars:
+      ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+      ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Set initial environment variables
+  shell: |
+    export LC_ALL=C
+    export LANG=C
+  changed_when: false
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+
+- name: Install required locale packages
+  shell: |
+    DEBIAN_FRONTEND=noninteractive apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y locales
+  args:
+    executable: /bin/bash
+  become: true
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C
+    LANG: C
+
+- name: Ensure C.UTF-8 locale is generated
+  locale_gen:
+    name: C.UTF-8
+    state: present
+  become: true
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C
+    LANG: C
+
+- name: Set system-wide locale
+  shell: |
+    update-locale LC_ALL=C.UTF-8 LANG=C.UTF-8
+  args:
+    executable: /bin/bash
+  become: true
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C
+    LANG: C
+
+- name: Set environment variables for current execution
+  set_fact:
+    ansible_env:
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+
+- name: Check if UFW is installed
+  shell: |
+    DEBIAN_FRONTEND=noninteractive apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y ufw
+  args:
+    executable: /bin/bash
+  become: true
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+- name: Allow Kubernetes API Server port
+  ufw:
+    rule: allow
+    port: "6443"
+    proto: tcp
+    comment: "Kubernetes API Server"
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+- name: Allow etcd ports
+  ufw:
+    rule: allow
+    port: "{{ item.0 }}"
+    proto: tcp
+    comment: "etcd"
+  loop: "{{ ['2379', '2380'] | product(kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([])) | list }}"
+  delegate_to: "{{ item.1.ansible_host }}"
+  when: kubernetes_deployment.enabled | default(false)
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.1.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+- name: Allow Kubelet API port
+  ufw:
+    rule: allow
+    port: "10250"
+    proto: tcp
+    comment: "Kubelet API"
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+- name: Allow kube-scheduler port
+  ufw:
+    rule: allow
+    port: "10251"
+    proto: tcp
+    comment: "kube-scheduler health/metrics"
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+- name: Allow kube-controller-manager port
+  ufw:
+    rule: allow
+    port: "10252"
+    proto: tcp
+    comment: "kube-controller-manager health/metrics"
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+- name: Reload UFW
+  ufw:
+    state: reloaded
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8 
