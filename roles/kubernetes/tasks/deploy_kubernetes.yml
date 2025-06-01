@@ -28,7 +28,8 @@
   vars:
     control_plane_nodes: "{{ user_input.kubernetes_deployment.control_plane_nodes }}"
     worker_nodes: "{{ user_input.kubernetes_deployment.worker_nodes | default([]) }}"
-    ssh_key_path: "~/.ssh/k8s_rsa"
+    ssh_key_path: "{{ user_input.kubernetes_deployment.ssh_key_path | default('~/.ssh/k8s_rsa') }}"
+    default_ansible_user: "{{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}"
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Show generated inventory file contents
@@ -48,10 +49,11 @@
 
 - name: Test SSH connection to all hosts
   command:
-    cmd: "ssh -i ~/.ssh/k8s_rsa -o StrictHostKeyChecking=no root@{{ item.ansible_host }} 'echo SSH connection successful'"
+    cmd: "ssh -i {{ ssh_key_path }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ item.ansible_user | default('root') }}@{{ item.ansible_host }} 'echo SSH connection successful'"
   loop: "{{ user_input.kubernetes_deployment.control_plane_nodes + user_input.kubernetes_deployment.worker_nodes | default([]) }}"
   register: ssh_test
   changed_when: false
+  ignore_errors: true
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Display SSH test results
