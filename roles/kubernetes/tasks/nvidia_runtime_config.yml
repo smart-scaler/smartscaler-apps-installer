@@ -1,0 +1,92 @@
+---
+- name: Check if NVIDIA runtime configuration is enabled
+  debug:
+    msg: "NVIDIA runtime configuration is disabled. Skipping..."
+  when: not kubernetes_deployment.nvidia_runtime.enabled | default(false)
+
+# Get all nodes from the deployment configuration
+- name: Combine control plane and worker nodes
+  set_fact:
+    k8s_nodes: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+
+# Node-specific tasks that need to run on each K8s node
+- name: Configure NVIDIA runtime on each node
+  include_tasks: nvidia_runtime_node_config.yml
+  loop: "{{ k8s_nodes }}"
+  loop_control:
+    loop_var: target_node
+  when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+
+# RuntimeClass tasks that only need to run once (on control plane)
+- name: Configure RuntimeClass on control plane
+  block:
+    - name: Set kubeconfig facts
+      set_fact:
+        kubeconfig_path: "{{ kubernetes_deployment.kubeconfig_path | default('/etc/kubernetes/admin.conf') }}"
+        kube_context: "{{ kubernetes_deployment.kube_context | default(omit) }}"
+
+    - name: Check if kubeconfig exists
+      stat:
+        path: "{{ kubeconfig_path }}"
+      register: kubeconfig_stat
+      delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+      vars:
+        ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+        ansible_user: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+      environment:
+        LC_ALL: C.UTF-8
+        LANG: C.UTF-8
+
+    - name: Fail if kubeconfig not found
+      fail:
+        msg: "Kubeconfig not found at {{ kubeconfig_path }}. Ensure Kubernetes deployment completed successfully."
+      when: not kubeconfig_stat.stat.exists
+
+    - name: Copy kubeconfig from remote to local temp
+      fetch:
+        src: "{{ kubeconfig_path }}"
+        dest: "/tmp/k8s-nvidia-kubeconfig-{{ ansible_date_time.epoch }}"
+        flat: yes
+      delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+      vars:
+        ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+        ansible_user: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+      environment:
+        LC_ALL: C.UTF-8
+        LANG: C.UTF-8
+      register: kubeconfig_fetch
+
+    - name: Check if NVIDIA RuntimeClass exists
+      kubernetes.core.k8s_info:
+        kind: RuntimeClass
+        name: nvidia
+        kubeconfig: "{{ kubeconfig_fetch.dest }}"
+        context: "{{ kube_context | default(omit) }}"
+      register: runtime_class
+      ignore_errors: true
+
+    - name: Create NVIDIA RuntimeClass if not exists
+      kubernetes.core.k8s:
+        state: present
+        kubeconfig: "{{ kubeconfig_fetch.dest }}"
+        context: "{{ kube_context | default(omit) }}"
+        definition:
+          apiVersion: node.k8s.io/v1
+          kind: RuntimeClass
+          metadata:
+            name: nvidia
+          handler: nvidia
+      when: runtime_class.resources | length == 0
+
+    - name: Remove temporary kubeconfig
+      file:
+        path: "{{ kubeconfig_fetch.dest }}"
+        state: absent
+      when: kubeconfig_fetch.dest is defined
+  when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+
+- name: Display completion message
+  debug:
+    msg: "NVIDIA runtime configuration completed successfully on all nodes"
+  when: kubernetes_deployment.nvidia_runtime.enabled | default(false) 

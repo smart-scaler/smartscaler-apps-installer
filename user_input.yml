@@ -5,9 +5,21 @@
 kubernetes_deployment:
   enabled: false                               # Enable/disable Kubernetes cluster deployment
   
+  # Firewall Configuration
+  firewall:
+    enabled: true                             # Enable/disable firewall configuration
+    allow_additional_ports: []                # Additional ports to allow (e.g., ["8080", "9090"])
+    
+  # NVIDIA Runtime Configuration
+  nvidia_runtime:
+    enabled: true                            # Enable/disable NVIDIA runtime configuration
+    install_toolkit: true                     # Install NVIDIA Container Toolkit if not present
+    configure_containerd: true                # Configure containerd with NVIDIA runtime
+    create_runtime_class: true                # Create Kubernetes RuntimeClass for NVIDIA
+  
   # SSH Configuration
   # Required for Kubespray to access and configure nodes
-  ssh_key_path: "/home/user/.ssh/k8s_rsa"     # Absolute Path to SSH private key for node access
+  ssh_key_path: "/root/.ssh/k8s_rsa"     # Absolute Path to SSH private key for node access
   default_ansible_user: "root"                 # Default SSH user for node access
   
   # Node Configuration
@@ -30,7 +42,7 @@ global_image_pull_secret:
 
 # Kubeconfig settings
 global_kubeconfig: "files/kubeconfig"
-global_kubecontext: "lke462675-ctx"
+global_kubecontext: "kubecontext" 
 use_global_context: true
 
 # Helm repository settings
@@ -52,7 +64,7 @@ validate_prerequisites:
   enabled: true            
 
 # Execution Configuration
-execution_order_enabled: true                  # Enable/disable execution order tasks
+execution_order_enabled: true               # Enable/disable execution order tasks
 
 # Execution configuration
 execution_order:

@@ -6,13 +6,7 @@
 
 - name: Ensure Python requirements are installed
   pip:
-    name:
-      - ansible>=2.14
-      - jinja2>=2.11
-      - netaddr
-      - pbr
-      - jmespath
-      - ruamel.yaml
+    requirements: "{{ playbook_dir }}/requirements.txt"
     state: present
     virtualenv: "{{ ansible_env.VIRTUAL_ENV | default(omit) }}"
   when: kubernetes_deployment.enabled | default(false)
@@ -85,6 +79,34 @@
     creates: "{{ inventory_dir }}/kubespray/group_vars/all"
   when: kubernetes_deployment.enabled | default(false)
 
+- name: Setup firewall prerequisites
+  include_tasks: firewall_prerequisites.yml
+  when: kubernetes_deployment.enabled | default(false)
+
 - name: Deploy Kubernetes cluster
   include_tasks: deploy_kubernetes.yml
-  when: deploy_kubernetes | default(true) | bool and kubernetes_deployment.enabled | default(false) 
+  when: deploy_kubernetes | default(true) | bool and kubernetes_deployment.enabled | default(false)
+
+# Post-deployment tasks that require a running Kubernetes cluster
+- name: Wait for Kubernetes API to be available
+  wait_for:
+    host: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+    port: 6443
+    timeout: 300
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - deploy_kubernetes | default(true) | bool
+
+- name: Configure NVIDIA runtime firewall rules
+  include_tasks: firewall_config.yml
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubernetes_deployment.nvidia_runtime.enabled | default(false)
+    - deploy_kubernetes | default(true) | bool
+
+- name: Configure NVIDIA runtime
+  include_tasks: nvidia_runtime_config.yml
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubernetes_deployment.nvidia_runtime.enabled | default(false)
+    - deploy_kubernetes | default(true) | bool 
