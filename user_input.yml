@@ -4,7 +4,7 @@
 kubernetes_deployment:
   enabled: true
   # SSH configuration
-  ssh_key_path: "~/.ssh/k8s_rsa"  # Path to the SSH private key
+  ssh_key_path: "/home/user/.ssh/k8s_rsa"  # Absolute Path to the SSH private key
   default_ansible_user: "root"     # Default user for SSH connections
   control_plane_nodes:
     - name: master-k8s
