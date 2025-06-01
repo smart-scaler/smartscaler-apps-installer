@@ -206,6 +206,13 @@ command_exec:
   - name: "verify_ngc_secrets"
     ...
 
+kubernetes_deployment:
+  control_plane_nodes:
+    - ansible_host: "YOUR_MASTER_NODE_IP"  # Update this IP
+      node_name: "master-1"
+  worker_nodes:
+    - ansible_host: "YOUR_WORKER_NODE_IP"  # Update this IP
+      node_name: "worker-1"
 
 ```
 
@@ -265,6 +272,73 @@ nim_cache_manifest:
 
 ## Installation
 
+⚠️ **IMPORTANT**: The **ONLY** supported method for installing Kubernetes is through the `setup_kubernetes.sh` script. This script handles all necessary setup steps and validations.
+
+### Prerequisites
+
+Before starting the installation:
+
+1. Ensure all nodes meet the system requirements:
+   - Ubuntu-based system
+   - SSH access configured
+   - Sufficient resources (CPU, RAM, Storage)
+   - Network connectivity between nodes
+
+2. Prepare your environment:
+   ```bash
+   # Clone the repository
+   git clone https://github.com/smart-scaler/smartscaler-apps-installer.git
+   cd smartscaler-apps-installer
+
+   # Set up Python environment
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+3. Configure environment variables:
+   ```bash
+   export NGC_API_KEY="your-ngc-api-key"
+   export NGC_DOCKER_API_KEY="your-ngc-docker-api-key"
+   ```
+
+### Kubernetes Installation
+
+1. Update node IPs in `user_input.yml`:
+   ```yaml
+   kubernetes_deployment:
+     enabled: true  # Must be set to true
+     control_plane_nodes:
+       - ansible_host: "YOUR_MASTER_NODE_IP"  # Update this IP
+         name: "master-1"
+     worker_nodes:
+       - ansible_host: "YOUR_WORKER_NODE_IP"  # Update this IP
+         name: "worker-1"
+   ```
+
+2. Run the Kubernetes setup script:
+   ```bash
+   chmod +x setup_kubernetes.sh
+   ./setup_kubernetes.sh
+   ```
+   
+   The script will:
+   - Validate your configuration
+   - Test SSH connectivity to all nodes
+   - Generate necessary inventory files
+   - Deploy Kubernetes components
+   - Verify the installation
+
+3. Verify the installation:
+   ```bash
+   kubectl get nodes -o wide
+   kubectl cluster-info
+   ```
+
+### Component Installation
+
+After Kubernetes is successfully installed:
+
 1. Clone the repository:
 ```bash
 git clone https://github.com/smart-scaler/smartscaler-apps-installer.git
@@ -289,14 +363,31 @@ export NGC_DOCKER_API_KEY="your-ngc-docker-api-key"
 cp /path/to/your/kubeconfig files/kubeconfig
 ```
 
-5. Update kubeconfig settings in user_input.yml:
+5. Update node IPs in `user_input.yml`:
+```yaml
+kubernetes_deployment:
+  control_plane_nodes:
+    - ansible_host: "YOUR_MASTER_NODE_IP"  # Update this IP
+      node_name: "master-1"
+  worker_nodes:
+    - ansible_host: "YOUR_WORKER_NODE_IP"  # Update this IP
+      node_name: "worker-1"
+```
+
+6. Run the Kubernetes setup script:
+```bash
+chmod +x setup_kubernetes.sh
+./setup_kubernetes.sh
+```
+
+7. Update kubeconfig settings in user_input.yml:
 ```yaml
 # Kubeconfig settings
 global_kubeconfig: "files/kubeconfig"
 global_kubecontext: "your-cluster-context"
 ```
 
-6. Run the installation:
+8. Run the installation:
 ```bash
 # Basic execution
 ansible-playbook site.yml
@@ -316,6 +407,19 @@ ansible-playbook site.yml \
   -e "avesha_docker_password=$AVESHA_DOCKER_PASSWORD" \
   -vvvv
 ```
+
+### Important Notes
+
+1. **IP Configuration**
+   - Always update the node IPs in `user_input.yml` before running `setup_kubernetes.sh`
+   - Ensure the IPs are reachable and have proper SSH access
+   - Verify network connectivity between nodes
+
+2. **Setup Script**
+   - `setup_kubernetes.sh` must be run after updating IPs
+   - The script requires proper permissions (`chmod +x setup_kubernetes.sh`)
+   - Monitor the script output for any errors
+   - Wait for the script to complete before proceeding with other configurations
 
 ## Execution Process
 
@@ -391,4 +495,22 @@ kubectl get all -n <namespace>
 3. Commit your changes
 4. Push to the branch
 5. Create a Pull Request
+
+## Documentation
+
+Detailed documentation is available for various components and configurations:
+
+### Core Configuration
+- [User Input Configuration Guide](docs/USER_INPUT_CONFIGURATION.md)
+- [Kubernetes Configuration](docs/KUBERNETES_CONFIGURATION.md)
+
+### Feature-specific Documentation
+- [NVIDIA Container Runtime Configuration](docs/NVIDIA_CONTAINER_RUNTIME.md)
+- [Kubernetes Firewall Configuration](docs/KUBERNETES_FIREWALL.md)
+
+### Quick Links
+- [Installation Guide](#installation)
+- [Components Overview](#components)
+- [Troubleshooting Guide](#troubleshooting)
+- [Contributing Guidelines](#contributing)
 
