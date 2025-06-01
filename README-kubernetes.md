@@ -4,18 +4,18 @@ This guide provides step-by-step instructions for setting up a Kubernetes cluste
 
 ## Prerequisites
 
-### System Requirements
+### System Requirements for smartscaler
 
 #### Control Plane Nodes (Master)
-- CPU: 2 cores minimum
-- RAM: 4GB minimum
-- Storage: 50GB minimum
-- Operating System: Ubuntu 20.04+ or compatible Linux distribution
+- CPU: 8 cores minimum
+- RAM: 16GB minimum
+- Storage: 500GB minimum
+- Operating System: Ubuntu 22.04+ or compatible Linux distribution
 
 #### Worker Nodes
-- CPU: 2 cores minimum
-- RAM: 4GB minimum
-- Storage: 50GB minimum
+- CPU: 8 cores minimum
+- RAM: 16GB minimum
+- Storage: 500GB minimum
 - Operating System: Same as control plane nodes
 
 ### Software Requirements
