@@ -80,20 +80,9 @@
           {%- endif %}
 
   tasks:
-    - name: Deploy Kubernetes Cluster
-      include_role:
-        name: kubernetes
-      vars:
-        kubespray_dir: "{{ playbook_dir }}/kubespray"
-        deploy_kubernetes: true
-      tags: 
-        - kubernetes
-        - k8s
-      when: "'kubernetes' in execution_order"
-
     - name: Validate prerequisites
       include_tasks: "tasks/validate_prerequisites.yml"
-      when: false
+      when: validate_prerequisites.enabled | default(true)
 
     - name: Include execution order
       include_tasks: "tasks/process_execution_order.yml"
@@ -103,4 +92,4 @@
           ngc_docker_api_key: "{{ ngc_docker_api_key }}"
           avesha_docker_username: "{{ avesha_docker_username }}"
           avesha_docker_password: "{{ avesha_docker_password }}"
-      when: false
+      when: execution_order_enabled | default(true)
