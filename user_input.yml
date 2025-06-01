@@ -1,5 +1,16 @@
 # user_input.yml
 ---
+# Kubernetes Deployment Configuration
+kubernetes_deployment:
+  enabled: false
+  control_plane_nodes:
+    - name: master1
+      ansible_host: 172.232.122.188
+      ansible_user: root 
+  network_plugin: calico
+  container_runtime: containerd
+  dns_mode: coredns
+
 # Global image pull secret settings
 global_image_pull_secret:
   repository: "https://index.docker.io/v1/"

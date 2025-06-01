@@ -1,0 +1,41 @@
+[all]
+{% for node in control_plane_nodes %}
+{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }}
+{% endfor %}
+{% for node in worker_nodes %}
+{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }}
+{% endfor %}
+
+[kube_control_plane]
+{% for node in control_plane_nodes %}
+{{ node.name }}
+{% endfor %}
+
+[etcd]
+{% for node in control_plane_nodes %}
+{{ node.name }}
+{% endfor %}
+
+[kube_node]
+{% for node in control_plane_nodes %}
+{{ node.name }}
+{% endfor %}
+{% for node in worker_nodes %}
+{{ node.name }}
+{% endfor %}
+
+[k8s_cluster:children]
+kube_control_plane
+kube_node
+
+[calico_rr]
+
+[k8s_cluster:vars]
+# Network plugin (calico, flannel, weave or cilium)
+kube_network_plugin=calico
+
+# Container runtime (containerd, crio)
+container_manager=containerd
+
+# DNS mode (coredns, nodelocaldns)
+dns_mode=coredns 

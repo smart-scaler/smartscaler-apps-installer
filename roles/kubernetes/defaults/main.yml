@@ -1,0 +1,47 @@
+---
+# Kubespray configuration defaults
+kubespray_version: v2.28.0
+kubespray_download_url: "https://github.com/kubernetes-sigs/kubespray/archive/refs/tags/{{ kubespray_version }}.tar.gz"
+
+# Kubernetes configuration
+kube_version: v1.28.5
+container_runtime: containerd
+dns_mode: coredns
+kube_network_plugin: calico
+
+# Node configurations will be populated from user_input.yml
+k8s_masters: "{{ kubernetes_deployment.control_plane_nodes | default([]) }}"
+k8s_workers: "{{ kubernetes_deployment.worker_nodes | default([]) }}"
+
+# Default to enabled if kubernetes is in execution order
+deploy_kubernetes: "{{ 'kubernetes' in execution_order }}"
+
+# SSH and connection settings
+ansible_ssh_common_args: '-o ControlMaster=auto -o ControlPersist=30m -o ConnectionAttempts=100'
+ansible_ssh_pipelining: true
+
+# Kubespray deployment configuration
+kubespray_become_method: "sudo"
+kubespray_become_user: "root"
+kubespray_ansible_timeout: 120
+kubespray_async_timeout: 3600
+kubespray_poll_interval: 10
+kubespray_stdout_callback: "debug"
+
+# Environment configuration for non-raw tasks
+kubespray_env:
+  ANSIBLE_CONFIG: "{{ kubespray_dir }}/ansible.cfg"
+  ANSIBLE_STDOUT_CALLBACK: "{{ kubespray_stdout_callback }}"
+  ANSIBLE_TIMEOUT: "{{ kubespray_ansible_timeout }}"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+  ANSIBLE_SSH_RETRIES: "10"
+  ANSIBLE_RETRY_FILES_ENABLED: "false"
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_SSH_ARGS: "{{ ansible_ssh_common_args }}"
+  ANSIBLE_BECOME_METHOD: "{{ kubespray_become_method }}"
+  ANSIBLE_BECOME_USER: "{{ kubespray_become_user }}"
+  ANSIBLE_BECOME_ASK_PASS: "false"
+
+# Additional configurations that can be overridden
+kubespray_extra_args: ""
+kubespray_extra_env: {} 

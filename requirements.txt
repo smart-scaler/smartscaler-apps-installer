@@ -1,5 +1,5 @@
 ansible>=2.10
 openshift
 kubernetes
-PyYAML 
+PyYAML>=6.0.1
 kubernetes-validate>=1.28.0 
