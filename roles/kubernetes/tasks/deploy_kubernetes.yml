@@ -1,0 +1,103 @@
+---
+- name: Check if Kubernetes deployment is enabled
+  fail:
+    msg: "Kubernetes deployment is disabled in user_input.yml"
+  when: not kubernetes_deployment.enabled | default(false)
+
+- name: Display current working directory
+  command: pwd
+  register: current_dir
+  changed_when: false
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Read user_input.yml
+  slurp:
+    src: "{{ playbook_dir }}/user_input.yml"
+  register: user_input_content
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Parse user_input.yml content
+  set_fact:
+    user_input: "{{ user_input_content.content | b64decode | from_yaml }}"
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Generate inventory content
+  template:
+    src: "{{ playbook_dir }}/templates/inventory.ini.j2"
+    dest: "{{ inventory_dir }}/kubespray/inventory.ini"
+  vars:
+    control_plane_nodes: "{{ user_input.kubernetes_deployment.control_plane_nodes }}"
+    worker_nodes: "{{ user_input.kubernetes_deployment.worker_nodes | default([]) }}"
+    ssh_key_path: "{{ user_input.kubernetes_deployment.ssh_key_path | default('~/.ssh/k8s_rsa') }}"
+    default_ansible_user: "{{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}"
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Show generated inventory file contents
+  command: cat {{ inventory_dir }}/kubespray/inventory.ini
+  register: inventory_contents
+  changed_when: false
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Display debug information
+  debug:
+    msg: |
+      Current Directory: {{ current_dir.stdout }}
+      Inventory Path: {{ inventory_dir }}/kubespray/inventory.ini
+      Kubespray Dir: {{ kubespray_dir }}
+      Group Vars Path: {{ inventory_dir }}/kubespray/group_vars/all/all.yml
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Test SSH connection to all hosts
+  command:
+    cmd: "ssh -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ item.ansible_user | default('root') }}@{{ item.ansible_host }} 'echo SSH connection successful'"
+  loop: "{{ user_input.kubernetes_deployment.control_plane_nodes + user_input.kubernetes_deployment.worker_nodes | default([]) }}"
+  register: ssh_test
+  changed_when: false
+  ignore_errors: true
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Display SSH test results
+  debug:
+    var: ssh_test
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Set Ansible environment variables
+  set_fact:
+    ansible_env_vars: "{{ kubespray_env | combine(kubespray_extra_env) }}"
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Set default values for async execution
+  set_fact:
+    kubespray_async_timeout: "{{ kubespray_async_timeout | default(3600) }}"  # 1 hour default timeout
+    kubespray_poll_interval: "{{ kubespray_poll_interval | default(30) }}"    # 30 seconds default poll interval
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Run Kubespray cluster deployment
+  command:
+    cmd: >
+      ansible-playbook -i {{ inventory_dir }}/kubespray/inventory.ini
+      {{ kubespray_dir }}/cluster.yml
+      -e @{{ inventory_dir }}/kubespray/group_vars/all/all.yml
+      --become
+      --become-method={{ kubespray_become_method }}
+      --become-user={{ kubespray_become_user }}
+      -e ansible_ssh_private_key_file={{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }}
+      -e ansible_user={{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}
+      -e ansible_become_pass=''
+      --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+      -vvvv
+  environment: "{{ kubespray_env | combine(kubespray_extra_env) | combine({'ANSIBLE_CONFIG': playbook_dir + '/ansible.cfg'}) }}"
+  register: kubespray_result
+  async: "{{ kubespray_async_timeout }}"
+  poll: "{{ kubespray_poll_interval }}"
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Display Kubespray deployment result
+  debug:
+    msg: |
+      STDOUT:
+      {{ kubespray_result.stdout_lines | default([]) | join('\n') }}
+      
+      STDERR:
+      {{ kubespray_result.stderr_lines | default([]) | join('\n') }}
+  when: kubespray_result is defined and kubernetes_deployment.enabled | default(false) 

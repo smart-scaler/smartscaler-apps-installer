@@ -1,0 +1,35 @@
+[all]
+{% for node in k8s_masters %}
+{{ node.name }} ansible_host={{ node.ansible_host }}
+{% endfor %}
+
+[kube_control_plane]
+{% for node in k8s_masters %}
+{{ node.name }}
+{% endfor %}
+
+[etcd]
+{% for node in k8s_masters %}
+{{ node.name }}
+{% endfor %}
+
+[kube_node]
+{% for node in k8s_masters %}
+{{ node.name }}
+{% endfor %}
+
+[k8s_cluster:children]
+kube_control_plane
+kube_node
+
+[calico_rr]
+
+[k8s_cluster:vars]
+# Network plugin (calico, flannel, weave or cilium)
+kube_network_plugin={{ kubernetes_deployment.network_plugin | default('calico') }}
+
+# Container runtime (containerd, crio)
+container_manager={{ kubernetes_deployment.container_runtime | default('containerd') }}
+
+# DNS mode (coredns, nodelocaldns)
+dns_mode={{ kubernetes_deployment.dns_mode | default('coredns') }} 

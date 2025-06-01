@@ -1,0 +1,32 @@
+---
+- name: Deploy Kubernetes Cluster Only
+  hosts: localhost
+  gather_facts: true
+  become: true
+  become_method: sudo
+  vars_files:
+    - "{{ lookup('env', 'VARS_FILE', default='user_input.yml') }}"
+  vars:
+    inventory_dir: "{{ playbook_dir }}/inventory"
+    kubespray_dir: "{{ playbook_dir }}/kubespray"
+
+  pre_tasks:
+    - name: Check if Kubernetes deployment is enabled
+      debug:
+        msg: "Kubernetes deployment is disabled in user_input.yml. Skipping all tasks."
+      when: not kubernetes_deployment.enabled | default(false)
+
+    - name: Ensure inventory directory exists
+      file:
+        path: "{{ inventory_dir }}"
+        state: directory
+        mode: '0755'
+      when: kubernetes_deployment.enabled | default(false)
+
+  tasks:
+    - name: Deploy Kubernetes Cluster
+      include_role:
+        name: kubernetes
+      vars:
+        deploy_kubernetes: true
+      when: kubernetes_deployment.enabled | default(false) 

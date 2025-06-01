@@ -1,0 +1,90 @@
+---
+- name: Check if Kubernetes deployment is enabled
+  fail:
+    msg: "Kubernetes deployment is disabled in user_input.yml"
+  when: not kubernetes_deployment.enabled | default(false)
+
+- name: Ensure Python requirements are installed
+  pip:
+    name:
+      - ansible>=2.14
+      - jinja2>=2.11
+      - netaddr
+      - pbr
+      - jmespath
+      - ruamel.yaml
+    state: present
+    virtualenv: "{{ ansible_env.VIRTUAL_ENV | default(omit) }}"
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Display current working directory
+  command: pwd
+  register: current_dir
+  changed_when: false
+
+- name: Show inventory file contents
+  command: cat {{ inventory_dir }}/kubespray/inventory.ini
+  register: inventory_contents
+  changed_when: false
+
+- name: Display debug information
+  debug:
+    msg: |
+      Current Directory: {{ current_dir.stdout }}
+      Inventory Path: {{ inventory_dir }}/kubespray/inventory.ini
+      Kubespray Dir: {{ kubespray_dir }}
+      Group Vars Path: {{ inventory_dir }}/kubespray/group_vars/all/all.yml
+
+- name: Check if local Kubespray exists
+  stat:
+    path: "{{ kubespray_dir }}"
+  register: kubespray_stat
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Create Kubespray directory if it doesn't exist
+  file:
+    path: "{{ kubespray_dir }}"
+    state: directory
+    mode: '0755'
+  when: not kubespray_stat.stat.exists and kubernetes_deployment.enabled | default(false)
+
+- name: Create Kubespray inventory directory
+  file:
+    path: "{{ inventory_dir }}/kubespray"
+    state: directory
+    mode: '0755'
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Copy Kubespray sample inventory directory
+  synchronize:
+    src: "{{ kubespray_dir }}/inventory/sample/"
+    dest: "{{ inventory_dir }}/kubespray"
+    delete: no
+    recursive: yes
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Generate Kubespray inventory
+  template:
+    src: inventory.ini.j2
+    dest: "{{ inventory_dir }}/kubespray/inventory.ini"
+  vars:
+    k8s_masters: "{{ kubernetes_deployment.control_plane_nodes | default([]) }}"
+    k8s_workers: "{{ kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Ensure group_vars directory exists
+  file:
+    path: "{{ inventory_dir }}/kubespray/group_vars"
+    state: directory
+    mode: '0755'
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Copy group_vars from Kubespray
+  command: "cp -rf {{ kubespray_dir }}/inventory/sample/group_vars {{ inventory_dir }}/kubespray/"
+  args:
+    creates: "{{ inventory_dir }}/kubespray/group_vars/all"
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Deploy Kubernetes cluster
+  include_tasks: deploy_kubernetes.yml
+  when: deploy_kubernetes | default(true) | bool and kubernetes_deployment.enabled | default(false) 
