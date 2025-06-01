@@ -20,7 +20,6 @@
         name: 
           - curl
           - gnupg
-          - lsb-release
           - ca-certificates
         state: present
         update_cache: yes
@@ -40,18 +39,13 @@
         creates: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
       delegate_to: "{{ target_node.ansible_host }}"
 
-    - name: Get Ubuntu distribution codename
-      command: lsb_release -cs
-      register: ubuntu_codename
-      changed_when: false
-      delegate_to: "{{ target_node.ansible_host }}"
-
-    - name: Add NVIDIA repository
-      apt_repository:
-        repo: "deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://nvidia.github.io/libnvidia-container/stable/{{ ubuntu_codename.stdout }}/amd64 /"
-        state: present
-        filename: nvidia-container-toolkit
-        update_cache: yes
+    - name: Configure NVIDIA repository
+      shell: |
+        curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+        sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+        tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+      args:
+        creates: /etc/apt/sources.list.d/nvidia-container-toolkit.list
       delegate_to: "{{ target_node.ansible_host }}"
 
     - name: Update apt cache

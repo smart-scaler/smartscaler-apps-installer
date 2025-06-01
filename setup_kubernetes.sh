@@ -72,14 +72,14 @@ import yaml
 try:
     with open("user_input.yml") as f:
         data = yaml.safe_load(f)
-    print(data.get("kubernetes_deployment", {}).get("ansible_user", ""))
+    print(data.get("kubernetes_deployment", {}).get("default_ansible_user", ""))
 except:
     print("")
 ')
 
 # If no default user in yaml, ask for it
 if [ -z "$DEFAULT_USER" ]; then
-    echo -e "\nNo default ansible_user found in user_input.yml"
+    echo -e "\nNo default_ansible_user found in user_input.yml"
     read -p "Enter the default ansible user for all nodes: " DEFAULT_USER
     if [ -z "$DEFAULT_USER" ]; then
         echo -e "${RED}Error: ansible user cannot be empty${NC}"

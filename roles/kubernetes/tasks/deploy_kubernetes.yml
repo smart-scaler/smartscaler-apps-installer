@@ -100,4 +100,28 @@
       
       STDERR:
       {{ kubespray_result.stderr_lines | default([]) | join('\n') }}
-  when: kubespray_result is defined and kubernetes_deployment.enabled | default(false) 
+  when: kubespray_result is defined and kubernetes_deployment.enabled | default(false)
+
+- name: Ensure files directory exists
+  file:
+    path: "{{ lookup('env', 'PWD') }}/files"
+    state: directory
+    mode: '0755'
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Copy kubeconfig from first control plane node
+  command:
+    cmd: "scp -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}@{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }}:/etc/kubernetes/admin.conf {{ lookup('env', 'PWD') }}/files/kubeconfig"
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result is defined
+    - kubespray_result is succeeded
+
+- name: Set kubeconfig permissions
+  file:
+    path: "{{ lookup('env', 'PWD') }}/files/kubeconfig"
+    mode: '0600'
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result is defined
+    - kubespray_result is succeeded 
