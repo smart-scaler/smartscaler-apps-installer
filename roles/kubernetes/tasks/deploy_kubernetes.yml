@@ -115,4 +115,13 @@
   when: 
     - kubernetes_deployment.enabled | default(false)
     - kubespray_result is defined
+    - kubespray_result is succeeded
+
+- name: Set kubeconfig permissions
+  file:
+    path: "{{ lookup('env', 'PWD') }}/files/kubeconfig"
+    mode: '0600'
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result is defined
     - kubespray_result is succeeded 
