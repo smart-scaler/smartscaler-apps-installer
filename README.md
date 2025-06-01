@@ -270,7 +270,7 @@ nim_cache_manifest:
    - `nim_cache_pvc_size`: PVC size
    - `nim_cache_volume_access_mode`: Volume access mode
 
-## Installation
+## (Optional) Kubernetes Installation
 
 ⚠️ **IMPORTANT**: The **ONLY** supported method for installing Kubernetes is through the `setup_kubernetes.sh` script. This script handles all necessary setup steps and validations.
 
@@ -278,29 +278,32 @@ nim_cache_manifest:
 
 Before starting the installation:
 
-1. Ensure all nodes meet the system requirements:
+1. **Ensure all nodes meet the system requirements:**
    - Ubuntu-based system
    - SSH access configured
    - Sufficient resources (CPU, RAM, Storage)
    - Network connectivity between nodes
 
-2. Prepare your environment:
+2. **Setup Python Environment**
    ```bash
-   # Clone the repository
-   git clone https://github.com/smart-scaler/smartscaler-apps-installer.git
-   cd smartscaler-apps-installer
-
-   # Set up Python environment
+   # Create and activate virtual environment
    python3 -m venv venv
    source venv/bin/activate
+
+   # Install dependencies
    pip install -r requirements.txt
+   
+   # Install Ansible collections
+   ansible-galaxy install -r requirements.yml
    ```
 
-3. Configure environment variables:
+3. **SSH Key Setup**
    ```bash
-   export NGC_API_KEY="your-ngc-api-key"
-   export NGC_DOCKER_API_KEY="your-ngc-docker-api-key"
-   ```
+   # Generate SSH key
+   ssh-keygen -t rsa -b 4096 -f ~/.ssh/k8s_rsa -N ""
+
+   # Copy SSH key to each node (repeat for each node)
+   ssh-copy-id -i ~/.ssh/k8s_rsa.pub user@node-ip
 
 ### Kubernetes Installation
 
@@ -316,20 +319,21 @@ Before starting the installation:
          name: "worker-1"
    ```
 
-2. Run the Kubernetes setup script:
+2. **Run the Kubernetes setup script:**
    ```bash
    chmod +x setup_kubernetes.sh
    ./setup_kubernetes.sh
    ```
    
    The script will:
+   - create an inventory.ini file for kubespray
    - Validate your configuration
    - Test SSH connectivity to all nodes
    - Generate necessary inventory files
    - Deploy Kubernetes components
    - Verify the installation
 
-3. Verify the installation:
+4. Verify the installation:
    ```bash
    kubectl get nodes -o wide
    kubectl cluster-info
