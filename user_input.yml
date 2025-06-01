@@ -12,7 +12,7 @@ kubernetes_deployment:
     
   # NVIDIA Runtime Configuration
   nvidia_runtime:
-    enabled: false                            # Enable/disable NVIDIA runtime configuration
+    enabled: true                            # Enable/disable NVIDIA runtime configuration
     install_toolkit: true                     # Install NVIDIA Container Toolkit if not present
     configure_containerd: true                # Configure containerd with NVIDIA runtime
     create_runtime_class: true                # Create Kubernetes RuntimeClass for NVIDIA

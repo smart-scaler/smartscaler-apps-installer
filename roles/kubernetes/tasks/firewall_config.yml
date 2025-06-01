@@ -12,19 +12,19 @@
 - name: Configure NVIDIA Container Runtime ports
   ufw:
     rule: allow
-    from_ip: "{{ item.0 }}"
-    to_ip: "{{ item.1 }}"
-    port: "{{ item.2 }}"
+    from_ip: "{{ item.0.0 }}"
+    to_ip: "{{ item.0.1 }}"
+    port: "{{ item.1 }}"
     proto: tcp
     comment: "NVIDIA Container Runtime"
-  loop: "{{ all_node_ips | product(all_node_ips) | product(['8080', '3476']) | list }}"
+  loop: "{{ all_node_ips | product(all_node_ips) | list | product(['8080', '3476']) | list }}"
   when: 
-    - item.0 != item.1  # Skip same source and destination IP
+    - item.0.0 != item.0.1  # Skip same source and destination IP
     - kubernetes_deployment.nvidia_runtime.enabled | default(false)
-  delegate_to: "{{ item.1 }}"
+  delegate_to: "{{ item.0.1 }}"
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
-    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    ansible_user: "{{ (kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([])) | selectattr('ansible_host', 'equalto', item.0.1) | map(attribute='ansible_user') | default(kubernetes_deployment.default_ansible_user, true) | first }}"
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8
@@ -32,11 +32,11 @@
 - name: Allow containerd communication
   ufw:
     rule: allow
-    from_ip: "{{ item.0 }}"
+    from_ip: "{{ item.ansible_host }}"
     port: 10250
     proto: tcp
     comment: "Containerd for NVIDIA Runtime"
-  loop: "{{ all_node_ips }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
   when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
   delegate_to: "{{ item.ansible_host }}"
   vars:

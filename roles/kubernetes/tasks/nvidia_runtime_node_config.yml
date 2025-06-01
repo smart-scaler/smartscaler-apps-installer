@@ -1,0 +1,169 @@
+---
+# Check NVIDIA Container Toolkit first
+- name: Check if NVIDIA Container Runtime is installed
+  command: which nvidia-container-runtime
+  register: nvidia_runtime_check
+  ignore_errors: true
+  changed_when: false
+  delegate_to: "{{ target_node.ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ target_node.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+- name: Install NVIDIA Container Toolkit
+  block:
+    - name: Install required packages for repository setup
+      apt:
+        name: 
+          - curl
+          - gnupg
+          - lsb-release
+          - ca-certificates
+        state: present
+        update_cache: yes
+      delegate_to: "{{ target_node.ansible_host }}"
+
+    - name: Create keyrings directory
+      file:
+        path: /usr/share/keyrings
+        state: directory
+        mode: '0755'
+      delegate_to: "{{ target_node.ansible_host }}"
+
+    - name: Download and add NVIDIA GPG key to keyring
+      shell: |
+        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+      delegate_to: "{{ target_node.ansible_host }}"
+
+    - name: Get Ubuntu distribution codename
+      command: lsb_release -cs
+      register: ubuntu_codename
+      changed_when: false
+      delegate_to: "{{ target_node.ansible_host }}"
+
+    - name: Add NVIDIA repository
+      apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://nvidia.github.io/libnvidia-container/stable/{{ ubuntu_codename.stdout }}/amd64 /"
+        state: present
+        filename: nvidia-container-toolkit
+        update_cache: yes
+      delegate_to: "{{ target_node.ansible_host }}"
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      delegate_to: "{{ target_node.ansible_host }}"
+    
+    - name: Install NVIDIA Container Toolkit
+      apt:
+        name: nvidia-container-toolkit
+        state: present
+      delegate_to: "{{ target_node.ansible_host }}"
+  when: nvidia_runtime_check.rc != 0
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ target_node.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+# Configure containerd
+- name: Ensure containerd config directory exists
+  file:
+    path: /etc/containerd
+    state: directory
+    mode: '0755'
+  delegate_to: "{{ target_node.ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ target_node.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+- name: Check if containerd config exists
+  stat:
+    path: /etc/containerd/config.toml
+  register: config_stat
+  delegate_to: "{{ target_node.ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ target_node.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+- name: Generate default containerd config if not exists
+  shell: containerd config default | tee /etc/containerd/config.toml > /dev/null
+  when: not config_stat.stat.exists
+  delegate_to: "{{ target_node.ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ target_node.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+- name: Check if NVIDIA runtime is already configured
+  command: grep -q "nvidia" /etc/containerd/config.toml
+  register: nvidia_grep
+  ignore_errors: true
+  changed_when: false
+  delegate_to: "{{ target_node.ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ target_node.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+- name: Add NVIDIA runtime configuration
+  lineinfile:
+    path: /etc/containerd/config.toml
+    insertafter: '^\[plugins."io.containerd.grpc.v1.cri".containerd.runtimes\]'
+    line: |
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+        runtime_type = "io.containerd.runc.v2"
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
+          BinaryName = "/usr/bin/nvidia-container-runtime"
+  when: nvidia_grep.rc != 0
+  delegate_to: "{{ target_node.ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ target_node.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+- name: Restart containerd after config change
+  systemd:
+    name: containerd
+    state: restarted
+  when: nvidia_grep.rc != 0
+  delegate_to: "{{ target_node.ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ target_node.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+
+# Add status messages
+- name: Display NVIDIA Container Toolkit check status
+  debug:
+    msg: "{{ 'NVIDIA Container Toolkit is already installed.' if nvidia_runtime_check.rc == 0 else 'NVIDIA Container Toolkit is not installed. Installing...' }}"
+
+- name: Display containerd config status
+  debug:
+    msg: "{{ 'Containerd config file not found. Creating default config...' if not config_stat.stat.exists else 'Containerd config file exists.' }}"
+  when: config_stat is defined
+
+- name: Display NVIDIA runtime configuration status
+  debug:
+    msg: "{{ 'NVIDIA runtime is already configured in containerd.' if nvidia_grep.rc == 0 else 'NVIDIA runtime not found in containerd config. Adding it...' }}"
+  when: nvidia_grep is defined 
