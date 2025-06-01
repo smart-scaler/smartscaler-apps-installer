@@ -49,7 +49,7 @@
 
 - name: Test SSH connection to all hosts
   command:
-    cmd: "ssh -i {{ user_input.kubernetes_deployment.ssh_key_path }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ item.ansible_user | default('root') }}@{{ item.ansible_host }} 'echo SSH connection successful'"
+    cmd: "ssh -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ item.ansible_user | default('root') }}@{{ item.ansible_host }} 'echo SSH connection successful'"
   loop: "{{ user_input.kubernetes_deployment.control_plane_nodes + user_input.kubernetes_deployment.worker_nodes | default([]) }}"
   register: ssh_test
   changed_when: false
@@ -73,18 +73,20 @@
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Run Kubespray cluster deployment
-  shell:
+  command:
     cmd: >
-      ANSIBLE_DEBUG=1 
-      ANSIBLE_HOST_KEY_CHECKING=false 
       ansible-playbook -i {{ inventory_dir }}/kubespray/inventory.ini
       {{ kubespray_dir }}/cluster.yml
       -e @{{ inventory_dir }}/kubespray/group_vars/all/all.yml
       --become
-      --become-method={{ ansible_env_vars['ANSIBLE_BECOME_METHOD'] }}
-      --become-user={{ ansible_env_vars['ANSIBLE_BECOME_USER'] }}
+      --become-method={{ kubespray_become_method }}
+      --become-user={{ kubespray_become_user }}
+      -e ansible_ssh_private_key_file={{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }}
+      -e ansible_user={{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}
+      -e ansible_become_pass=''
+      --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
       -vvvv
-  environment: "{{ ansible_env_vars }}"
+  environment: "{{ kubespray_env | combine(kubespray_extra_env) | combine({'ANSIBLE_CONFIG': playbook_dir + '/ansible.cfg'}) }}"
   register: kubespray_result
   async: "{{ kubespray_async_timeout }}"
   poll: "{{ kubespray_poll_interval }}"

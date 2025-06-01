@@ -35,31 +35,6 @@
       Kubespray Dir: {{ kubespray_dir }}
       Group Vars Path: {{ inventory_dir }}/kubespray/group_vars/all/all.yml
 
-- name: Run Kubespray cluster deployment
-  command:
-    cmd: >
-      ansible-playbook -i {{ inventory_dir }}/kubespray/inventory.ini
-      {{ kubespray_dir }}/cluster.yml
-      -e @{{ inventory_dir }}/kubespray/group_vars/all/all.yml
-      --become
-      --become-method={{ kubespray_become_method }}
-      --become-user={{ kubespray_become_user }}
-      -vvvv
-  environment: "{{ kubespray_env | combine(kubespray_extra_env) }}"
-  register: kubespray_result
-  async: "{{ kubespray_async_timeout }}"
-  poll: "{{ kubespray_poll_interval }}"
-
-- name: Display Kubespray deployment result
-  debug:
-    msg: |
-      STDOUT:
-      {{ kubespray_result.stdout_lines | default([]) | join('\n') }}
-      
-      STDERR:
-      {{ kubespray_result.stderr_lines | default([]) | join('\n') }}
-  when: kubespray_result is defined
-
 - name: Check if local Kubespray exists
   stat:
     path: "{{ kubespray_dir }}"
