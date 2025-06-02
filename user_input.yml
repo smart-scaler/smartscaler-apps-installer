@@ -104,6 +104,16 @@ helm_charts:
         enabled: true
       driver:
         enabled: false
+      cdi:
+        default: true
+        enabled: true
+      hostPaths:
+        driverInstallDir: /home/kubernetes/bin/nvidia
+      toolkit:
+        installDir: /home/kubernetes/bin/nvidia
+        env:
+          - name: CONTAINERD_RUNTIME_CLASS
+            value: "nvidia"
     chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
 
   prometheus_stack:
