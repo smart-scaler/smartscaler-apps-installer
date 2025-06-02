@@ -437,6 +437,17 @@ command_exec:
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
     commands:
       - cmd: |
+          # First check and create namespace if it doesn't exist
+          if ! kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            get namespace smart-scaler >/dev/null 2>&1; then
+            echo "Creating namespace smart-scaler..."
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+              --context={{ kubecontext | default(global_kubecontext) }} \
+              create namespace smart-scaler
+          fi
+          
+          # Then handle the secret
           if kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
             -n smart-scaler get secret avesha-systems >/dev/null 2>&1; then
@@ -454,6 +465,7 @@ command_exec:
           AVESHA_DOCKER_USERNAME: "{{ avesha_docker_username }}"
           AVESHA_DOCKER_PASSWORD: "{{ avesha_docker_password }}"
           KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
+
 
   - name: "verify_avesha_secret"
     commands:
