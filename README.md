@@ -2,6 +2,18 @@
 
 Ansible-based installer for Smart Scaler components and dependencies.
 
+## Important Prerequisites for Apps Installation
+
+Before proceeding with the Smart Scaler applications deployment, ensure:
+
+1. **Cluster Accessibility**
+   - The Kubernetes cluster endpoint must be accessible from the machine where you're running this installer
+   - Verify connectivity by running `kubectl get nodes` using your kubeconfig file
+
+2. **Configuration Requirements**
+   - The `kubernetes_deployment.enabled` flag in `user_input.yml` must be set to `false` before running apps installation
+   - This prevents unintended cluster setup operations during app deployment
+
 ## Ansible Project Structure
 
 ```
@@ -291,6 +303,24 @@ kubectl get nodes
 ---
 
 # Part 2: Smart Scaler Applications Deployment
+
+## Prerequisites
+
+Before proceeding with the applications deployment:
+
+1. **Cluster Accessibility**
+   - Ensure the Kubernetes cluster endpoint is accessible from the machine running this installer
+   - Verify connectivity by running: `KUBECONFIG=files/kubeconfig kubectl get nodes`
+   - If you cannot access the cluster, check network connectivity and firewall rules
+
+2. **Configuration Requirements**
+   - Set `kubernetes_deployment.enabled: false` in your `user_input.yml`
+   - This is crucial to prevent unintended cluster setup operations during app deployment
+   - Example configuration:
+     ```yaml
+     kubernetes_deployment:
+       enabled: false  # Must be false for apps deployment
+     ```
 
 ## Required Environment Variables
 
@@ -977,4 +1007,14 @@ curl http://localhost:9091/metrics | grep smartscaler_hpa_num_pods
 - Ensure proper resource limits and requests
 - Add monitoring and metrics for new components
 - Follow security best practices for secrets and access
+
+## Running the Playbook
+
+To deploy the Kubernetes cluster, run:
+
+```bash
+ansible-playbook kubernetes.yml --ask-become-pass
+```
+
+This will prompt for your sudo password which is required for certain operations.
 
