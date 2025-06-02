@@ -21,15 +21,45 @@
     user_input: "{{ user_input_content.content | b64decode | from_yaml }}"
   when: kubernetes_deployment.enabled | default(false)
 
+- name: Extract and set Kubernetes deployment variables
+  set_fact:
+    k8s_ssh_key_path: "{{ user_input.kubernetes_deployment.ssh_key_path | default('~/.ssh/k8s_rsa') }}"
+    k8s_default_user: "{{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}"
+    k8s_control_plane_nodes: "{{ user_input.kubernetes_deployment.control_plane_nodes | default([]) }}"
+    k8s_worker_nodes: "{{ user_input.kubernetes_deployment.worker_nodes | default([]) }}"
+    k8s_kubeconfig_path: "{{ user_input.kubernetes_deployment.kubeconfig_path | default('/etc/kubernetes/admin.conf') }}"
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - user_input is defined
+    - user_input.kubernetes_deployment is defined
+
+- name: Set fallback Kubernetes deployment variables if user_input is not available
+  set_fact:
+    k8s_ssh_key_path: "~/.ssh/k8s_rsa"
+    k8s_default_user: "root"
+    k8s_control_plane_nodes: []
+    k8s_worker_nodes: []
+    k8s_kubeconfig_path: "/etc/kubernetes/admin.conf"
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - (user_input is not defined or user_input.kubernetes_deployment is not defined)
+
+- name: Validate that control plane nodes are defined
+  fail:
+    msg: "No control plane nodes defined in configuration. Please check your user_input.yml file."
+  when:
+    - kubernetes_deployment.enabled | default(false)
+    - k8s_control_plane_nodes | length == 0
+
 - name: Generate inventory content
   template:
     src: "{{ playbook_dir }}/templates/inventory.ini.j2"
     dest: "{{ inventory_dir }}/kubespray/inventory.ini"
   vars:
-    control_plane_nodes: "{{ user_input.kubernetes_deployment.control_plane_nodes }}"
-    worker_nodes: "{{ user_input.kubernetes_deployment.worker_nodes | default([]) }}"
-    ssh_key_path: "{{ user_input.kubernetes_deployment.ssh_key_path | default('~/.ssh/k8s_rsa') }}"
-    default_ansible_user: "{{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}"
+    control_plane_nodes: "{{ k8s_control_plane_nodes }}"
+    worker_nodes: "{{ k8s_worker_nodes }}"
+    ssh_key_path: "{{ k8s_ssh_key_path }}"
+    default_ansible_user: "{{ k8s_default_user }}"
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Show generated inventory file contents
@@ -49,8 +79,8 @@
 
 - name: Test SSH connection to all hosts
   command:
-    cmd: "ssh -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ item.ansible_user | default('root') }}@{{ item.ansible_host }} 'echo SSH connection successful'"
-  loop: "{{ user_input.kubernetes_deployment.control_plane_nodes + user_input.kubernetes_deployment.worker_nodes | default([]) }}"
+    cmd: "ssh -i {{ k8s_ssh_key_path | expanduser | realpath | default('~/.ssh/k8s_rsa') }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ item.ansible_user | default(k8s_default_user) }}@{{ item.ansible_host }} 'echo SSH connection successful'"
+  loop: "{{ k8s_control_plane_nodes + k8s_worker_nodes }}"
   register: ssh_test
   changed_when: false
   ignore_errors: true
@@ -81,8 +111,8 @@
       --become
       --become-method={{ kubespray_become_method }}
       --become-user={{ kubespray_become_user }}
-      -e ansible_ssh_private_key_file={{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }}
-      -e ansible_user={{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}
+      -e ansible_ssh_private_key_file={{ k8s_ssh_key_path | expanduser | realpath | default('~/.ssh/k8s_rsa') }}
+      -e ansible_user={{ k8s_default_user }}
       -e ansible_become_pass=''
       --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
       -vvvv
@@ -111,34 +141,55 @@
 
 - name: Create temporary readable copy of kubeconfig on remote master
   shell: |
-    sudo cp /etc/kubernetes/admin.conf /tmp/kubeconfig_temp
-    sudo chown {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}:{{ user_input.kubernetes_deployment.default_ansible_user | default('root') }} /tmp/kubeconfig_temp
-    sudo chmod 644 /tmp/kubeconfig_temp
-  delegate_to: "{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+    if [ -f "{{ k8s_kubeconfig_path }}" ]; then
+      sudo cp {{ k8s_kubeconfig_path }} /tmp/kubeconfig_temp
+      sudo chown {{ k8s_default_user }}:{{ k8s_default_user }} /tmp/kubeconfig_temp
+      sudo chmod 644 /tmp/kubeconfig_temp
+      echo "Kubeconfig copied from {{ k8s_kubeconfig_path }}"
+    elif [ -f "/etc/kubernetes/admin.conf" ]; then
+      sudo cp /etc/kubernetes/admin.conf /tmp/kubeconfig_temp
+      sudo chown {{ k8s_default_user }}:{{ k8s_default_user }} /tmp/kubeconfig_temp
+      sudo chmod 644 /tmp/kubeconfig_temp
+      echo "Kubeconfig copied from /etc/kubernetes/admin.conf (default fallback)"
+    else
+      echo "ERROR: No kubeconfig found at {{ k8s_kubeconfig_path }} or /etc/kubernetes/admin.conf"
+      exit 1
+    fi
+  delegate_to: "{{ k8s_control_plane_nodes[0].ansible_host }}"
   vars:
-    ansible_ssh_private_key_file: "{{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }}"
-    ansible_user: "{{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}"
+    ansible_ssh_private_key_file: "{{ k8s_ssh_key_path | expanduser | realpath | default('~/.ssh/k8s_rsa') }}"
+    ansible_user: "{{ k8s_default_user }}"
   when:
     - kubernetes_deployment.enabled | default(false)
     - kubespray_result is defined
     - kubespray_result is succeeded
+  register: kubeconfig_copy_result
+
+- name: Display kubeconfig copy result
+  debug:
+    var: kubeconfig_copy_result.stdout_lines
+  when:
+    - kubernetes_deployment.enabled | default(false)
+    - kubeconfig_copy_result is defined
 
 - name: Copy kubeconfig from first control plane node
   command:
-    cmd: "scp -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}@{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }}:/tmp/kubeconfig_temp {{ lookup('env', 'PWD') }}/files/kubeconfig"
+    cmd: "scp -i {{ k8s_ssh_key_path | expanduser | realpath | default('~/.ssh/k8s_rsa') }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ k8s_default_user }}@{{ k8s_control_plane_nodes[0].ansible_host }}:/tmp/kubeconfig_temp {{ lookup('env', 'PWD') }}/files/kubeconfig"
   when: 
     - kubernetes_deployment.enabled | default(false)
     - kubespray_result is defined
     - kubespray_result is succeeded
+    - kubeconfig_copy_result is defined
+    - kubeconfig_copy_result is succeeded
 
 - name: Cleanup temporary kubeconfig file on remote master
   file:
     path: /tmp/kubeconfig_temp
     state: absent
-  delegate_to: "{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  delegate_to: "{{ k8s_control_plane_nodes[0].ansible_host }}"
   vars:
-    ansible_ssh_private_key_file: "{{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }}"
-    ansible_user: "{{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}"
+    ansible_ssh_private_key_file: "{{ k8s_ssh_key_path | expanduser | realpath | default('~/.ssh/k8s_rsa') }}"
+    ansible_user: "{{ k8s_default_user }}"
   when:
     - kubernetes_deployment.enabled | default(false)
     - kubespray_result is defined
