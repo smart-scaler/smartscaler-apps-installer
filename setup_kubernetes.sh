@@ -201,7 +201,13 @@ export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 export LC_CTYPE=en_US.UTF-8
 
-ansible-playbook kubernetes.yml -i "$INVENTORY_FILE" -vv
+# Check if we should ignore errors
+if [ "${ANSIBLE_EXTRA_VARS}" ]; then
+    echo "Running with extra variables: ${ANSIBLE_EXTRA_VARS}"
+    ansible-playbook kubernetes.yml -i "$INVENTORY_FILE" -e "${ANSIBLE_EXTRA_VARS}" -vv
+else
+    ansible-playbook kubernetes.yml -i "$INVENTORY_FILE" -vv
+fi
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}Kubernetes deployment failed.${NC}"
