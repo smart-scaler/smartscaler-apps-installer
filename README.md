@@ -129,9 +129,6 @@ Before setting up the Kubernetes cluster, ensure you have:
 - helm v3.15.0
 - kubectl v1.25.0
 
-3. **NVIDIA GPU Requirements** (for GPU nodes)
-   - NVIDIA GPU drivers installed
-   - Docker runtime configured for GPU support
 
 ### Setting Up Local Environment
 
