@@ -554,10 +554,18 @@ EOF
 validate_kubeconfig() {
     print_status "Validating kubeconfig..."
 
-    # Set KUBECONFIG environment variable
+    # Skip validation for remote deployments - cluster is on remote server
+    if [ "$REMOTE_DEPLOY" = true ] || [ -n "$MASTER_NODE_IP" ]; then
+        print_status "Skipping local kubeconfig validation for remote deployment"
+        print_status "Kubernetes cluster is running on remote master: $MASTER_NODE_IP"
+        print_status "All kubectl commands will be executed on the remote server"
+        return 0
+    fi
+
+    # Set KUBECONFIG environment variable for local validation
     export KUBECONFIG="$KUBECONFIG_LOCAL_PATH"
 
-    # Test kubectl connectivity
+    # Test kubectl connectivity locally
     if kubectl cluster-info >/dev/null 2>&1; then
         print_success "Kubeconfig is valid and cluster is accessible"
         
@@ -568,6 +576,7 @@ validate_kubeconfig() {
         kubectl get nodes
     else
         print_error "Failed to connect to Kubernetes cluster using kubeconfig"
+        print_status "Tip: For remote clusters, use --remote flag to run commands on the master node"
         exit 1
     fi
 }
@@ -769,7 +778,8 @@ EOF
 verify_deployment() {
     print_status "Verifying deployment..."
 
-    if [ "$REMOTE_DEPLOY" = true ] && [ -n "$MASTER_NODE_IP" ]; then
+    # Always use remote verification when we have a master node IP
+    if [ -n "$MASTER_NODE_IP" ]; then
         verify_deployment_remote
     else
         verify_deployment_local
@@ -797,28 +807,52 @@ verify_deployment_local() {
 
 # Function to verify deployment remotely
 verify_deployment_remote() {
-    print_status "Verifying deployment remotely on master node..."
+    print_status "Verifying deployment remotely on master node: $MASTER_NODE_IP"
 
-    ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$MASTER_NODE_USER@$MASTER_NODE_IP" << EOF
-export KUBECONFIG="$KUBECONFIG_REMOTE_PATH"
+    ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$MASTER_NODE_USER@$MASTER_NODE_IP" << 'EOF'
+export KUBECONFIG="/etc/kubernetes/admin.conf"
 
-echo "Checking namespaces..."
+echo "=== Cluster Information ==="
+kubectl cluster-info
+
+echo ""
+echo "=== Node Status ==="
+kubectl get nodes -o wide
+
+echo ""
+echo "=== All Namespaces ==="
 kubectl get namespaces
 
-echo "Checking pods in all namespaces..."
+echo ""
+echo "=== Pods in All Namespaces ==="
 kubectl get pods --all-namespaces
 
-echo "Checking services..."
+echo ""
+echo "=== Services in All Namespaces ==="  
 kubectl get svc --all-namespaces
 
-echo "Checking KEDA ScaledObjects..."
-kubectl get scaledobjects --all-namespaces 2>/dev/null || echo "No KEDA ScaledObjects found"
+echo ""
+echo "=== Cluster Health Check ==="
+kubectl get componentstatuses 2>/dev/null || echo "ComponentStatus API not available (expected in newer K8s versions)"
+
+echo ""
+echo "=== Storage Classes ==="
+kubectl get storageclass
+
+echo ""
+echo "=== KEDA ScaledObjects (if any) ==="
+kubectl get scaledobjects --all-namespaces 2>/dev/null || echo "No KEDA ScaledObjects found or KEDA not installed yet"
+
+echo ""
+echo "=== Deployment Verification Complete ==="
 EOF
 
     if [ $? -eq 0 ]; then
-        print_success "Deployment verification completed (remote)"
+        print_success "Deployment verification completed successfully (remote)"
+        print_status "Kubernetes cluster is running and accessible on $MASTER_NODE_IP"
     else
         print_warning "Some verification commands failed, but deployment may still be successful"
+        print_status "You can manually check the cluster with: ssh -i $SSH_KEY_PATH $MASTER_NODE_USER@$MASTER_NODE_IP"
     fi
 }
 
@@ -826,18 +860,54 @@ EOF
 display_final_status() {
     print_success "Smart Scaler deployment completed successfully!"
     echo
-    print_status "Next steps:"
-    echo "1. Access Grafana dashboard for monitoring"
-    echo "   kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80"
-    echo
-    echo "2. Access Prometheus for metrics"
-    echo "   kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090"
-    echo
-    echo "3. Test NIM service endpoint"
-    echo "   kubectl port-forward -n nim svc/meta-llama3-8b-instruct 8000:8000"
-    echo
-    echo "4. Monitor scaling with KEDA"
-    echo "   kubectl get scaledobjects -n nim"
+    
+    if [ -n "$MASTER_NODE_IP" ]; then
+        print_status "REMOTE DEPLOYMENT - Cluster running on: $MASTER_NODE_USER@$MASTER_NODE_IP"
+        echo
+        print_status "Access your cluster remotely:"
+        echo "1. SSH to master node:"
+        echo "   ssh -i $SSH_KEY_PATH $MASTER_NODE_USER@$MASTER_NODE_IP"
+        echo
+        echo "2. Check cluster status (on remote master):"
+        echo "   export KUBECONFIG=/etc/kubernetes/admin.conf"
+        echo "   kubectl get nodes"
+        echo "   kubectl get pods --all-namespaces"
+        echo
+        echo "3. Access services via port forwarding from master:"
+        echo "   # Grafana dashboard"
+        echo "   kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80 --address 0.0.0.0"
+        echo "   # Then access: http://$MASTER_NODE_IP:3000"
+        echo
+        echo "   # Prometheus"
+        echo "   kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090 --address 0.0.0.0"
+        echo "   # Then access: http://$MASTER_NODE_IP:9090"
+        echo
+        echo "   # NIM service endpoint"
+        echo "   kubectl port-forward -n nim svc/meta-llama3-8b-instruct 8000:8000 --address 0.0.0.0"
+        echo "   # Then access: http://$MASTER_NODE_IP:8000"
+        echo
+        echo "4. Monitor scaling with KEDA (on remote master):"
+        echo "   kubectl get scaledobjects -n nim"
+        echo "   kubectl get hpa -n nim"
+        echo
+        print_status "Remote cluster management commands:"
+        echo "ssh -i $SSH_KEY_PATH $MASTER_NODE_USER@$MASTER_NODE_IP 'kubectl get nodes'"
+        echo "ssh -i $SSH_KEY_PATH $MASTER_NODE_USER@$MASTER_NODE_IP 'kubectl get pods --all-namespaces'"
+    else
+        print_status "LOCAL DEPLOYMENT - Next steps:"
+        echo "1. Access Grafana dashboard for monitoring"
+        echo "   kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80"
+        echo
+        echo "2. Access Prometheus for metrics"
+        echo "   kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090"
+        echo
+        echo "3. Test NIM service endpoint"
+        echo "   kubectl port-forward -n nim svc/meta-llama3-8b-instruct 8000:8000"
+        echo
+        echo "4. Monitor scaling with KEDA"
+        echo "   kubectl get scaledobjects -n nim"
+    fi
+    
     echo
     echo "5. View deployment logs:"
     echo "   tail -f $LOG_FILE"
