@@ -21,15 +21,24 @@
     user_input: "{{ user_input_content.content | b64decode | from_yaml }}"
   when: kubernetes_deployment.enabled | default(false)
 
+- name: Set Kubespray variables
+  set_fact:
+    kube_apiserver_ip: "{{ kubernetes_deployment.api_server.host }}"
+    loadbalancer_apiserver:
+      address: "{{ kubernetes_deployment.api_server.host }}"
+      port: "{{ kubernetes_deployment.api_server.port }}"
+  when: kubernetes_deployment.enabled | default(false)
+
 - name: Generate inventory content
   template:
     src: "{{ playbook_dir }}/templates/inventory.ini.j2"
     dest: "{{ inventory_dir }}/kubespray/inventory.ini"
   vars:
-    control_plane_nodes: "{{ user_input.kubernetes_deployment.control_plane_nodes }}"
-    worker_nodes: "{{ user_input.kubernetes_deployment.worker_nodes | default([]) }}"
-    ssh_key_path: "{{ user_input.kubernetes_deployment.ssh_key_path | default('~/.ssh/k8s_rsa') }}"
-    default_ansible_user: "{{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}"
+    control_plane_nodes: "{{ kubernetes_deployment.control_plane_nodes }}"
+    worker_nodes: "{{ kubernetes_deployment.worker_nodes | default([]) }}"
+    ssh_key_path: "{{ kubernetes_deployment.ssh_key_path | default('~/.ssh/k8s_rsa') }}"
+    default_ansible_user: "{{ kubernetes_deployment.default_ansible_user | default('root') }}"
+    kube_apiserver_ip: "{{ kubernetes_deployment.api_server.host }}"
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Show generated inventory file contents
@@ -49,8 +58,8 @@
 
 - name: Test SSH connection to all hosts
   command:
-    cmd: "ssh -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ item.ansible_user | default('root') }}@{{ item.ansible_host }} 'echo SSH connection successful'"
-  loop: "{{ user_input.kubernetes_deployment.control_plane_nodes + user_input.kubernetes_deployment.worker_nodes | default([]) }}"
+    cmd: "ssh -i {{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ item.ansible_user | default('root') }}@{{ item.ansible_host }} 'echo SSH connection successful'"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
   register: ssh_test
   changed_when: false
   ignore_errors: true
@@ -78,11 +87,16 @@
       ansible-playbook -i {{ inventory_dir }}/kubespray/inventory.ini
       {{ kubespray_dir }}/cluster.yml
       -e @{{ inventory_dir }}/kubespray/group_vars/all/all.yml
+      -e @{{ inventory_dir }}/kubespray/group_vars/all/api_server.yml
+      -e "kube_apiserver_ip={{ kubernetes_deployment.api_server.host }}"
+      -e "loadbalancer_apiserver={address: '{{ kubernetes_deployment.api_server.host }}', port: {{ kubernetes_deployment.api_server.port }}}"
+      -e "apiserver_loadbalancer_domain_name={{ kubernetes_deployment.api_server.host }}"
+      -e "supplementary_addresses_in_ssl_keys=['{{ kubernetes_deployment.api_server.host }}']"
       --become
       --become-method={{ kubespray_become_method }}
       --become-user={{ kubespray_become_user }}
-      -e ansible_ssh_private_key_file={{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }}
-      -e ansible_user={{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}
+      -e ansible_ssh_private_key_file={{ kubernetes_deployment.ssh_key_path | expanduser | realpath }}
+      -e ansible_user={{ kubernetes_deployment.default_ansible_user | default('root') }}
       -e ansible_become_pass=''
       --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
       -vvvv
@@ -111,7 +125,7 @@
 
 - name: Try direct copy of kubeconfig from first control plane node
   command:
-    cmd: "scp -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}@{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }}:/etc/kubernetes/admin.conf {{ lookup('env', 'PWD') }}/files/kubeconfig"
+    cmd: "scp -i {{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ kubernetes_deployment.default_ansible_user | default('root') }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}:/etc/kubernetes/admin.conf {{ lookup('env', 'PWD') }}/files/kubeconfig"
   register: direct_copy_result
   ignore_errors: true
   when: 
@@ -123,17 +137,17 @@
   block:
     - name: Create temporary copy of admin.conf on remote host
       command:
-        cmd: "ssh -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}@{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }} 'sudo cp /etc/kubernetes/admin.conf /tmp/admin.conf && sudo chown {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}:{{ user_input.kubernetes_deployment.default_ansible_user | default('root') }} /tmp/admin.conf'"
+        cmd: "ssh -i {{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ kubernetes_deployment.default_ansible_user | default('root') }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }} 'sudo cp /etc/kubernetes/admin.conf /tmp/admin.conf && sudo chown {{ kubernetes_deployment.default_ansible_user | default('root') }}:{{ kubernetes_deployment.default_ansible_user | default('root') }} /tmp/admin.conf'"
       when: direct_copy_result is failed
 
     - name: Copy temporary admin.conf from remote host
       command:
-        cmd: "scp -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}@{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }}:/tmp/admin.conf {{ lookup('env', 'PWD') }}/files/kubeconfig"
+        cmd: "scp -i {{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ kubernetes_deployment.default_ansible_user | default('root') }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}:/tmp/admin.conf {{ lookup('env', 'PWD') }}/files/kubeconfig"
       when: direct_copy_result is failed
 
     - name: Clean up temporary admin.conf on remote host
       command:
-        cmd: "ssh -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}@{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }} 'sudo rm -f /tmp/admin.conf'"
+        cmd: "ssh -i {{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ kubernetes_deployment.default_ansible_user | default('root') }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }} 'sudo rm -f /tmp/admin.conf'"
       when: direct_copy_result is failed
   ignore_errors: true
   when:

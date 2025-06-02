@@ -14,11 +14,13 @@
     export LANG=C
   changed_when: false
   delegate_to: "{{ item.ansible_host }}"
+  delegate_facts: true
   loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
   when: kubernetes_deployment.enabled | default(false)
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
 
 - name: Install required locale packages
   shell: |
@@ -33,6 +35,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
   environment:
     LC_ALL: C
     LANG: C
@@ -48,6 +51,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
   environment:
     LC_ALL: C
     LANG: C
@@ -64,6 +68,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
   environment:
     LC_ALL: C
     LANG: C
@@ -79,6 +84,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
 
 - name: Check if UFW is installed
   shell: |
@@ -93,6 +99,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8
@@ -109,6 +116,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8
@@ -125,6 +133,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.1.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8
@@ -141,6 +150,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8
@@ -157,6 +167,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8
@@ -173,6 +184,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8
@@ -186,6 +198,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8 

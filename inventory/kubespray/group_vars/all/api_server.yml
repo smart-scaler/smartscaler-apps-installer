@@ -1,0 +1,9 @@
+---
+# API Server Configuration
+kube_apiserver_ip: "{{ kube_apiserver_ip | default('127.0.0.1') }}"
+kube_apiserver_port: "{{ loadbalancer_apiserver.port | default(6443) }}"
+supplementary_addresses_in_ssl_keys: ["{{ kube_apiserver_ip | default('127.0.0.1') }}"]
+
+# Ensure API server binds to the correct IP
+bind_address: "{{ kube_apiserver_ip | default('127.0.0.1') }}"
+advertise_address: "{{ kube_apiserver_ip | default('127.0.0.1') }}" 

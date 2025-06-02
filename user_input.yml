@@ -5,6 +5,12 @@
 kubernetes_deployment:
   enabled: false # Enable/disable Kubernetes cluster deployment
 
+  # API Server Configuration
+  api_server:
+    host: "<API SERVER IP ADDRESS>" # API server host IP or DNS name
+    port: 6443 # API server port
+    secure: true # Use HTTPS for API server connection
+
   # Firewall Configuration
   firewall:
     enabled: true # Enable/disable firewall configuration
@@ -19,24 +25,30 @@ kubernetes_deployment:
 
   # SSH Configuration
   # Required for Kubespray to access and configure nodes
-  ssh_key_path: "/root/.ssh/k8s_rsa" # Absolute Path to SSH private key for node access
-  default_ansible_user: "root" # Default SSH user for node access
+  ssh_key_path: "/home/richie/Downloads/scm-test.pem"          # Absolute Path to SSH private key for node access
+  default_ansible_user: "ubuntu" # Default SSH user for node access
 
   # Node Configuration
   # Define the control plane (master) nodes for the Kubernetes cluster
   control_plane_nodes: # List of control plane nodes
     - name: master-k8s # Hostname/identifier for the node
-      ansible_host: 127.0.0.1 # IP address or DNS name of the node
-      ansible_user: root # SSH user for this specific node
+      ansible_host: "<PUBLIC IP ADDRESS>"  # IP address or DNS name of the node
+      ansible_user: <SSH USER> # SSH user for this specific node
       ansible_become: true
       ansible_become_method: sudo
       ansible_become_user: root
-      # private_ip: 10.0.102.57        # SSH user for this specific node
+      private_ip: <PRIVATE IP ADDRESS>          
 
   # Kubernetes Components Configuration
   network_plugin: calico # CNI plugin for pod networking (options: calico, flannel, etc.)
   container_runtime: containerd # Container runtime (options: containerd, docker)
   dns_mode: coredns # DNS service for the cluster
+  
+  # Network Configuration
+  network_config:
+    service_subnet: "10.233.0.0/18"  # Kubernetes service network CIDR
+    pod_subnet: "10.233.64.0/18"     # Kubernetes pod network CIDR
+    node_prefix: 24                   # Node subnet size
 
 # Global image pull secret settings
 global_image_pull_secret:
