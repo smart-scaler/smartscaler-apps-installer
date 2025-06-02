@@ -599,14 +599,41 @@ ls -la files/
 # - Various YAML templates
 ```
 
-### Deployment Process
-
-1. **Basic deployment:**
+5. **Create and activate a virtual environment:**
 ```bash
-ansible-playbook site.yml
+python3 -m venv venv
+source venv/bin/activate  # On Linux/Mac
+# or
+.\venv\Scripts\activate  # On Windows
 ```
 
-2. **Deployment with explicit credentials:**
+6. **Install Python dependencies:**
+```bash
+pip install -r requirements.txt
+
+# The requirements include:
+# - ansible>=2.10
+# - openshift
+# - kubernetes
+# - PyYAML
+# - kubernetes-validate>=1.28.0
+```
+
+7. **Install Ansible collections:**
+```bash
+ansible-galaxy collection install -r requirements.yml
+
+# Collections installed:
+#  - community.general
+#  - kubernetes.core
+#  - ansible.posix
+#  - community.crypto 
+```
+
+### Deployment Process
+
+
+1. **Deployment with explicit credentials:**
 ```bash
 ansible-playbook site.yml \
   -e "ngc_api_key=$NGC_API_KEY" \
@@ -615,7 +642,7 @@ ansible-playbook site.yml \
   -e "avesha_docker_password=$AVESHA_DOCKER_PASSWORD"
 ```
 
-3. **Debug deployment with verbose output:**
+2. **Debug deployment with verbose output:**
 ```bash
 ansible-playbook site.yml \
   -e "ngc_api_key=$NGC_API_KEY" \
