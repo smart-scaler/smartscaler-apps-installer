@@ -1,6 +1,6 @@
 # Kubernetes Configuration
 
-This document describes the Kubernetes cluster configuration options and deployment settings in our Ansible automation.
+This document describes the Kubernetes cluster configuration options and deployment settings for the Smart Scaler platform deployment using our Ansible automation.
 
 ## ⚠️ Important: Installation Method
 
@@ -27,7 +27,7 @@ The `setup_kubernetes.sh` script performs the following critical operations:
 
 4. **Node Configuration**
    - Sets up control plane nodes
-   - Configures worker nodes
+   - Configures worker nodes (if specified)
    - Handles node-specific user configurations
 
 5. **Security Checks**
@@ -46,65 +46,104 @@ The Kubernetes configuration is managed through `user_input.yml`:
 
 ```yaml
 kubernetes_deployment:
-  # Basic cluster configuration
-  kubeconfig_path: "/path/to/kubeconfig"
-  kube_context: "your-context"
-  default_ansible_user: "ubuntu"
-  ssh_key_path: "/path/to/ssh/key"
-
-  # Node configuration
-  control_plane_nodes:
-    - ansible_host: "192.168.1.10"
-      ansible_user: "ubuntu"
-      node_name: "master-1"
-  worker_nodes:
-    - ansible_host: "192.168.1.11"
-      ansible_user: "ubuntu"
-      node_name: "worker-1"
-
-  # Feature flags
-  nvidia_runtime:
-    enabled: true
+  enabled: false                               # Enable/disable Kubernetes cluster deployment
+  
+  # Firewall Configuration
   firewall:
-    enabled: true
-
-  # Network configuration
-  pod_network_cidr: "10.244.0.0/16"
-  service_cidr: "10.96.0.0/12"
+    enabled: true                             # Enable/disable firewall configuration
+    allow_additional_ports: []                # Additional ports to allow
+    
+  # NVIDIA Runtime Configuration
+  nvidia_runtime:
+    enabled: true                            # Enable/disable NVIDIA runtime configuration
+    install_toolkit: true                     # Install NVIDIA Container Toolkit if not present
+    configure_containerd: true                # Configure containerd with NVIDIA runtime
+    create_runtime_class: true                # Create Kubernetes RuntimeClass for NVIDIA
   
-  # Container runtime
-  container_runtime: "containerd"
-  containerd_version: "1.6.0"
-
-  # Kubernetes version
-  kubernetes_version: "1.28.0"
+  # SSH Configuration
+  ssh_key_path: "/root/.ssh/k8s_rsa"         # Absolute Path to SSH private key for node access
+  default_ansible_user: "root"               # Default SSH user for node access
   
-  # CNI configuration
-  cni_plugin: "calico"
-  calico_version: "v3.26.0"
+  # Node Configuration
+  control_plane_nodes:
+    - name: master-k8s                        # Hostname/identifier for the node
+      ansible_host: "127.0.0.1"             # IP address or DNS name of the node
+      ansible_user: root                      # SSH user for this specific node
+  
+  # Kubernetes Components Configuration
+  network_plugin: calico                      # CNI plugin for pod networking
+  container_runtime: containerd               # Container runtime
+  dns_mode: coredns                          # DNS service for the cluster
 ```
 
-## Features
+## Enhanced Features
 
-1. **Node Management**
-   - Control plane and worker node configuration
-   - SSH access management
-   - Node labeling and tainting
+### 1. Firewall Management
 
-2. **Network Configuration**
-   - Pod network CIDR configuration
-   - Service CIDR configuration
-   - CNI plugin selection and setup
+The deployment now includes comprehensive firewall configuration:
 
-3. **Runtime Configuration**
-   - Container runtime selection
-   - Version management
-   - Runtime-specific optimizations
+```yaml
+firewall:
+  enabled: true                             # Enable automatic firewall management
+  allow_additional_ports:                   # Additional ports to open
+    - "8080"                               # Custom HTTP port
+    - "9090"                               # Prometheus metrics
+    - "3000"                               # Grafana dashboard
+```
 
-4. **Security Features**
-   - SSH key management
-   - Firewall configuration
-   - RBAC setup
+**Automatically Configured Ports:**
+- **Control Plane Ports**: 6443 (API server), 2379-2380 (etcd), 10250 (kubelet), 10259 (scheduler), 10257 (controller-manager)
+- **Worker Node Ports**: 10250 (kubelet), 30000-32767 (NodePort services)
+- **CNI Ports**: 179 (Calico BGP), 4789 (Calico VXLAN), 5473 (Calico Typha)
+- **Additional Services**: 9099 (health checks), custom application ports
+
+### 2. NVIDIA Runtime Integration
+
+Enhanced GPU support with comprehensive NVIDIA runtime configuration:
+
+```yaml
+nvidia_runtime:
+  enabled: true                            # Enable NVIDIA runtime support
+  install_toolkit: true                     # Install NVIDIA Container Toolkit
+  configure_containerd: true                # Configure containerd for GPU support
+  create_runtime_class: true                # Create Kubernetes RuntimeClass
+```
+
+**Features Included:**
+- NVIDIA Container Toolkit installation and configuration
+- Containerd runtime configuration for GPU workloads
+- Kubernetes RuntimeClass creation for NVIDIA workloads
+- GPU resource management and allocation
+- Validation and testing of GPU functionality
+
+### 3. Network Configuration
+
+```yaml
+# Network Configuration
+network_plugin: calico                      # CNI plugin selection
+container_runtime: containerd               # Container runtime
+dns_mode: coredns                          # DNS service configuration
+
+# Advanced Network Settings (configured automatically)
+pod_network_cidr: "10.233.64.0/18"        # Pod network CIDR
+service_cidr: "10.233.0.0/18"             # Service network CIDR
+```
+
+### 4. Security Configuration
+
+Enhanced security features:
+
+```yaml
+# SSH Configuration
+ssh_key_path: "/root/.ssh/k8s_rsa"         # Must be absolute path
+default_ansible_user: "root"               # Default SSH user
+
+# Security Features (automatically configured)
+- RBAC enabled by default
+- Network policies support
+- Pod security standards
+- Audit logging
+```
 
 ## Node Configuration
 
@@ -112,315 +151,300 @@ kubernetes_deployment:
 
 ```yaml
 control_plane_nodes:
-  - ansible_host: "192.168.1.10"
-    ansible_user: "ubuntu"
-    node_name: "master-1"
-    labels:
-      role: "control-plane"
-    taints:
-      - key: "node-role.kubernetes.io/control-plane"
-        effect: "NoSchedule"
+  - name: master-k8s                        # Node identifier
+    ansible_host: "127.0.0.1"             # Node IP address
+    ansible_user: root                      # SSH user for this node
 ```
 
-### Worker Nodes
+**Control Plane Features:**
+- Kubernetes API server
+- etcd cluster member
+- Controller manager
+- Scheduler
+- CNI plugin installation
+
+### Worker Nodes (Optional)
 
 ```yaml
 worker_nodes:
-  - ansible_host: "192.168.1.11"
-    ansible_user: "ubuntu"
-    node_name: "worker-1"
-    labels:
-      role: "worker"
-      gpu: "nvidia"
+  - name: worker-1
+    ansible_host: "192.168.1.11"
+    ansible_user: root
 ```
 
-## Network Configuration
+**Worker Node Features:**
+- Kubelet service
+- Container runtime
+- CNI plugin
+- GPU support (if enabled)
 
-### Pod Network
+## Deployment Process
 
-```yaml
-pod_network:
-  cidr: "10.244.0.0/16"
-  plugin: "calico"
-  calico_version: "v3.26.0"
-  mtu: 1440
+### Step 1: Pre-deployment Configuration
+
+1. **Update Node Configuration**
+   ```yaml
+   kubernetes_deployment:
+     enabled: true                          # Enable Kubernetes deployment
+     ssh_key_path: "/root/.ssh/k8s_rsa"    # Update with your SSH key path
+     control_plane_nodes:
+       - name: master-k8s
+         ansible_host: "YOUR_NODE_IP"       # Update with actual IP
+         ansible_user: root
+   ```
+
+2. **Configure Features**
+   ```yaml
+   firewall:
+     enabled: true                          # Enable firewall management
+   nvidia_runtime:
+     enabled: true                          # Enable for GPU workloads
+   ```
+
+### Step 2: Run Deployment Script
+
+```bash
+# Make script executable
+chmod +x setup_kubernetes.sh
+
+# Run the deployment
+./setup_kubernetes.sh
 ```
 
-### Service Network
+### Step 3: Verification
 
-```yaml
-service_network:
-  cidr: "10.96.0.0/12"
-  dns_domain: "cluster.local"
+```bash
+# Check cluster status
+kubectl get nodes
+
+# Verify pods are running
+kubectl get pods -A
+
+# Check GPU nodes (if NVIDIA runtime enabled)
+kubectl get nodes -l nvidia.com/gpu=true
+
+# Verify firewall rules
+sudo ufw status verbose
 ```
 
-## Container Runtime
+## Advanced Configuration Options
 
-### Containerd Configuration
+### Custom Network Configuration
 
 ```yaml
-container_runtime:
-  name: "containerd"
-  version: "1.6.0"
-  config_template: "containerd/config.toml.j2"
-  registry_mirrors:
-    - "https://registry-1.docker.io"
+# Advanced networking (automatically configured)
+kube_network_plugin: calico
+kube_pods_subnet: 10.233.64.0/18
+kube_service_addresses: 10.233.0.0/18
+cluster_name: cluster.local
 ```
 
-## Security Configuration
+### GPU Workload Configuration
 
-### SSH Configuration
-
-```yaml
-ssh_config:
-  key_path: "/path/to/ssh/key"
-  default_user: "ubuntu"
-  sudo_without_password: true
-```
-
-### Firewall Rules
+For GPU-enabled clusters:
 
 ```yaml
-firewall:
+# GPU Runtime Configuration
+nvidia_runtime:
   enabled: true
-  default_policy: "deny"
-  allowed_ports:
-    - port: 22
-      protocol: tcp
-    - port: 6443
-      protocol: tcp
+  install_toolkit: true
+  configure_containerd: true
+  create_runtime_class: true
+
+# Automatically creates RuntimeClass for GPU workloads
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: nvidia
+handler: nvidia
 ```
 
-## Pre-deployment Requirements
+### Security Hardening
 
-Before running `setup_kubernetes.sh`, ensure:
-
-1. **Node Configuration**
-   ```yaml
-   kubernetes_deployment:
-     enabled: true  # Must be set to true
-     control_plane_nodes:
-       - ansible_host: "YOUR_MASTER_NODE_IP"
-         name: "master-1"
-         ansible_user: "ubuntu"  # Optional, will use default if not specified
-     worker_nodes:
-       - ansible_host: "YOUR_WORKER_NODE_IP"
-         name: "worker-1"
-         ansible_user: "ubuntu"  # Optional, will use default if not specified
-   ```
-
-2. **SSH Configuration**
-   - SSH key at `~/.ssh/k8s_rsa`
-   - Proper permissions on SSH key (600)
-   - SSH access to all nodes
-
-3. **System Requirements**
-   - Python virtual environment activated
-   - Required Python packages installed
-   - Proper locale settings (UTF-8)
-
-## Installation Process
-
-1. **Update Configuration**
-   ```yaml
-   # In user_input.yml
-   kubernetes_deployment:
-     enabled: true
-     # ... node configurations ...
-   ```
-
-2. **Run Setup Script**
-   ```bash
-   chmod +x setup_kubernetes.sh
-   ./setup_kubernetes.sh
-   ```
-
-3. **Monitor Output**
-   The script will:
-   - Validate configurations
-   - Test node connectivity
-   - Generate inventory
-   - Deploy Kubernetes components
-
-## Validation and Verification
-
-After the script completes:
-
-1. **Check Node Status**
-   ```bash
-   kubectl get nodes -o wide
-   ```
-
-2. **Verify System Pods**
-   ```bash
-   kubectl get pods -n kube-system
-   ```
-
-3. **Check Cluster Health**
-   ```bash
-   kubectl cluster-info
-   ```
+```yaml
+# Security features (automatically enabled)
+- RBAC authorization
+- Network policies
+- Pod security standards
+- Audit logging
+- TLS encryption for all communications
+```
 
 ## Troubleshooting
 
-### Common Issues
+### Common Issues and Solutions
 
-1. **SSH Connectivity**
-   - Verify SSH key permissions
-   - Check node IP addresses
-   - Ensure proper user configuration
-
-2. **Configuration Issues**
-   - Validate user_input.yml format
-   - Check node specifications
-   - Verify enabled flag is set
-
-3. **Deployment Failures**
-   - Check script output for errors
-   - Verify node requirements
-   - Review connectivity issues
-
-### Error Resolution
-
-1. **SSH Errors**
+1. **SSH Connection Issues**
    ```bash
-   # Fix SSH key permissions
-   chmod 600 ~/.ssh/k8s_rsa
+   # Verify SSH connectivity
+   ssh -i /root/.ssh/k8s_rsa root@NODE_IP
    
-   # Test SSH connection
-   ssh -i ~/.ssh/k8s_rsa user@node-ip
+   # Check SSH key permissions
+   chmod 600 /root/.ssh/k8s_rsa
    ```
 
-2. **Configuration Errors**
-   - Review user_input.yml syntax
-   - Ensure all required fields are present
-   - Check node accessibility
-
-3. **System Issues**
-   - Verify Python environment
-   - Check locale settings
-   - Ensure sufficient resources
-
-## Post-Installation
-
-After successful installation:
-1. Configure additional components
-2. Set up monitoring and logging
-3. Deploy applications
-
-## Usage
-
-### Pre-deployment Steps
-
-1. Update node IPs in `user_input.yml`:
-   ```yaml
-   kubernetes_deployment:
-     control_plane_nodes:
-       - ansible_host: "YOUR_MASTER_NODE_IP"  # Update this IP
-         node_name: "master-1"
-     worker_nodes:
-       - ansible_host: "YOUR_WORKER_NODE_IP"  # Update this IP
-         node_name: "worker-1"
-   ```
-
-2. Run the Kubernetes setup script:
+2. **Node Not Ready**
    ```bash
-   ./setup_kubernetes.sh
+   # Check kubelet status
+   systemctl status kubelet
+   
+   # Check kubelet logs
+   journalctl -u kubelet -f
    ```
-   This script will:
-   - Initialize the Kubernetes cluster
-   - Configure networking
-   - Set up required components
-   - Apply initial configurations
 
-### Basic Deployment
+3. **DNS Resolution Issues**
+   ```bash
+   # Check CoreDNS pods
+   kubectl get pods -n kube-system -l k8s-app=kube-dns
+   
+   # Test DNS resolution
+   kubectl run test-dns --image=busybox --rm -it -- nslookup kubernetes
+   ```
 
-1. Configure your nodes in `user_input.yml`:
+4. **Network Connectivity**
+   ```bash
+   # Check Calico pods
+   kubectl get pods -n kube-system -l k8s-app=calico-node
+   
+   # Verify network policy support
+   kubectl get networkpolicies -A
+   ```
+
+5. **GPU Issues (if enabled)**
+   ```bash
+   # Check NVIDIA runtime
+   kubectl get runtimeclass nvidia
+   
+   # Test GPU access
+   kubectl run gpu-test --image=nvidia/cuda:11.0-base --rm -it -- nvidia-smi
+   ```
+
+### Firewall Troubleshooting
+
+1. **Check Firewall Status**
+   ```bash
+   sudo ufw status verbose
+   ```
+
+2. **Verify Required Ports**
+   ```bash
+   # Test API server connectivity
+   nc -zv NODE_IP 6443
+   
+   # Test kubelet port
+   nc -zv NODE_IP 10250
+   ```
+
+3. **Add Custom Ports**
    ```yaml
-   kubernetes_deployment:
-     control_plane_nodes:
-       - ansible_host: "192.168.1.10"
-         node_name: "master-1"
-     worker_nodes:
-       - ansible_host: "192.168.1.11"
-         node_name: "worker-1"
+   firewall:
+     enabled: true
+     allow_additional_ports:
+       - "8080"    # Custom application port
+       - "9090"    # Prometheus
    ```
 
+### GPU Runtime Troubleshooting
 
-### Advanced Configuration
+1. **Verify NVIDIA Toolkit Installation**
+   ```bash
+   nvidia-container-cli info
+   ```
 
-1. Enable specific features:
+2. **Check Containerd Configuration**
+   ```bash
+   cat /etc/containerd/config.toml | grep nvidia
+   ```
+
+3. **Test GPU Pod**
    ```yaml
-   kubernetes_deployment:
-     nvidia_runtime:
-       enabled: true
-     firewall:
-       enabled: true
+   apiVersion: v1
+   kind: Pod
+   metadata:
+     name: gpu-test
+   spec:
+     runtimeClassName: nvidia
+     containers:
+     - name: cuda
+       image: nvidia/cuda:11.0-base
+       command: ["nvidia-smi"]
+       resources:
+         limits:
+           nvidia.com/gpu: 1
    ```
 
-2. Configure networking:
-   ```yaml
-   kubernetes_deployment:
-     pod_network_cidr: "10.244.0.0/16"
-     service_cidr: "10.96.0.0/12"
-     cni_plugin: "calico"
+## Post-Deployment Steps
+
+After successful Kubernetes deployment:
+
+1. **Install Core Components**
+   ```bash
+   # Run the main playbook for Smart Scaler components
+   ansible-playbook site.yml
    ```
 
-## Important Notes
+2. **Verify Component Installation**
+   ```bash
+   # Check GPU Operator (if enabled)
+   kubectl get pods -n gpu-operator
+   
+   # Check Prometheus Stack
+   kubectl get pods -n monitoring
+   
+   # Check KEDA
+   kubectl get pods -n keda
+   ```
 
-1. **IP Configuration**
-   - Always update the node IPs in `user_input.yml` before running `setup_kubernetes.sh`
-   - Ensure the IPs are reachable and have proper SSH access
-   - Verify network connectivity between nodes
+3. **Configure Monitoring**
+   ```bash
+   # Access Grafana dashboard
+   kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+   ```
 
-2. **Setup Script**
-   - `setup_kubernetes.sh` must be run after updating IPs
-   - The script requires proper permissions (`chmod +x setup_kubernetes.sh`)
-   - Monitor the script output for any errors
-   - Wait for the script to complete before proceeding with other configurations
+4. **Test Smart Scaler Components**
+   ```bash
+   # Check NIM services
+   kubectl get pods -n nim
+   
+   # Check Smart Scaler inference
+   kubectl get pods -n smart-scaler
+   ```
 
-## Validation
+## Best Practices
 
-### Cluster Health Check
+### 1. Pre-deployment
+- Always verify SSH connectivity to all nodes
+- Ensure proper SSH key permissions (600)
+- Update node IP addresses in configuration
+- Plan for adequate storage and compute resources
 
-```bash
-# Check node status
-kubectl get nodes -o wide
+### 2. Security
+- Enable firewall management for production deployments
+- Use strong SSH keys and proper key management
+- Implement network policies for workload isolation
+- Regular security updates and patching
 
-# Check system pods
-kubectl get pods -n kube-system
+### 3. GPU Workloads
+- Verify NVIDIA drivers are installed on target nodes
+- Enable NVIDIA runtime only on GPU-enabled nodes
+- Plan for GPU resource allocation and sharing
+- Monitor GPU utilization and performance
 
-# Verify networking
-kubectl run test-pod --image=busybox -- sleep 3600
-kubectl exec test-pod -- ping -c 1 8.8.8.8
-```
+### 4. Network Configuration
+- Choose appropriate CNI plugin for your environment
+- Plan for pod and service network CIDRs
+- Consider multi-zone deployments for high availability
+- Implement proper ingress and load balancing
 
-### Security Validation
+### 5. Monitoring and Maintenance
+- Set up monitoring and alerting from day one
+- Plan for backup and disaster recovery
+- Implement proper logging and audit trails
+- Regular cluster health checks and maintenance
 
-```bash
-# Check firewall status
-sudo ufw status
+## Related Documentation
 
-# Verify SSH access
-ssh -i /path/to/key user@node-ip
-
-# Check RBAC
-kubectl auth can-i --list
-```
-
-## Troubleshooting
-
-1. **Node Join Issues**
-   - Verify SSH access
-   - Check firewall rules
-   - Validate token and certificates
-
-2. **Network Issues**
-   - Check CNI plugin status
-   - Verify network CIDR configurations
-   - Check pod-to-pod communication
-
-3. **Runtime Issues**
-   - Verify containerd status
-   - Check runtime configuration
-   - Validate image pull access 
+- [User Input Configuration Guide](USER_INPUT_CONFIGURATION.md) - Complete configuration guide
+- [User Input Reference](USER_INPUT_REFERENCE.md) - Detailed configuration reference
+- [NVIDIA Container Runtime](NVIDIA_CONTAINER_RUNTIME.md) - GPU runtime configuration
+- [Kubernetes Firewall](KUBERNETES_FIREWALL.md) - Network security configuration 
