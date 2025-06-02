@@ -91,10 +91,17 @@ smartscaler-apps-installer/
 Before setting up the Kubernetes cluster, ensure you have:
 
 1. **System Requirements**
-   - Ubuntu-based system on all nodes
-   - Minimum 2 CPUs, 4GB RAM per node
-   - Network connectivity between all nodes
-   - SSH access to all nodes
+    #### Control Plane Nodes (Master)
+    - CPU: 8 cores minimum
+    - RAM: 16GB minimum
+    - Storage: 500GB minimum
+    - Operating System: Ubuntu 22.04+ or compatible Linux distribution
+    
+    #### Worker Nodes
+    - CPU: 8 cores minimum
+    - RAM: 16GB minimum
+    - Storage: 500GB minimum
+    - Operating System: Same as control plane nodes
 
 2. **Local Development Environment**
    - Python 3.x and pip installed
