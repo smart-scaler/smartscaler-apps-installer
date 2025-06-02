@@ -600,8 +600,10 @@ ls -la files/
 ```
 
 5. **Install Python 3.x and pip**
+```bash
 sudo apt update
 sudo apt install -y python3 python3-pip python3-venv
+```
 
 6. **Create and activate a virtual environment:**
 ```bash
