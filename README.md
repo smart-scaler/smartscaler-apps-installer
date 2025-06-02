@@ -2,60 +2,68 @@
 
 Ansible-based installer for Smart Scaler components and dependencies.
 
-## 🚀 Quick Setup Guide
+## Prerequisites
 
-### Prerequisites
-- Ubuntu 22.04+ or compatible Linux distribution
-- Python 3.8+
-- Git
-- SSH access to target nodes
-- NVIDIA GPU (for GPU nodes)
-- NGC API Key and Docker API Key
-- Avesha Docker registry credentials
+Before running the installer, ensure you have:
 
-### One-Line Installation
+1. Kubernetes cluster access with proper permissions
+2. `kubectl` installed and configured
+3. `helm` v3.x installed
+4. NGC API credentials (API key and Docker API key)
+5. AVESHA Docker Credentials 
+6. Python 3.x and pip installed
+
+### Setting Up Python Environment
+
+1. Create and activate a virtual environment:
 ```bash
-curl -sSL https://raw.githubusercontent.com/smart-scaler/smartscaler-apps-installer/main/install.sh | bash
+python3 -m venv venv
+source venv/bin/activate  # On Linux/Mac
+# or
+.\venv\Scripts\activate  # On Windows
 ```
 
-### Manual Installation Steps
-1. **Clone and Setup:**
+2. Install Python dependencies:
 ```bash
-# Clone repository
-git clone https://github.com/smart-scaler/smartscaler-apps-installer.git
-cd smartscaler-apps-installer
+# Install Python packages
+pip install -r requirements.txt
 
-# Set required environment variables
-export NGC_API_KEY="your-ngc-api-key"
-export NGC_DOCKER_API_KEY="your-ngc-docker-key"
-export AVESHA_DOCKER_USERNAME="your-username"
-export AVESHA_DOCKER_PASSWORD="your-password"
-
-# Run deployment script
-./deploy_smartscaler.sh
+# The requirements include:
+# - ansible>=2.10
+# - openshift
+# - kubernetes
+# - PyYAML
+# - kubernetes-validate>=1.28.0
 ```
 
-2. **Access Services:**
+### Installing Ansible Collections
+
+Install required Ansible collections from Galaxy:
 ```bash
-# Grafana dashboard (default credentials: admin/admin)
-kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+# Install collections from requirements.yml
+ansible-galaxy collection install -r requirements.yml
 
-# Prometheus metrics
-kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
-
-# NIM service endpoint
-kubectl port-forward -n nim svc/meta-llama3-8b-instruct 8000:8000
+# Collections included:
+# - community.general
+# - kubernetes.core
 ```
 
-### Latest Changes (June 2024)
-- Added single-script deployment with `deploy_smartscaler.sh`
-- Improved remote deployment with automatic kubeconfig handling
-- Added NVIDIA GPU operator integration
-- Implemented KEDA autoscaling for NIM services
-- Added comprehensive monitoring with Prometheus and Grafana
-- Improved error handling and validation
-- Added debug mode for troubleshooting
-- Optimized file transfer and deployment process
+### Verifying Installation
+
+Verify the installation of required components:
+```bash
+# Check Python packages
+pip list | grep -E "ansible|kubernetes|openshift|PyYAML"
+
+# Check Ansible collections
+ansible-galaxy collection list | grep -E "community.general|kubernetes.core"
+
+# Check kubectl version
+kubectl version --client
+
+# Check helm version
+helm version
+```
 
 ## Detailed Documentation
 
