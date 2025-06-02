@@ -33,6 +33,7 @@ kubernetes_deployment:
   # Node Configuration
   # Define the control plane (master) nodes for the Kubernetes cluster
   control_plane_nodes:                         # List of control plane nodes
+
     - name: master-k8s                         # Hostname/identifier for the node
       ansible_host: <MASTER_IP>             # IP address or DNS name of the node
       ansible_user: avesha
@@ -40,6 +41,7 @@ kubernetes_deployment:
       # ansible_become_method: sudo
       # ansible_become_user: root
       # private_ip: <PRIVATE_IP>        # SSH user for this specific node
+
   
   # Kubernetes Components Configuration
   network_plugin: calico                       # CNI plugin for pod networking (options: calico, flannel, etc.)

@@ -212,6 +212,10 @@ kubernetes_deployment:
     - name: master-k8s                        # Hostname/identifier for the node
       ansible_host: "YOUR_MASTER_NODE_IP"     # IP address or DNS name of the node
       ansible_user: root                      # SSH user for this specific node
+      ansible_become: true
+      ansible_become_method: sudo
+      private_ip: 10.0.0.19
+
   
   # Kubernetes Components Configuration
   network_plugin: calico                      # CNI plugin for pod networking (options: calico, flannel, etc.)
