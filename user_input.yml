@@ -47,7 +47,7 @@ global_image_pull_secret:
 
 # Kubeconfig settings
 global_kubeconfig: "files/kubeconfig"
-global_kubecontext: "kubecontext" 
+global_kubecontext: "kubernetes-admin@cluster.local"
 use_global_context: true
 
 # Helm repository settings
