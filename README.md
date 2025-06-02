@@ -107,6 +107,8 @@ Before setting up the Kubernetes cluster, ensure you have:
    - Python 3.x and pip installed
    - Git installed
    - SSH key generation capability
+   - helm v3.15.0
+   - kubectl v1.25.0
 
 3. **NVIDIA GPU Requirements** (for GPU nodes)
    - NVIDIA GPU drivers installed
