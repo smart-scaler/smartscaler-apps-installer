@@ -121,7 +121,7 @@ Before setting up the Kubernetes cluster, ensure you have:
     - Storage: 500GB minimum
     - Operating System: Same as control plane nodes
 
-2. **Local Development Environment**
+2. **Environment Prerequisite**
 
 - Python 3.x and pip installed
 - Git installed
