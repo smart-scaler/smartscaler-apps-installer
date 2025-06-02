@@ -26,6 +26,7 @@ SKIP_PREREQUISITES=false
 SKIP_K8S_SETUP=false
 SKIP_APP_DEPLOYMENT=false
 SKIP_VALIDATION=false
+IGNORE_DEPLOYMENT_ERRORS=false
 MASTER_NODE_IP=""
 MASTER_NODE_USER="root"
 KUBECONFIG_REMOTE_PATH="/etc/kubernetes/admin.conf"
@@ -113,6 +114,7 @@ Options:
     --skip-k8s                  Skip Kubernetes setup
     --skip-apps                 Skip application deployment
     --skip-validation           Skip configuration validation
+    --ignore-errors             Ignore all deployment errors and continue (debug mode)
     --ngc-api-key KEY          NGC API Key
     --ngc-docker-key KEY       NGC Docker API Key
     --avesha-username USER     Avesha Docker username
@@ -160,6 +162,12 @@ Examples:
 
     # Skip configuration validation (not recommended)
     $0 --skip-validation
+
+    # Ignore all errors and continue deployment (debug mode)
+    $0 --ignore-errors
+
+    # Combination: Remote deployment ignoring errors
+    $0 --remote --master-ip 192.168.1.100 --ignore-errors
 
     # Validate configuration only (manual validation)
     python3 files/validate_config.py
@@ -416,14 +424,26 @@ setup_kubernetes() {
     # Make setup script executable
     chmod +x setup_kubernetes.sh
 
+    # Set ignore errors flag for Ansible
+    if [ "$IGNORE_DEPLOYMENT_ERRORS" = true ]; then
+        print_warning "IGNORE ERRORS MODE ENABLED - Deployment will continue despite errors"
+        export ANSIBLE_EXTRA_VARS="ignore_deployment_errors=true"
+    else
+        export ANSIBLE_EXTRA_VARS="ignore_deployment_errors=false"
+    fi
+
     # Run Kubernetes setup
     ./setup_kubernetes.sh
 
     if [ $? -eq 0 ]; then
         print_success "Kubernetes cluster setup completed"
     else
-        print_error "Kubernetes cluster setup failed"
-        exit 1
+        if [ "$IGNORE_DEPLOYMENT_ERRORS" = true ]; then
+            print_warning "Kubernetes cluster setup had errors but continuing due to --ignore-errors flag"
+        else
+            print_error "Kubernetes cluster setup failed"
+            exit 1
+        fi
     fi
 }
 
@@ -949,6 +969,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --skip-validation)
             SKIP_VALIDATION=true
+            shift
+            ;;
+        --ignore-errors)
+            IGNORE_DEPLOYMENT_ERRORS=true
             shift
             ;;
         --ngc-api-key)
