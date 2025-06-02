@@ -27,6 +27,7 @@ SKIP_K8S_SETUP=false
 SKIP_APP_DEPLOYMENT=false
 SKIP_VALIDATION=false
 IGNORE_DEPLOYMENT_ERRORS=false
+DEBUG_MODE=false
 MASTER_NODE_IP=""
 MASTER_NODE_USER="root"
 KUBECONFIG_REMOTE_PATH="/etc/kubernetes/admin.conf"
@@ -115,6 +116,7 @@ Options:
     --skip-apps                 Skip application deployment
     --skip-validation           Skip configuration validation
     --ignore-errors             Ignore all deployment errors and continue (debug mode)
+    --debug                   Enable debug mode
     --ngc-api-key KEY          NGC API Key
     --ngc-docker-key KEY       NGC Docker API Key
     --avesha-username USER     Avesha Docker username
@@ -447,15 +449,14 @@ setup_kubernetes() {
     fi
 }
 
-# Function to get kubeconfig from remote master
-get_remote_kubeconfig() {
-    print_status "Retrieving kubeconfig from remote master node..."
+# Function to validate kubeconfig
+validate_kubeconfig() {
+    print_status "Validating kubeconfig on remote node..."
 
-    # If no master IP specified, get it from user_input.yml
+    # Get master node info if not already set
     if [ -z "$MASTER_NODE_IP" ]; then
-        print_status "No master IP specified, reading from user_input.yml..."
+        print_status "Getting master node information from user_input.yml..."
         
-        # Extract master node info from user_input.yml
         MASTER_INFO=$(python3 << 'EOF'
 import yaml
 import sys
@@ -490,93 +491,49 @@ EOF
         fi
         
         IFS='|' read -r MASTER_NODE_IP MASTER_NODE_USER <<< "$MASTER_INFO"
-        print_status "Using master node: $MASTER_NODE_USER@$MASTER_NODE_IP"
     fi
 
-    if [ -z "$MASTER_NODE_IP" ]; then
-        print_error "Master node IP not available for remote deployment"
-        exit 1
-    fi
+    # Test kubectl connectivity on remote node
+    ssh -T -o LogLevel=QUIET -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$SSH_KEY_PATH" "$MASTER_NODE_USER@$MASTER_NODE_IP" << 'EOF' >/dev/null 2>&1
+# Create a temporary copy of admin.conf with proper permissions
+sudo cp /etc/kubernetes/admin.conf /tmp/admin.conf >/dev/null 2>&1
+sudo chown $(whoami) /tmp/admin.conf >/dev/null 2>&1
+export KUBECONFIG=/tmp/admin.conf
 
-    # Create files directory if it doesn't exist
-    mkdir -p "$SCRIPT_DIR/files"
-
-    # Copy kubeconfig from remote master
-    print_status "Copying kubeconfig from $MASTER_NODE_USER@$MASTER_NODE_IP:$KUBECONFIG_REMOTE_PATH"
-    scp -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$MASTER_NODE_USER@$MASTER_NODE_IP:$KUBECONFIG_REMOTE_PATH" "$KUBECONFIG_LOCAL_PATH"
-
-    if [ $? -eq 0 ]; then
-        # Set proper permissions
-        chmod 600 "$KUBECONFIG_LOCAL_PATH"
-        
-        # Update the server IP in kubeconfig to use the master node IP
-        print_status "Updating kubeconfig server address..."
-        python3 << EOF
-import yaml
-import sys
-
-try:
-    with open('$KUBECONFIG_LOCAL_PATH', 'r') as f:
-        config = yaml.safe_load(f)
-    
-    # Update server address to use master node IP
-    if 'clusters' in config:
-        for cluster in config['clusters']:
-            if 'cluster' in cluster and 'server' in cluster['cluster']:
-                # Replace localhost or internal IP with master node IP
-                old_server = cluster['cluster']['server']
-                cluster['cluster']['server'] = f"https://$MASTER_NODE_IP:6443"
-                print(f"Updated server address from {old_server} to {cluster['cluster']['server']}")
-    
-    with open('$KUBECONFIG_LOCAL_PATH', 'w') as f:
-        yaml.dump(config, f, default_flow_style=False)
-    
-    print("Kubeconfig server address updated successfully")
-    
-except Exception as e:
-    print(f"Warning: Could not update kubeconfig server address: {e}")
-    # Don't exit on this error as the kubeconfig might still work
-EOF
-
-        print_success "Kubeconfig retrieved and saved to $KUBECONFIG_LOCAL_PATH"
-    else
-        print_error "Failed to retrieve kubeconfig from remote master"
-        print_status "Possible solutions:"
-        print "1. Ensure the master node is accessible via SSH"
-        print "2. Check if kubeconfig exists at: $KUBECONFIG_REMOTE_PATH"
-        print "3. Verify SSH key authentication is working"
-        print "4. Try manual copy: scp -i $SSH_KEY_PATH $MASTER_NODE_USER@$MASTER_NODE_IP:$KUBECONFIG_REMOTE_PATH files/kubeconfig"
-        exit 1
-    fi
+print_status() {
+    echo "[INFO] $1"
 }
 
-# Function to validate kubeconfig
-validate_kubeconfig() {
-    print_status "Validating kubeconfig..."
+print_success() {
+    echo "[SUCCESS] $1"
+}
 
-    # Skip validation for remote deployments - cluster is on remote server
-    if [ "$REMOTE_DEPLOY" = true ] || [ -n "$MASTER_NODE_IP" ]; then
-        print_status "Skipping local kubeconfig validation for remote deployment"
-        print_status "Kubernetes cluster is running on remote master: $MASTER_NODE_IP"
-        print_status "All kubectl commands will be executed on the remote server"
-        return 0
-    fi
-
-    # Set KUBECONFIG environment variable for local validation
-    export KUBECONFIG="$KUBECONFIG_LOCAL_PATH"
-
-    # Test kubectl connectivity locally
-    if kubectl cluster-info >/dev/null 2>&1; then
-        print_success "Kubeconfig is valid and cluster is accessible"
-        
-        # Show cluster info
-        print_status "Cluster information:"
+print_status "Checking cluster connectivity..."
+if kubectl cluster-info >/dev/null 2>&1; then
+    print_success "Kubeconfig is valid and cluster is accessible"
+    
+    if [ "$DEBUG_MODE" = "true" ]; then
+        echo
+        echo "[DEBUG] Cluster information:"
         kubectl cluster-info
         echo
         kubectl get nodes
-    else
-        print_error "Failed to connect to Kubernetes cluster using kubeconfig"
-        print_status "Tip: For remote clusters, use --remote flag to run commands on the master node"
+    fi
+    
+    # Clean up temporary kubeconfig
+    rm -f /tmp/admin.conf >/dev/null 2>&1
+    exit 0
+else
+    # Clean up temporary kubeconfig
+    rm -f /tmp/admin.conf >/dev/null 2>&1
+    echo "[ERROR] Failed to connect to Kubernetes cluster"
+    echo "[INFO] Please ensure the Kubernetes deployment completed successfully"
+    exit 1
+fi
+EOF
+
+    if [ $? -ne 0 ]; then
+        print_error "Failed to validate kubeconfig on remote node"
         exit 1
     fi
 }
@@ -665,22 +622,12 @@ EOF
 
     print_status "Using master node for deployment: $MASTER_NODE_USER@$MASTER_NODE_IP"
 
-    # Create a temporary directory name for the deployment
+    # Create a temporary directory for deployment
+    LOCAL_TEMP_DIR=$(mktemp -d)
+    DEPLOYMENT_ZIP="$LOCAL_TEMP_DIR/deployment.zip"
     REMOTE_DEPLOY_DIR="/tmp/smartscaler-deployment-$(date +%s)"
     
-    print_status "Creating remote deployment directory: $REMOTE_DEPLOY_DIR"
-    
-    # Create remote directory
-    ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$MASTER_NODE_USER@$MASTER_NODE_IP" \
-        "mkdir -p $REMOTE_DEPLOY_DIR"
-
-    if [ $? -ne 0 ]; then
-        print_error "Failed to create remote deployment directory"
-        exit 1
-    fi
-
-    # Copy necessary files to master node
-    print_status "Copying deployment files to master node..."
+    print_status "Creating deployment package..."
     
     # Files and directories to copy
     COPY_FILES=(
@@ -697,27 +644,26 @@ EOF
         "host_vars/"
     )
     
-    for item in "${COPY_FILES[@]}"; do
-        if [ -e "$item" ]; then
-            print_status "Copying $item..."
-            scp -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no -r "$item" \
-                "$MASTER_NODE_USER@$MASTER_NODE_IP:$REMOTE_DEPLOY_DIR/"
-            
-            if [ $? -ne 0 ]; then
-                print_warning "Failed to copy $item (may not be critical)"
-            fi
-        else
-            print_warning "$item not found (may not be critical)"
-        fi
-    done
+    # Create zip file with all required files
+    (cd "$SCRIPT_DIR" && zip -q -r "$DEPLOYMENT_ZIP" "${COPY_FILES[@]}" 2>/dev/null)
+
+    # Create remote directory and copy zip file
+    print_status "Copying deployment package to remote host..."
+    scp -q -o LogLevel=QUIET -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$SSH_KEY_PATH" "$DEPLOYMENT_ZIP" "$MASTER_NODE_USER@$MASTER_NODE_IP:$REMOTE_DEPLOY_DIR/deployment.zip" 2>/dev/null
+
+    if [ $? -ne 0 ]; then
+        print_error "Failed to copy deployment package"
+        rm -rf "$LOCAL_TEMP_DIR"
+        exit 1
+    fi
 
     print_status "Setting up remote environment and running deployment..."
     
     # Execute deployment on remote master node
-    ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$MASTER_NODE_USER@$MASTER_NODE_IP" << EOF
-set -e
-
-cd $REMOTE_DEPLOY_DIR
+    ssh -T -o LogLevel=QUIET -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$SSH_KEY_PATH" "$MASTER_NODE_USER@$MASTER_NODE_IP" << EOF >/dev/null 2>&1
+cd "$REMOTE_DEPLOY_DIR"
+unzip -q deployment.zip
+rm -f deployment.zip
 
 # Export environment variables
 export NGC_API_KEY="$NGC_API_KEY"
@@ -726,44 +672,34 @@ export AVESHA_DOCKER_USERNAME="$AVESHA_DOCKER_USERNAME"
 export AVESHA_DOCKER_PASSWORD="$AVESHA_DOCKER_PASSWORD"
 export KUBECONFIG="$KUBECONFIG_REMOTE_PATH"
 
-echo "Setting up Python virtual environment on master node..."
-
-# Check if python3 and pip are installed
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "Installing Python3..."
-    sudo apt-get update && sudo apt-get install -y python3 python3-pip python3-venv
-fi
+# Check if python3 and pip are installed silently
+command -v python3 >/dev/null 2>&1 || { sudo apt-get update >/dev/null 2>&1 && sudo apt-get install -y python3 python3-pip python3-venv >/dev/null 2>&1; }
 
 # Create virtual environment
-python3 -m venv venv
+python3 -m venv venv >/dev/null 2>&1
 source venv/bin/activate
 
 # Upgrade pip
-pip install --upgrade pip
+pip install --upgrade pip >/dev/null 2>&1
 
-echo "Installing Python dependencies..."
-pip install -r requirements.txt
+# Install dependencies
+pip install -r requirements.txt >/dev/null 2>&1
+ansible-galaxy collection install -r requirements.yml >/dev/null 2>&1
 
-echo "Installing Ansible collections..."
-ansible-galaxy collection install -r requirements.yml
-
-echo "Running Smart Scaler deployment..."
-ansible-playbook site.yml \\
-    -e "ngc_api_key=\$NGC_API_KEY" \\
-    -e "ngc_docker_api_key=\$NGC_DOCKER_API_KEY" \\
-    -e "avesha_docker_username=\$AVESHA_DOCKER_USERNAME" \\
-    -e "avesha_docker_password=\$AVESHA_DOCKER_PASSWORD" \\
+# Run deployment
+ansible-playbook site.yml \
+    -e "ngc_api_key=\$NGC_API_KEY" \
+    -e "ngc_docker_api_key=\$NGC_DOCKER_API_KEY" \
+    -e "avesha_docker_username=\$AVESHA_DOCKER_USERNAME" \
+    -e "avesha_docker_password=\$AVESHA_DOCKER_PASSWORD" \
     -vv
-
-echo "Deployment completed successfully"
 EOF
 
     DEPLOYMENT_EXIT_CODE=$?
 
-    # Cleanup remote deployment directory
-    print_status "Cleaning up remote deployment directory..."
-    ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$MASTER_NODE_USER@$MASTER_NODE_IP" \
-        "rm -rf $REMOTE_DEPLOY_DIR" 2>/dev/null || true
+    # Cleanup
+    rm -rf "$LOCAL_TEMP_DIR"
+    ssh -T -o LogLevel=QUIET -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$SSH_KEY_PATH" "$MASTER_NODE_USER@$MASTER_NODE_IP" "rm -rf $REMOTE_DEPLOY_DIR" >/dev/null 2>&1
 
     if [ $DEPLOYMENT_EXIT_CODE -eq 0 ]; then
         print_success "Smart Scaler applications deployed successfully (remote)"
@@ -809,8 +745,15 @@ verify_deployment_local() {
 verify_deployment_remote() {
     print_status "Verifying deployment remotely on master node: $MASTER_NODE_IP"
 
-    ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$MASTER_NODE_USER@$MASTER_NODE_IP" << 'EOF'
-export KUBECONFIG="/etc/kubernetes/admin.conf"
+    # Create a temporary directory for output
+    local temp_dir=$(mktemp -d)
+    local output_file="$temp_dir/deployment_verification.txt"
+
+    ssh -T -o LogLevel=QUIET -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" "$MASTER_NODE_USER@$MASTER_NODE_IP" << EOF 2>/dev/null > "$output_file"
+# Create a temporary copy of admin.conf with proper permissions
+sudo cp /etc/kubernetes/admin.conf /tmp/admin.conf
+sudo chown \$(whoami) /tmp/admin.conf
+export KUBECONFIG=/tmp/admin.conf
 
 echo "=== Cluster Information ==="
 kubectl cluster-info
@@ -843,17 +786,31 @@ echo ""
 echo "=== KEDA ScaledObjects (if any) ==="
 kubectl get scaledobjects --all-namespaces 2>/dev/null || echo "No KEDA ScaledObjects found or KEDA not installed yet"
 
-echo ""
-echo "=== Deployment Verification Complete ==="
+# Clean up temporary kubeconfig
+rm -f /tmp/admin.conf
 EOF
 
-    if [ $? -eq 0 ]; then
+    local exit_code=$?
+
+    if [ $exit_code -eq 0 ]; then
         print_success "Deployment verification completed successfully (remote)"
         print_status "Kubernetes cluster is running and accessible on $MASTER_NODE_IP"
+        
+        if [ "$DEBUG_MODE" = "true" ]; then
+            echo
+            print_status "Debug information saved to deployment_verification.zip"
+            # Create a zip file with the verification output
+            (cd "$temp_dir" && zip deployment_verification.zip deployment_verification.txt)
+            mv "$temp_dir/deployment_verification.zip" .
+            echo "To view the complete verification output, unzip deployment_verification.zip"
+        fi
     else
         print_warning "Some verification commands failed, but deployment may still be successful"
         print_status "You can manually check the cluster with: ssh -i $SSH_KEY_PATH $MASTER_NODE_USER@$MASTER_NODE_IP"
     fi
+
+    # Cleanup
+    rm -rf "$temp_dir"
 }
 
 # Function to display final status
@@ -954,41 +911,8 @@ main() {
         print_warning "Skipping Kubernetes setup"
     fi
 
-    # Get kubeconfig (local or remote)
-    if [ "$REMOTE_DEPLOY" = true ]; then
-        get_remote_kubeconfig
-    else
-        # For local deployment, check if kubeconfig already exists
-        if [ -f "$KUBECONFIG_LOCAL_PATH" ]; then
-            print_status "Using existing kubeconfig: $KUBECONFIG_LOCAL_PATH"
-        else
-            # Try to find kubeconfig in common locations
-            if [ -f "/etc/kubernetes/admin.conf" ]; then
-                print_status "Copying local kubeconfig from /etc/kubernetes/admin.conf..."
-                sudo cp /etc/kubernetes/admin.conf "$KUBECONFIG_LOCAL_PATH"
-                sudo chown $USER:$USER "$KUBECONFIG_LOCAL_PATH"
-                chmod 600 "$KUBECONFIG_LOCAL_PATH"
-            elif [ -f "$HOME/.kube/config" ]; then
-                print_status "Copying kubeconfig from ~/.kube/config..."
-                cp "$HOME/.kube/config" "$KUBECONFIG_LOCAL_PATH"
-                chmod 600 "$KUBECONFIG_LOCAL_PATH"
-            else
-                # No local kubeconfig found, try to get from master node
-                print_warning "No local kubeconfig found, attempting to retrieve from master node..."
-                get_remote_kubeconfig
-            fi
-        fi
-    fi
-
     # Validate kubeconfig
     validate_kubeconfig
-
-    # Determine if we should use remote deployment
-    # If kubeconfig was retrieved from remote master, we should deploy remotely
-    if [ "$REMOTE_DEPLOY" = false ] && [ -n "$MASTER_NODE_IP" ]; then
-        print_status "Kubeconfig was retrieved from remote master, switching to remote deployment mode"
-        REMOTE_DEPLOY=true
-    fi
 
     # Deploy applications
     if [ "$SKIP_APP_DEPLOYMENT" = false ]; then
@@ -1045,6 +969,10 @@ while [[ $# -gt 0 ]]; do
             IGNORE_DEPLOYMENT_ERRORS=true
             shift
             ;;
+        --debug)
+            DEBUG_MODE=true
+            shift
+            ;;
         --ngc-api-key)
             CLI_NGC_API_KEY="$2"
             shift 2
@@ -1085,4 +1013,4 @@ trap 'print_error "Script interrupted"; exit 1' INT TERM
 # Run main function
 main
 
-print_success "Smart Scaler deployment script completed successfully!" 
+print_success "Smart Scaler deployment script completed successfully!"

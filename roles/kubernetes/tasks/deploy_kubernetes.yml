@@ -15,85 +15,28 @@
 - name: Check if Kubernetes deployment is enabled
   fail:
     msg: "Kubernetes deployment is disabled in user_input.yml"
-  when: 
-    - not kubernetes_deployment.enabled | default(false)
-    - not ignore_all_errors | bool
+  when: not kubernetes_deployment.enabled | default(false)
 
 - name: Display current working directory
   command: pwd
   register: current_dir
   changed_when: false
-  ignore_errors: "{{ ignore_all_errors | bool }}"
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Read user_input.yml
   slurp:
     src: "{{ playbook_dir }}/user_input.yml"
   register: user_input_content
-  ignore_errors: "{{ ignore_all_errors | bool }}"
   when: kubernetes_deployment.enabled | default(false)
 
-- name: Parse user_input.yml content
+- name: Parse user_input.yml content and set deployment variables
   set_fact:
     user_input: "{{ user_input_content.content | b64decode | from_yaml }}"
-  ignore_errors: "{{ ignore_all_errors | bool }}"
+    k8s_ssh_key_path: "{{ (user_input_content.content | b64decode | from_yaml).kubernetes_deployment.ssh_key_path | default('~/.ssh/k8s_rsa') }}"
+    k8s_default_user: "{{ (user_input_content.content | b64decode | from_yaml).kubernetes_deployment.default_ansible_user | default('root') }}"
+    k8s_control_plane_nodes: "{{ (user_input_content.content | b64decode | from_yaml).kubernetes_deployment.control_plane_nodes }}"
+    k8s_worker_nodes: "{{ (user_input_content.content | b64decode | from_yaml).kubernetes_deployment.worker_nodes | default([]) }}"
   when: kubernetes_deployment.enabled | default(false)
-
-- name: Set Kubernetes deployment variables dynamically from user_input.yml
-  block:
-    - name: Read user_input.yml for variable extraction
-      slurp:
-        src: "{{ playbook_dir }}/user_input.yml"
-      register: config_content
-      
-    - name: Extract configuration and set variables
-      set_fact:
-        config_data: "{{ config_content.content | b64decode | from_yaml }}"
-        
-    - name: Set Kubernetes deployment variables from config
-      set_fact:
-        k8s_ssh_key_path: "{{ config_data.kubernetes_deployment.ssh_key_path | default('~/.ssh/k8s_rsa') }}"
-        k8s_default_user: "{{ config_data.kubernetes_deployment.default_ansible_user | default('root') }}"
-        k8s_control_plane_nodes: "{{ config_data.kubernetes_deployment.control_plane_nodes | default([]) }}"
-        k8s_worker_nodes: "{{ config_data.kubernetes_deployment.worker_nodes | default([]) }}"
-        k8s_kubeconfig_path: "{{ config_data.kubernetes_deployment.kubeconfig_path | default('/etc/kubernetes/admin.conf') }}"
-        k8s_deployment_timeout: "{{ config_data.kubernetes_deployment.deployment_timeout | default(3600) }}"
-        k8s_poll_interval: "{{ config_data.kubernetes_deployment.poll_interval | default(30) }}"
-  rescue:
-    - name: Set fallback variables if config reading fails
-      set_fact:
-        k8s_ssh_key_path: "~/.ssh/k8s_rsa"
-        k8s_default_user: "root"
-        k8s_control_plane_nodes: []
-        k8s_worker_nodes: []
-        k8s_kubeconfig_path: "/etc/kubernetes/admin.conf"
-        k8s_deployment_timeout: 3600
-        k8s_poll_interval: 30
-        
-    - name: Display fallback warning
-      debug:
-        msg: "Warning: Failed to read user_input.yml, using fallback values"
-  when: kubernetes_deployment.enabled | default(false)
-
-- name: Debug extracted variables
-  debug:
-    msg:
-      - "k8s_ssh_key_path: {{ k8s_ssh_key_path | default('NOT SET') }}"
-      - "k8s_default_user: {{ k8s_default_user | default('NOT SET') }}"
-      - "k8s_control_plane_nodes: {{ k8s_control_plane_nodes | default([]) | length }} nodes"
-      - "k8s_kubeconfig_path: {{ k8s_kubeconfig_path | default('NOT SET') }}"
-      - "k8s_deployment_timeout: {{ k8s_deployment_timeout | default('NOT SET') }} seconds"
-      - "k8s_poll_interval: {{ k8s_poll_interval | default('NOT SET') }} seconds"
-  when: kubernetes_deployment.enabled | default(false)
-  ignore_errors: "{{ ignore_all_errors | bool }}"
-
-- name: Validate that control plane nodes are defined
-  fail:
-    msg: "No control plane nodes defined in configuration. Please check your user_input.yml file."
-  when:
-    - kubernetes_deployment.enabled | default(false)
-    - k8s_control_plane_nodes | default([]) | length == 0
-    - not ignore_all_errors | bool
 
 - name: Generate inventory content
   template:
@@ -105,14 +48,27 @@
     ssh_key_path: "{{ k8s_ssh_key_path }}"
     default_ansible_user: "{{ k8s_default_user }}"
   when: kubernetes_deployment.enabled | default(false)
-  ignore_errors: "{{ ignore_all_errors | bool }}"
+
+- name: Generate group vars
+  template:
+    src: "{{ playbook_dir }}/templates/group_vars.yml.j2"
+    dest: "{{ inventory_dir }}/kubespray/group_vars/all/all.yml"
+  vars:
+    network_plugin: "{{ kubernetes_deployment.network_plugin | default('calico') }}"
+    container_runtime: "{{ kubernetes_deployment.container_runtime | default('containerd') }}"
+    dns_mode: "{{ kubernetes_deployment.dns_mode | default('coredns') }}"
+    apiserver_loadbalancer_ip: "{{ kubernetes_deployment.apiserver_loadbalancer_ip | default(k8s_control_plane_nodes[0].ansible_host) }}"
+    apiserver_port: "{{ kubernetes_deployment.apiserver_port | default(6443) }}"
+    apiserver_loadbalancer_domain: "{{ kubernetes_deployment.apiserver_loadbalancer_domain | default('') }}"
+    control_plane_nodes: "{{ k8s_control_plane_nodes }}"
+    kube_version: "{{ kubernetes_deployment.kube_version | default('1.30.0') }}"
+  when: kubernetes_deployment.enabled | default(false)
 
 - name: Show generated inventory file contents
   command: cat {{ inventory_dir }}/kubespray/inventory.ini
   register: inventory_contents
   changed_when: false
   when: kubernetes_deployment.enabled | default(false)
-  ignore_errors: "{{ ignore_all_errors | bool }}"
 
 - name: Display debug information
   debug:
@@ -121,12 +77,13 @@
       Inventory Path: {{ inventory_dir }}/kubespray/inventory.ini
       Kubespray Dir: {{ kubespray_dir }}
       Group Vars Path: {{ inventory_dir }}/kubespray/group_vars/all/all.yml
+      SSH Key Path: {{ k8s_ssh_key_path }}
+      Default User: {{ k8s_default_user }}
   when: kubernetes_deployment.enabled | default(false)
-  ignore_errors: "{{ ignore_all_errors | bool }}"
 
 - name: Test SSH connection to all hosts
   command:
-    cmd: "ssh -i {{ k8s_ssh_key_path | expanduser | realpath | default('~/.ssh/k8s_rsa') }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ item.ansible_user | default(k8s_default_user) }}@{{ item.ansible_host }} 'echo SSH connection successful'"
+    cmd: "ssh -i {{ k8s_ssh_key_path | expanduser }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 {{ item.ansible_user | default(k8s_default_user) }}@{{ item.ansible_host }} 'echo SSH connection successful'"
   loop: "{{ k8s_control_plane_nodes + k8s_worker_nodes }}"
   register: ssh_test
   changed_when: false
@@ -137,29 +94,25 @@
   debug:
     var: ssh_test
   when: kubernetes_deployment.enabled | default(false)
-  ignore_errors: "{{ ignore_all_errors | bool }}"
 
 - name: Set Ansible environment variables
   set_fact:
     ansible_env_vars: "{{ kubespray_env | combine(kubespray_extra_env) }}"
   when: kubernetes_deployment.enabled | default(false)
-  ignore_errors: "{{ ignore_all_errors | bool }}"
 
 - name: Set default values for async execution
   set_fact:
-    kubespray_async_timeout: "{{ k8s_deployment_timeout | default(3600) }}"  # Use configurable timeout
-    kubespray_poll_interval: "{{ k8s_poll_interval | default(30) }}"    # Use configurable poll interval
+    kubespray_async_timeout: "{{ user_input.kubernetes_deployment.deployment_timeout | default(3600) | int * 60 }}"  # Convert minutes to seconds
+    kubespray_poll_interval: "{{ user_input.kubernetes_deployment.poll_interval | default(30) }}"
   when: kubernetes_deployment.enabled | default(false)
-  ignore_errors: "{{ ignore_all_errors | bool }}"
 
 - name: Display deployment timeout settings
   debug:
-    msg:
-      - "Kubespray deployment timeout: {{ kubespray_async_timeout }} seconds ({{ (kubespray_async_timeout | int / 60) | round(1) }} minutes)"
-      - "Polling interval: {{ kubespray_poll_interval }} seconds"
-      - "Maximum polls: approximately {{ (kubespray_async_timeout | int / kubespray_poll_interval | int) | round(0) }}"
+    msg: |
+      Deployment timeout: {{ kubespray_async_timeout }} seconds ({{ (kubespray_async_timeout | int / 60) | round(1) }} minutes)
+      Polling interval: {{ kubespray_poll_interval }} seconds
+      Maximum polls: approximately {{ (kubespray_async_timeout | int / kubespray_poll_interval | int) | round(0) }}
   when: kubernetes_deployment.enabled | default(false)
-  ignore_errors: "{{ ignore_all_errors | bool }}"
 
 - name: Run Kubespray cluster deployment
   command:
@@ -170,17 +123,18 @@
       --become
       --become-method={{ kubespray_become_method }}
       --become-user={{ kubespray_become_user }}
-      -e ansible_ssh_private_key_file={{ k8s_ssh_key_path | expanduser | realpath | default('~/.ssh/k8s_rsa') }}
+      -e ansible_ssh_private_key_file={{ k8s_ssh_key_path | expanduser }}
       -e ansible_user={{ k8s_default_user }}
       -e ansible_become_pass=''
-      --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+      --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 -o ControlMaster=auto -o ControlPersist=60s"
       -vvvv
-  environment: "{{ kubespray_env | combine(kubespray_extra_env) | combine({'ANSIBLE_CONFIG': playbook_dir + '/ansible.cfg'}) }}"
+  environment: "{{ kubespray_env | combine(kubespray_extra_env) | combine({'ANSIBLE_CONFIG': playbook_dir + '/ansible.cfg', 'ANSIBLE_SSH_RETRIES': '10', 'ANSIBLE_TIMEOUT': '60'}) }}"
   register: kubespray_result
   async: "{{ kubespray_async_timeout }}"
   poll: "{{ kubespray_poll_interval }}"
+  ignore_errors: true
+  failed_when: false
   when: kubernetes_deployment.enabled | default(false)
-  ignore_errors: "{{ ignore_all_errors | bool }}"
 
 - name: Display Kubespray deployment result
   debug:
@@ -191,82 +145,46 @@
       STDERR:
       {{ kubespray_result.stderr_lines | default([]) | join('\n') }}
   when: kubespray_result is defined and kubernetes_deployment.enabled | default(false)
-  ignore_errors: "{{ ignore_all_errors | bool }}"
+
+- name: Validate kubeconfig on remote node
+  block:
+    - name: Check cluster info on remote node
+      command: kubectl cluster-info
+      register: cluster_info
+      delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+      vars:
+        ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+        ansible_user: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+      environment:
+        KUBECONFIG: "/etc/kubernetes/admin.conf"
+        LC_ALL: C.UTF-8
+        LANG: C.UTF-8
+
+    - name: Display cluster info
+      debug:
+        msg: "{{ cluster_info.stdout_lines }}"
+
+    - name: Get node status on remote node
+      command: kubectl get nodes
+      register: node_status
+      delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+      vars:
+        ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+        ansible_user: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+      environment:
+        KUBECONFIG: "/etc/kubernetes/admin.conf"
+        LC_ALL: C.UTF-8
+        LANG: C.UTF-8
+
+    - name: Display node status
+      debug:
+        msg: "{{ node_status.stdout_lines }}"
+
+  when: kubernetes_deployment.enabled | default(false)
 
 - name: Ensure files directory exists
   file:
     path: "{{ lookup('env', 'PWD') }}/files"
     state: directory
     mode: '0755'
-  when: kubernetes_deployment.enabled | default(false)
-  ignore_errors: "{{ ignore_all_errors | bool }}"
-
-- name: Create temporary readable copy of kubeconfig on remote master
-  shell: |
-    if [ -f "{{ k8s_kubeconfig_path }}" ]; then
-      sudo cp {{ k8s_kubeconfig_path }} /tmp/kubeconfig_temp
-      sudo chown {{ k8s_default_user }}:{{ k8s_default_user }} /tmp/kubeconfig_temp
-      sudo chmod 644 /tmp/kubeconfig_temp
-      echo "Kubeconfig copied from {{ k8s_kubeconfig_path }}"
-    elif [ -f "/etc/kubernetes/admin.conf" ]; then
-      sudo cp /etc/kubernetes/admin.conf /tmp/kubeconfig_temp
-      sudo chown {{ k8s_default_user }}:{{ k8s_default_user }} /tmp/kubeconfig_temp
-      sudo chmod 644 /tmp/kubeconfig_temp
-      echo "Kubeconfig copied from /etc/kubernetes/admin.conf (default fallback)"
-    else
-      echo "ERROR: No kubeconfig found at {{ k8s_kubeconfig_path }} or /etc/kubernetes/admin.conf"
-      exit 1
-    fi
-  delegate_to: "{{ k8s_control_plane_nodes[0].ansible_host }}"
-  vars:
-    ansible_ssh_private_key_file: "{{ k8s_ssh_key_path | expanduser | realpath | default('~/.ssh/k8s_rsa') }}"
-    ansible_user: "{{ k8s_default_user }}"
-  when:
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result is defined
-    - kubespray_result is succeeded
-  register: kubeconfig_copy_result
-  ignore_errors: "{{ ignore_all_errors | bool }}"
-
-- name: Display kubeconfig copy result
-  debug:
-    var: kubeconfig_copy_result.stdout_lines
-  when:
-    - kubernetes_deployment.enabled | default(false)
-    - kubeconfig_copy_result is defined
-  ignore_errors: "{{ ignore_all_errors | bool }}"
-
-- name: Copy kubeconfig from first control plane node
-  command:
-    cmd: "scp -i {{ k8s_ssh_key_path | expanduser | realpath | default('~/.ssh/k8s_rsa') }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ k8s_default_user }}@{{ k8s_control_plane_nodes[0].ansible_host }}:/tmp/kubeconfig_temp {{ lookup('env', 'PWD') }}/files/kubeconfig"
-  when: 
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result is defined
-    - kubespray_result is succeeded
-    - kubeconfig_copy_result is defined
-    - kubeconfig_copy_result is succeeded
-  ignore_errors: "{{ ignore_all_errors | bool }}"
-
-- name: Cleanup temporary kubeconfig file on remote master
-  file:
-    path: /tmp/kubeconfig_temp
-    state: absent
-  delegate_to: "{{ k8s_control_plane_nodes[0].ansible_host }}"
-  vars:
-    ansible_ssh_private_key_file: "{{ k8s_ssh_key_path | expanduser | realpath | default('~/.ssh/k8s_rsa') }}"
-    ansible_user: "{{ k8s_default_user }}"
-  when:
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result is defined
-    - kubespray_result is succeeded
-  ignore_errors: true
-
-- name: Set kubeconfig permissions
-  file:
-    path: "{{ lookup('env', 'PWD') }}/files/kubeconfig"
-    mode: '0600'
-  when: 
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result is defined
-    - kubespray_result is succeeded 
-  ignore_errors: "{{ ignore_all_errors | bool }}" 
+  when: kubernetes_deployment.enabled | default(false) 

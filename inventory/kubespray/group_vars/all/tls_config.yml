@@ -1,0 +1,2 @@
+apiserver_extra_sans:
+  - "*.cluster.local" 

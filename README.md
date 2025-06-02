@@ -2,6 +2,63 @@
 
 Ansible-based installer for Smart Scaler components and dependencies.
 
+## 🚀 Quick Setup Guide
+
+### Prerequisites
+- Ubuntu 22.04+ or compatible Linux distribution
+- Python 3.8+
+- Git
+- SSH access to target nodes
+- NVIDIA GPU (for GPU nodes)
+- NGC API Key and Docker API Key
+- Avesha Docker registry credentials
+
+### One-Line Installation
+```bash
+curl -sSL https://raw.githubusercontent.com/smart-scaler/smartscaler-apps-installer/main/install.sh | bash
+```
+
+### Manual Installation Steps
+1. **Clone and Setup:**
+```bash
+# Clone repository
+git clone https://github.com/smart-scaler/smartscaler-apps-installer.git
+cd smartscaler-apps-installer
+
+# Set required environment variables
+export NGC_API_KEY="your-ngc-api-key"
+export NGC_DOCKER_API_KEY="your-ngc-docker-key"
+export AVESHA_DOCKER_USERNAME="your-username"
+export AVESHA_DOCKER_PASSWORD="your-password"
+
+# Run deployment script
+./deploy_smartscaler.sh
+```
+
+2. **Access Services:**
+```bash
+# Grafana dashboard (default credentials: admin/admin)
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+
+# Prometheus metrics
+kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
+
+# NIM service endpoint
+kubectl port-forward -n nim svc/meta-llama3-8b-instruct 8000:8000
+```
+
+### Latest Changes (June 2024)
+- Added single-script deployment with `deploy_smartscaler.sh`
+- Improved remote deployment with automatic kubeconfig handling
+- Added NVIDIA GPU operator integration
+- Implemented KEDA autoscaling for NIM services
+- Added comprehensive monitoring with Prometheus and Grafana
+- Improved error handling and validation
+- Added debug mode for troubleshooting
+- Optimized file transfer and deployment process
+
+## Detailed Documentation
+
 ## Ansible Project Structure
 
 ```
@@ -212,6 +269,10 @@ kubernetes_deployment:
     - name: master-k8s                        # Hostname/identifier for the node
       ansible_host: "YOUR_MASTER_NODE_IP"     # IP address or DNS name of the node
       ansible_user: root                      # SSH user for this specific node
+      ansible_become: true
+      ansible_become_method: sudo
+      private_ip: 10.0.0.19
+
   
   # Kubernetes Components Configuration
   network_plugin: calico                      # CNI plugin for pod networking (options: calico, flannel, etc.)

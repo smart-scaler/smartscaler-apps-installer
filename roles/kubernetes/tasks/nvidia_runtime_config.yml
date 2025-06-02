@@ -127,11 +127,18 @@
     - name: Set kubeconfig permissions and ownership
       file:
         path: "{{ lookup('env', 'PWD') }}/files/kubeconfig"
-        mode: '0600'
+        mode: '0644'
         owner: "{{ lookup('env', 'USER') }}"
         group: "{{ lookup('env', 'USER') }}"
-      delegate_to: localhost
       become: true
+      ignore_errors: true
+
+    - name: Ensure kubeconfig is readable
+      file:
+        path: "{{ lookup('env', 'PWD') }}/files/kubeconfig"
+        mode: '0644'
+      become: true
+      ignore_errors: true
 
   when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
 

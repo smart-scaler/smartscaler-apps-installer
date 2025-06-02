@@ -1,0 +1,29 @@
+# Kubernetes configuration
+kube_version: "{{ kubernetes_deployment.kube_version | default('1.30.0') }}"
+
+# Etcd configuration
+etcd_version: "3.5.9"  # Latest stable etcd version compatible with k8s 1.30
+etcd_deployment_type: "host"
+
+# Networking
+kube_service_addresses: 10.233.0.0/18
+kube_pods_subnet: 10.233.64.0/18
+kube_network_plugin: {{ network_plugin | default('calico') }}
+
+# Container runtime
+container_manager: {{ container_runtime | default('containerd') }}
+
+# DNS
+dns_mode: {{ dns_mode | default('coredns') }}
+
+# API Server configuration
+supplementary_addresses_in_ssl_keys: 
+  - "{{ apiserver_loadbalancer_ip | default(control_plane_nodes[0].ansible_host) }}"
+
+# API Server loadbalancer (if using a load balancer)
+apiserver_loadbalancer_domain_name: "{{ apiserver_loadbalancer_domain | default('') }}"
+loadbalancer_apiserver:
+  address: "{{ apiserver_loadbalancer_ip | default(control_plane_nodes[0].ansible_host) }}"
+  port: {{ apiserver_port | default(6443) }}
+
+# Additional Kubespray configurations can be added here 

@@ -50,4 +50,9 @@ kubespray_extra_env: {}
 
 # Inventory and playbook paths
 inventory_dir: "{{ playbook_dir }}/inventory"
-kubespray_dir: "{{ playbook_dir }}/kubespray" 
+kubespray_dir: "{{ playbook_dir }}/kubespray"
+
+# Deployment timeout settings
+deployment_timeout: 7200  # 2 hours default timeout
+poll_interval: 60  # Check every minute
+ignore_deployment_errors: true  # Continue even if deployment has issues 

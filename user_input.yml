@@ -5,10 +5,18 @@
 kubernetes_deployment:
   enabled: true                               # Enable/disable Kubernetes cluster deployment
   
+  # Kubernetes Version
+  kube_version: "1.30.0"                      # Kubernetes version to install (without 'v' prefix)
+  
+  # API Server Configuration
+  apiserver_loadbalancer_ip: "89.169.114.118"  # Custom IP for API server endpoint
+  apiserver_port: 6443                         # API server port (default: 6443)
+  apiserver_loadbalancer_domain: ""            # Optional: domain name for API server
+  
   # Deployment Timeout Configuration
-  deployment_timeout: 3600                    # Maximum time in seconds for Kubespray deployment (default: 1 hour)
-                                              # Large clusters may need 7200 (2 hours) or more
-                                              # Small clusters typically complete in 1800-3600 seconds (30-60 minutes)
+  deployment_timeout: 120                   # Maximum time in minutes for Kubespray deployment (default: 1 hour)
+                                              # Large clusters may need 120 (2 hours) or more
+                                              # Small clusters typically complete in 30-60 minutes
   poll_interval: 30                          # Polling interval in seconds to check deployment status (default: 30 seconds)
                                               # Lower values (10-15) provide more frequent updates but increase log verbosity
                                               # Higher values (60-120) reduce log spam but provide less frequent updates
@@ -33,14 +41,15 @@ kubernetes_deployment:
   # Node Configuration
   # Define the control plane (master) nodes for the Kubernetes cluster
   control_plane_nodes:                         # List of control plane nodes
-    - name: master-k8s                        # Hostname/identifier for the node
-      ansible_host: 89.169.114.118
-              # IP address or DNS name of the node
+
+    - name: master-k8s                         # Hostname/identifier for the node
+      ansible_host: 89.169.114.118             # IP address or DNS name of the node
       ansible_user: avesha
       ansible_become: true
       ansible_become_method: sudo
       ansible_become_user: root
-      private_ip: 10.0.102.57        # SSH user for this specific node
+      private_ip: 10.0.102.57       # SSH user for this specific node
+
   
   # Kubernetes Components Configuration
   network_plugin: calico                       # CNI plugin for pod networking (options: calico, flannel, etc.)
@@ -55,7 +64,7 @@ global_image_pull_secret:
 
 # Kubeconfig settings
 global_kubeconfig: "files/kubeconfig"
-global_kubecontext: "kubecontext" 
+global_kubecontext: "kubernetes-admin@cluster.local" 
 use_global_context: true
 
 # Helm repository settings
@@ -111,7 +120,7 @@ helm_charts:
       dcgm:
         enabled: true
       driver:
-        enabled: false
+        enabled: true
     chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
 
   prometheus_stack:
