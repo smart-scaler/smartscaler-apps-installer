@@ -3,7 +3,7 @@
 # Kubernetes Deployment Configuration
 # Controls the setup and configuration of the Kubernetes cluster using Kubespray
 kubernetes_deployment:
-  enabled: true                               # Enable/disable Kubernetes cluster deployment
+  enabled: false                               # Enable/disable Kubernetes cluster deployment
   
   # Deployment Timeout Configuration
   deployment_timeout: 3600                    # Maximum time in seconds for Kubespray deployment (default: 1 hour)
@@ -27,20 +27,19 @@ kubernetes_deployment:
   
   # SSH Configuration
   # Required for Kubespray to access and configure nodes
-  ssh_key_path: "/root/.ssh/k8s_rsa"     # Absolute Path to SSH private key for node access
-  default_ansible_user: "avesha"                 # Default SSH user for node access
+  ssh_key_path: "/home/user/.ssh/k8s_rsa"     # Absolute Path to SSH private key for node access
+  default_ansible_user: "root"                 # Default SSH user for node access
   
   # Node Configuration
   # Define the control plane (master) nodes for the Kubernetes cluster
   control_plane_nodes:                         # List of control plane nodes
-    - name: master-k8s                        # Hostname/identifier for the node
-      ansible_host: 89.169.114.118
-              # IP address or DNS name of the node
+    - name: master-k8s                         # Hostname/identifier for the node
+      ansible_host: <MASTER_IP>             # IP address or DNS name of the node
       ansible_user: avesha
-      ansible_become: true
-      ansible_become_method: sudo
-      ansible_become_user: root
-      private_ip: 10.0.102.57        # SSH user for this specific node
+      # ansible_become: true
+      # ansible_become_method: sudo
+      # ansible_become_user: root
+      # private_ip: <PRIVATE_IP>        # SSH user for this specific node
   
   # Kubernetes Components Configuration
   network_plugin: calico                       # CNI plugin for pod networking (options: calico, flannel, etc.)
@@ -55,7 +54,7 @@ global_image_pull_secret:
 
 # Kubeconfig settings
 global_kubeconfig: "files/kubeconfig"
-global_kubecontext: "kubecontext" 
+global_kubecontext: "kubernetes-admin@cluster.local" 
 use_global_context: true
 
 # Helm repository settings
