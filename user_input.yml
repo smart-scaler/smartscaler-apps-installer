@@ -90,21 +90,31 @@ execution_order:
   - locust_manifest
 
 helm_charts:
-  gpu_operator_chart:
-    release_name: gpu-operator
-    chart_ref: gpu-operator
-    release_namespace: gpu-operator
-    create_namespace: true
-    wait: true
-    chart_version: v25.3.0
-    release_values:
-      mig:
-        strategy: none
-      dcgm:
-        enabled: true
-      driver:
-        enabled: false
-    chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
+gpu_operator_chart:
+  release_name: gpu-operator
+  chart_ref: gpu-operator
+  release_namespace: gpu-operator
+  create_namespace: true
+  wait: true
+  chart_version: v25.3.0
+  release_values:
+    mig:
+      strategy: none  
+    dcgm:
+      enabled: true
+    driver:
+      enabled: false  
+    cdi:
+      default: true
+      enabled: true
+    hostPaths:
+      driverInstallDir: /home/kubernetes/bin/nvidia
+    toolkit:
+      installDir: /home/kubernetes/bin/nvidia
+      env:
+        - name: CONTAINERD_RUNTIME_CLASS
+          value: "nvidia"
+  chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
 
   prometheus_stack:
     release_name: prometheus
