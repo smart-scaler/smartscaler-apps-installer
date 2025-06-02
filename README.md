@@ -599,7 +599,11 @@ ls -la files/
 # - Various YAML templates
 ```
 
-5. **Create and activate a virtual environment:**
+5. **Install Python 3.x and pip**
+sudo apt update
+sudo apt install -y python3 python3-pip python3-venv
+
+6. **Create and activate a virtual environment:**
 ```bash
 python3 -m venv venv
 source venv/bin/activate  # On Linux/Mac
@@ -607,7 +611,7 @@ source venv/bin/activate  # On Linux/Mac
 .\venv\Scripts\activate  # On Windows
 ```
 
-6. **Install Python dependencies:**
+7. **Install Python dependencies:**
 ```bash
 pip install -r requirements.txt
 
@@ -619,7 +623,7 @@ pip install -r requirements.txt
 # - kubernetes-validate>=1.28.0
 ```
 
-7. **Install Ansible collections:**
+8. **Install Ansible collections:**
 ```bash
 ansible-galaxy collection install -r requirements.yml
 
