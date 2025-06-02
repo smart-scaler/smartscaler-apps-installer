@@ -28,10 +28,9 @@ kubernetes_deployment:
     - name: master-k8s                        # Hostname/identifier for the node
       ansible_host: 127.0.0.1          # IP address or DNS name of the node
       ansible_user: root                      # SSH user for this specific node
-      # ansible_user: avesha
-      # ansible_become: true
-      # ansible_become_method: sudo
-      # ansible_become_user: root
+      ansible_become: true
+      ansible_become_method: sudo
+      ansible_become_user: root
       # private_ip: 10.0.102.57        # SSH user for this specific node
   
   # Kubernetes Components Configuration
