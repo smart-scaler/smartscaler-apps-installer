@@ -16,7 +16,7 @@ Before proceeding with the Smart Scaler applications deployment, ensure:
 
 ## Ansible Project Structure
 
-```
+```sh
 smartscaler-apps-installer/
 ├── ansible.cfg                 # Ansible configuration
 ├── site.yml                   # Main playbook entry point
@@ -78,15 +78,18 @@ smartscaler-apps-installer/
 ## Documentation Links
 
 ### Core Configuration Guides
+
 - **[User Input Configuration Guide](docs/USER_INPUT_CONFIGURATION.md)** - Complete guide for configuring user_input.yml
 - **[User Input Reference](docs/USER_INPUT_REFERENCE.md)** - Reference documentation for all configuration options
 - **[Kubernetes Configuration](docs/KUBERNETES_CONFIGURATION.md)** - Kubernetes cluster setup and configuration
 - **[Kubernetes Firewall Configuration](docs/KUBERNETES_FIREWALL.md)** - Network and firewall setup for Kubernetes
 
 ### Specialized Configuration
+
 - **[NVIDIA Container Runtime Configuration](docs/NVIDIA_CONTAINER_RUNTIME.md)** - GPU runtime setup and configuration
 
 ### Quick Reference Links
+
 - [Prerequisites](#prerequisites)
 - [Environment Variables](#required-environment-variables)
 - [K8s Setup Guide](#part-1-kubernetes-cluster-setup)
@@ -103,24 +106,28 @@ smartscaler-apps-installer/
 Before setting up the Kubernetes cluster, ensure you have:
 
 1. **System Requirements**
-    #### Control Plane Nodes (Master)
+
+#### Control Plane Nodes (Master)
+
     - CPU: 8 cores minimum
     - RAM: 16GB minimum
     - Storage: 500GB minimum
     - Operating System: Ubuntu 22.04+ or compatible Linux distribution
-    
-    #### Worker Nodes
+
+#### Worker Nodes
+
     - CPU: 8 cores minimum
     - RAM: 16GB minimum
     - Storage: 500GB minimum
     - Operating System: Same as control plane nodes
 
 2. **Local Development Environment**
-   - Python 3.x and pip installed
-   - Git installed
-   - SSH key generation capability
-   - helm v3.15.0
-   - kubectl v1.25.0
+
+- Python 3.x and pip installed
+- Git installed
+- SSH key generation capability
+- helm v3.15.0
+- kubectl v1.25.0
 
 3. **NVIDIA GPU Requirements** (for GPU nodes)
    - NVIDIA GPU drivers installed
@@ -129,12 +136,14 @@ Before setting up the Kubernetes cluster, ensure you have:
 ### Setting Up Local Environment
 
 1. **Clone the repository:**
+
 ```bash
 git clone https://github.com/smart-scaler/smartscaler-apps-installer.git
 cd smartscaler-apps-installer
 ```
 
 2. **Create and activate a virtual environment:**
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate  # On Linux/Mac
@@ -143,6 +152,7 @@ source venv/bin/activate  # On Linux/Mac
 ```
 
 3. **Install Python dependencies:**
+
 ```bash
 pip install -r requirements.txt
 
@@ -155,6 +165,7 @@ pip install -r requirements.txt
 ```
 
 4. **Install Ansible collections:**
+
 ```bash
 ansible-galaxy collection install -r requirements.yml
 
@@ -162,17 +173,19 @@ ansible-galaxy collection install -r requirements.yml
 #  - community.general
 #  - kubernetes.core
 #  - ansible.posix
-#  - community.crypto 
+#  - community.crypto
 ```
 
 ### SSH Key Setup
 
 1. **Generate SSH key for cluster access:**
+
 ```bash
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/k8s_rsa -N ""
 ```
 
 2. **Copy SSH key to each node:**
+
 ```bash
 # Repeat for each node in your cluster
 ssh-copy-id -i ~/.ssh/k8s_rsa.pub user@node-ip
@@ -201,26 +214,27 @@ helm version
 ### Configuration
 
 1. **Update node IPs in `user_input.yml`:**
+
 ```yaml
 kubernetes_deployment:
   enabled: true  # Must be set to true for K8s installation
-  
+
   # Firewall Configuration
   firewall:
     enabled: true                             # Enable/disable firewall configuration
     allow_additional_ports: []                # Additional ports to allow (e.g., ["8080", "9090"])
-    
+
   # NVIDIA Runtime Configuration
   nvidia_runtime:
     enabled: true                            # Enable/disable NVIDIA runtime configuration
     install_toolkit: true                     # Install NVIDIA Container Toolkit if not present
     configure_containerd: true                # Configure containerd with NVIDIA runtime
     create_runtime_class: true                # Create Kubernetes RuntimeClass for NVIDIA
-  
+
   # SSH Configuration
   ssh_key_path: "/root/.ssh/k8s_rsa"         # Absolute Path to SSH private key for node access
   default_ansible_user: "root"               # Default SSH user for node access
-  
+
   # Node Configuration
   control_plane_nodes:
     - name: master-k8s                        # Hostname/identifier for the node
@@ -230,7 +244,7 @@ kubernetes_deployment:
       ansible_become_method: sudo
       private_ip: 10.0.0.19
 
-  
+
   # Kubernetes Components Configuration
   network_plugin: calico                      # CNI plugin for pod networking (options: calico, flannel, etc.)
   container_runtime: containerd               # Container runtime (options: containerd, docker)
@@ -238,16 +252,18 @@ kubernetes_deployment:
 ```
 
 2. **SSH User Configuration:**
-   
+
    **Option 1 (Recommended): Non-root user with sudo**
+
    ```yaml
    ansible_user: avesha
    ansible_become: true
    ansible_become_method: sudo
    ansible_become_user: root
    ```
-   
+
    **Option 2: Direct root access**
+
    ```yaml
    ansible_user: root
    ```
@@ -255,12 +271,14 @@ kubernetes_deployment:
 ### Installation Process
 
 1. **Execute the Kubernetes setup script:**
+
 ```bash
 chmod +x setup_kubernetes.sh
 ./setup_kubernetes.sh
 ```
 
 The script will:
+
 - Create an inventory.ini file for kubespray
 - Validate your configuration
 - Test SSH connectivity to all nodes
@@ -271,6 +289,7 @@ The script will:
 - Verify the installation
 
 2. **Verify the installation:**
+
 ```bash
 kubectl get nodes -o wide
 kubectl cluster-info
@@ -280,6 +299,7 @@ kubectl get pods --all-namespaces
 ### Post-Installation Configuration
 
 1. **Configure kubeconfig access:**
+
 ```bash
 # Copy kubeconfig from master node
 scp user@master-node-ip:/etc/kubernetes/admin.conf files/kubeconfig
@@ -289,12 +309,14 @@ chmod 600 files/kubeconfig
 ```
 
 2. **Update kubeconfig settings in user_input.yml:**
+
 ```yaml
 global_kubeconfig: "files/kubeconfig"
 global_kubecontext: "your-cluster-context"
 ```
 
 3. **Verify cluster access:**
+
 ```bash
 export KUBECONFIG=files/kubeconfig
 kubectl get nodes
@@ -317,6 +339,7 @@ Before proceeding with the applications deployment:
    - Set `kubernetes_deployment.enabled: false` in your `user_input.yml`
    - This is crucial to prevent unintended cluster setup operations during app deployment
    - Example configuration:
+
      ```yaml
      kubernetes_deployment:
        enabled: false  # Must be false for apps deployment
@@ -341,12 +364,14 @@ export AVESHA_DOCKER_PASSWORD="your-avesha-password"
 ### Infrastructure Components
 
 ### 1. GPU Operator
+
 - **Namespace**: `gpu-operator`
 - **Chart**: `gpu-operator`
 - **Version**: `v25.3.0`
 - **Purpose**: NVIDIA GPU management and device plugin
 
 ### 2. Prometheus Stack
+
 - **Namespace**: `monitoring`
 - **Chart**: `kube-prometheus-stack`
 - **Version**: `55.5.0`
@@ -354,11 +379,13 @@ export AVESHA_DOCKER_PASSWORD="your-avesha-password"
 - **Features**: GPU metrics collection, custom dashboards
 
 ### 3. Pushgateway
+
 - **Namespace**: `monitoring`
 - **Type**: Custom manifest
 - **Purpose**: Metrics aggregation for batch jobs and custom metrics
 
 ### 4. KEDA
+
 - **Namespace**: `keda`
 - **Chart**: `keda`
 - **Version**: `2.12.1`
@@ -367,18 +394,21 @@ export AVESHA_DOCKER_PASSWORD="your-avesha-password"
 ### AI/ML Components
 
 ### 5. NIM (NVIDIA NIM Operator)
+
 - **Namespace**: `nim`
 - **Chart**: `k8s-nim-operator`
 - **Version**: `v1.0.1`
 - **Purpose**: GPU instance management for AI workloads
 
 ### 6. NIM Cache
+
 - **Namespace**: `nim`
 - **Type**: Custom manifest
 - **Purpose**: Download and prep LLM models with NIM Cache
 - **Model**: Meta Llama 3.1 8B Instruct
 
 ### 7. NIM Service
+
 - **Namespace**: `nim`
 - **Type**: Custom manifest
 - **Purpose**: Serve LLM models as REST API endpoints
@@ -387,12 +417,14 @@ export AVESHA_DOCKER_PASSWORD="your-avesha-password"
 ### Smart Scaler Components
 
 ### 8. Smart Scaler Inference
+
 - **Namespace**: `smart-scaler`
 - **Type**: Custom manifest
 - **Purpose**: AI-driven inference optimization and scaling
 - **Features**: Policy-based scaling, inference benchmarking
 
 ### 9. KEDA ScaledObject
+
 - **Namespace**: `nim`
 - **Type**: Custom manifest
 - **Purpose**: Configure autoscaling for NIM services based on custom metrics
@@ -401,6 +433,7 @@ export AVESHA_DOCKER_PASSWORD="your-avesha-password"
 ### Load Testing Components
 
 ### 10. Locust Load Testing
+
 - **Namespace**: `nim-load-test`
 - **Type**: Custom manifest
 - **Purpose**: Generate load for testing and scaling validation
@@ -409,6 +442,7 @@ export AVESHA_DOCKER_PASSWORD="your-avesha-password"
 ## Application Configuration
 
 ### Updated Execution Order
+
 The deployment follows this comprehensive execution order:
 
 ```yaml
@@ -433,6 +467,7 @@ execution_order:
 ### Helm Charts Configuration
 
 #### GPU Operator Configuration
+
 ```yaml
   gpu_operator_chart:
   release_name: gpu-operator
@@ -449,6 +484,7 @@ execution_order:
 ```
 
 #### Prometheus Stack Configuration
+
 ```yaml
   prometheus_stack:
   release_name: prometheus
@@ -473,6 +509,7 @@ execution_order:
 ```
 
 #### KEDA Configuration
+
 ```yaml
   keda_chart:
   release_name: keda
@@ -482,6 +519,7 @@ execution_order:
 ```
 
 #### NIM Operator Configuration
+
 ```yaml
   nim_operator_chart:
   release_name: nim
@@ -493,6 +531,7 @@ execution_order:
 ### Advanced Manifest Configurations
 
 #### NIM Cache Configuration
+
 ```yaml
 nim_cache_manifest:
   name: nim-cache-setup
@@ -514,6 +553,7 @@ nim_cache_manifest:
 ```
 
 #### NIM Service Configuration
+
    ```yaml
 nim_service_manifest:
   name: nim-service-setup
@@ -548,6 +588,7 @@ nim_service_manifest:
 ```
 
 #### KEDA ScaledObject Configuration
+
    ```yaml
 keda_scaled_object_manifest:
   name: keda-scaled-object-setup
@@ -567,6 +608,7 @@ keda_scaled_object_manifest:
 ```
 
 #### Smart Scaler Inference Configuration
+
 ```yaml
 smart_scaler_inference:
   name: smart-scaler-inference-setup
@@ -591,6 +633,7 @@ smart_scaler_inference:
 ```
 
 #### Locust Load Testing Configuration
+
 ```yaml
 locust_manifest:
   name: locust-setup
@@ -610,21 +653,25 @@ locust_manifest:
 ## Application Deployment
 
 ### Prerequisites Verification
+
 Before deploying applications, ensure:
 
 1. **Kubernetes cluster is running**
+
 ```bash
 kubectl get nodes
 kubectl cluster-info
 ```
 
 2. **Required tools are installed**
+
 ```bash
 kubectl version --client
 helm version
 ```
 
 3. **Environment variables are set**
+
 ```bash
 echo $NGC_API_KEY
 echo $NGC_DOCKER_API_KEY
@@ -633,6 +680,7 @@ echo $AVESHA_DOCKER_PASSWORD
 ```
 
 4. **Required files are present**
+
 ```bash
 ls -la files/
 # Should contain:
@@ -643,12 +691,14 @@ ls -la files/
 ```
 
 5. **Install Python 3.x and pip**
+
 ```bash
 sudo apt update
 sudo apt install -y python3 python3-pip python3-venv
 ```
 
 6. **Create and activate a virtual environment:**
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate  # On Linux/Mac
@@ -657,6 +707,7 @@ source venv/bin/activate  # On Linux/Mac
 ```
 
 7. **Install Python dependencies:**
+
 ```bash
 pip install -r requirements.txt
 
@@ -669,6 +720,7 @@ pip install -r requirements.txt
 ```
 
 8. **Install Ansible collections:**
+
 ```bash
 ansible-galaxy collection install -r requirements.yml
 
@@ -676,13 +728,13 @@ ansible-galaxy collection install -r requirements.yml
 #  - community.general
 #  - kubernetes.core
 #  - ansible.posix
-#  - community.crypto 
+#  - community.crypto
 ```
 
 ### Deployment Process
 
-
 1. **Deployment with explicit credentials:**
+
 ```bash
 ansible-playbook site.yml \
   -e "ngc_api_key=$NGC_API_KEY" \
@@ -692,6 +744,7 @@ ansible-playbook site.yml \
 ```
 
 2. **Debug deployment with verbose output:**
+
 ```bash
 ansible-playbook site.yml \
   -e "ngc_api_key=$NGC_API_KEY" \
@@ -704,11 +757,30 @@ ansible-playbook site.yml \
 ### Deployment Verification
 
 1. **Check all namespaces:**
+
 ```bash
 kubectl get namespaces
 ```
 
+Expected output:
+
+```sh
+default              Active   5h2m
+gpu-operator         Active   93m
+keda                 Active   91m
+kube-node-lease      Active   5h2m
+kube-public          Active   5h2m
+kube-system          Active   5h2m
+local-path-storage   Active   5h
+monitoring           Active   93m
+nim                  Active   91m
+nim-load-test        Active   89m
+pushgateway-system   Active   92m
+smart-scaler         Active   90m
+```
+
 2. **Verify component status:**
+
 ```bash
 # Infrastructure Components
 kubectl get pods -n gpu-operator
@@ -725,19 +797,61 @@ kubectl get pods -n smart-scaler
 kubectl get pods -n nim-load-test
 ```
 
+Expected output:
+
+```sh
+## Infrastructure Components
+# GPU Operator
+gpu-operator-666bbffcd-drrwk                                  1/1     Running   0          96m
+gpu-operator-node-feature-discovery-gc-7c7f68d5f4-dz7jk       1/1     Running   0          96m
+gpu-operator-node-feature-discovery-master-58588c6967-8pjhc   1/1     Running   0          96m
+gpu-operator-node-feature-discovery-worker-xkbk2              1/1     Running   0          96m
+# Monitoring
+alertmanager-prometheus-kube-prometheus-alertmanager-0   2/2     Running   0          98m
+prometheus-grafana-67dc5c9fc9-5jzhh                      3/3     Running   0          98m
+prometheus-kube-prometheus-operator-775d58dc6b-bgglg     1/1     Running   0          98m
+prometheus-kube-state-metrics-856b96f64d-7st5q           1/1     Running   0          98m
+prometheus-prometheus-kube-prometheus-prometheus-0       2/2     Running   0          98m
+prometheus-prometheus-node-exporter-nm8zl                1/1     Running   0          98m
+pushgateway-65497548cc-6v7sv                             1/1     Running   0          97m
+# Keda
+keda-admission-webhooks-7c6fc8d849-9cchf          1/1     Running   0             98m
+keda-operator-6465596cb9-4j54h                    1/1     Running   1 (98m ago)   98m
+keda-operator-metrics-apiserver-dc4dd6d79-gzxpq   1/1     Running   0             98m
+
+# AI/ML
+meta-llama3-8b-instruct-pod             0/1     Pending   0          97m
+nim-k8s-nim-operator-7565b7477b-6d7rs   1/1     Running   0          98m
+
+# Smart Scaler
+smart-scaler-llm-inf-5f4bf754dd-6qbm9   1/1     Running   0          98m
+
+# Load Testing Service
+locust-load-54748fd47d-tndsr   1/1     Running   0          97m
+```
+
 3. **Check services and endpoints:**
+
 ```bash
 kubectl get svc --all-namespaces
 kubectl get endpoints --all-namespaces
 ```
 
 4. **Verify KEDA ScaledObjects:**
+
 ```bash
 kubectl get scaledobjects -n nim
 kubectl describe scaledobject llm-demo-keda -n nim
 ```
 
+Expected output:
+
+```sh
+llm-demo-keda   meta-llama3-8b-instruct   1     8     prometheus    False   Unknown   Unknown    Unknown   100m
+```
+
 5. **Check metrics and monitoring:**
+
 ```bash
 # Check if Prometheus is collecting metrics
 kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
@@ -751,22 +865,27 @@ kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
 The installer automatically manages the following secrets:
 
 ### NGC Secrets (for NVIDIA components)
+
 - **ngc-secret**: Docker registry secret for pulling NVIDIA images
 - **ngc-api-secret**: API key secret for NGC access
 
 ### Avesha Secrets (for Smart Scaler components)
+
 - **avesha-systems**: Docker registry secret for pulling Smart Scaler images
 
 ### ConfigMaps
+
 - **mesh-config**: Smart Scaler inference configuration
 - **locustfile**: Load testing script configuration
 
 ## Ansible Roles Overview
 
 ### 1. helm_chart_install
+
 **Purpose**: Manages Helm chart installations
 
 **Features**:
+
 - Chart version specification
 - Namespace creation and management
 - Chart values configuration
@@ -776,9 +895,11 @@ The installer automatically manages the following secrets:
 **Usage**: Handles GPU Operator, Prometheus Stack, KEDA, and NIM Operator
 
 ### 2. manifest_install
+
 **Purpose**: Manages Kubernetes manifest deployments
 
 **Features**:
+
 - Template variable substitution
 - Namespace management
 - Manifest validation
@@ -788,9 +909,11 @@ The installer automatically manages the following secrets:
 **Usage**: Handles all custom manifests (NIM Cache, NIM Service, KEDA ScaledObject, Smart Scaler, Locust)
 
 ### 3. command_exec
+
 **Purpose**: Executes shell commands with enhanced features
 
 **Features**:
+
 - Environment variable support
 - Error handling and retries
 - Conditional execution
@@ -840,7 +963,33 @@ The installer follows this systematic process:
 
 ### Common Issues
 
-1. **NGC Secret Creation Fails**
+1. **Python bad interpreter**
+
+If you get this error: `smartscaler-apps-installer/venv/bin/python: bad interpreter: No such file or directory`, try to run the following commands:
+
+```sh
+deactivate
+
+rm -rf smartscaler-apps-installer/smartscaler-apps-installer/venv/
+
+python3 -m venv venv
+
+source venv/bin/activate
+
+# Run again step 3 from "Setting Up Local Environment" section
+pip install -r requirements.txt
+```
+
+2. **Failed to find required executable "rsync"**
+
+```sh
+# Ubuntu as an example
+sudo apt update
+sudo apt install rsync
+```
+
+3. **NGC Secret Creation Fails**
+
 ```bash
 # Check NGC environment variables
 echo $NGC_API_KEY
@@ -855,7 +1004,8 @@ kubectl describe secret ngc-secret -n nim
 kubectl describe secret ngc-api-secret -n nim
 ```
 
-2. **NIM Service Not Starting**
+4. **NIM Service Not Starting**
+
 ```bash
 # Check NIM service pods
 kubectl get pods -n nim -l app=meta-llama3-8b-instruct
@@ -870,7 +1020,8 @@ kubectl get events -n nim --sort-by=.metadata.creationTimestamp
 kubectl describe nodes | grep nvidia.com/gpu
 ```
 
-3. **KEDA ScaledObject Issues**
+5. **KEDA ScaledObject Issues**
+
 ```bash
 # Check ScaledObject status
 kubectl get scaledobjects -n nim
@@ -883,7 +1034,8 @@ kubectl logs -n keda -l app=keda-operator
 kubectl exec -it -n nim deployment/meta-llama3-8b-instruct -- curl -s "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/query?query=up"
 ```
 
-4. **Smart Scaler Inference Issues**
+6. **Smart Scaler Inference Issues**
+
 ```bash
 # Check Smart Scaler pods
 kubectl get pods -n smart-scaler
@@ -898,7 +1050,8 @@ kubectl get configmap mesh-config -n smart-scaler -o yaml
 kubectl describe pod -n smart-scaler -l service=inference-tenant-app
 ```
 
-5. **Load Testing Issues**
+7. **Load Testing Issues**
+
 ```bash
 # Check Locust deployment
 kubectl get pods -n nim-load-test
@@ -910,7 +1063,8 @@ kubectl logs -n nim-load-test -l app=locust-load
 kubectl exec -it -n nim-load-test deployment/locust-load -- curl -s http://meta-llama3-8b-instruct.nim.svc.cluster.local:8000/v1/models
 ```
 
-6. **Metrics Collection Issues**
+8. **Metrics Collection Issues**
+
 ```bash
 # Check Prometheus targets
 kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
@@ -927,6 +1081,7 @@ kubectl logs -n monitoring -l app=pushgateway
 ### Log Analysis
 
 1. **Application logs:**
+
 ```bash
 # Get logs from specific pods
 kubectl logs -n <namespace> <pod-name>
@@ -942,6 +1097,7 @@ kubectl logs -n <namespace> <pod-name> -c <container-name>
 ```
 
 2. **Ansible execution logs:**
+
 ```bash
 # Run with verbose output for debugging
 ansible-playbook site.yml -vvvv
@@ -956,6 +1112,7 @@ ansible-playbook site.yml --skip-tags="gpu_operator,monitoring"
 ### Performance Monitoring
 
 1. **GPU Utilization:**
+
 ```bash
 # Check GPU metrics in Prometheus
 kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
@@ -966,6 +1123,7 @@ kubectl exec -it -n gpu-operator -l app=nvidia-device-plugin-daemonset -- nvidia
 ```
 
 2. **NIM Service Performance:**
+
 ```bash
 # Check inference latency and throughput
 kubectl port-forward -n nim svc/meta-llama3-8b-instruct 8000:8000
@@ -975,6 +1133,7 @@ curl -X POST http://localhost:8000/v1/completions \
 ```
 
 3. **Scaling Metrics:**
+
 ```bash
 # Monitor KEDA scaling decisions
 kubectl logs -n keda -l app=keda-operator -f
@@ -1017,4 +1176,3 @@ ansible-playbook kubernetes.yml --ask-become-pass
 ```
 
 This will prompt for your sudo password which is required for certain operations.
-

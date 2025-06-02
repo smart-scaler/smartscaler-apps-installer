@@ -3,40 +3,40 @@
 # Kubernetes Deployment Configuration
 # Controls the setup and configuration of the Kubernetes cluster using Kubespray
 kubernetes_deployment:
-  enabled: false                               # Enable/disable Kubernetes cluster deployment
-  
+  enabled: false # Enable/disable Kubernetes cluster deployment
+
   # Firewall Configuration
   firewall:
-    enabled: true                             # Enable/disable firewall configuration
-    allow_additional_ports: []                # Additional ports to allow (e.g., ["8080", "9090"])
-    
+    enabled: true # Enable/disable firewall configuration
+    allow_additional_ports: [] # Additional ports to allow (e.g., ["8080", "9090"])
+
   # NVIDIA Runtime Configuration
   nvidia_runtime:
-    enabled: true                            # Enable/disable NVIDIA runtime configuration
-    install_toolkit: true                     # Install NVIDIA Container Toolkit if not present
-    configure_containerd: true                # Configure containerd with NVIDIA runtime
-    create_runtime_class: true                # Create Kubernetes RuntimeClass for NVIDIA
-  
+    enabled: true # Enable/disable NVIDIA runtime configuration
+    install_toolkit: true # Install NVIDIA Container Toolkit if not present
+    configure_containerd: true # Configure containerd with NVIDIA runtime
+    create_runtime_class: true # Create Kubernetes RuntimeClass for NVIDIA
+
   # SSH Configuration
   # Required for Kubespray to access and configure nodes
-  ssh_key_path: "/root/.ssh/k8s_rsa"     # Absolute Path to SSH private key for node access
-  default_ansible_user: "root"                 # Default SSH user for node access
-  
+  ssh_key_path: "/root/.ssh/k8s_rsa" # Absolute Path to SSH private key for node access
+  default_ansible_user: "root" # Default SSH user for node access
+
   # Node Configuration
   # Define the control plane (master) nodes for the Kubernetes cluster
-  control_plane_nodes:                         # List of control plane nodes
-    - name: master-k8s                        # Hostname/identifier for the node
-      ansible_host: 127.0.0.1          # IP address or DNS name of the node
-      ansible_user: root                      # SSH user for this specific node
+  control_plane_nodes: # List of control plane nodes
+    - name: master-k8s # Hostname/identifier for the node
+      ansible_host: 127.0.0.1 # IP address or DNS name of the node
+      ansible_user: root # SSH user for this specific node
       ansible_become: true
       ansible_become_method: sudo
       ansible_become_user: root
       # private_ip: 10.0.102.57        # SSH user for this specific node
-  
+
   # Kubernetes Components Configuration
-  network_plugin: calico                       # CNI plugin for pod networking (options: calico, flannel, etc.)
-  container_runtime: containerd                # Container runtime (options: containerd, docker)
-  dns_mode: coredns                           # DNS service for the cluster
+  network_plugin: calico # CNI plugin for pod networking (options: calico, flannel, etc.)
+  container_runtime: containerd # Container runtime (options: containerd, docker)
+  dns_mode: coredns # DNS service for the cluster
 
 # Global image pull secret settings
 global_image_pull_secret:
@@ -65,10 +65,10 @@ avesha_docker_password: "{{ lookup('env', 'AVESHA_DOCKER_PASSWORD') }}"
 
 # Validation Configuration
 validate_prerequisites:
-  enabled: true            
+  enabled: true
 
 # Execution Configuration
-execution_order_enabled: true               # Enable/disable execution order tasks
+execution_order_enabled: true # Enable/disable execution order tasks
 
 # Execution configuration
 execution_order:
@@ -414,7 +414,7 @@ command_exec:
         env:
           NGC_DOCKER_API_KEY: "{{ ngc_docker_api_key }}"
           KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
-      
+
       # Handle ngc-api-secret
       - cmd: |
           if kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
@@ -431,7 +431,7 @@ command_exec:
             --from-literal=NGC_API_KEY="${NGC_API_KEY}"
         env:
           NGC_API_KEY: "{{ ngc_api_key }}"
-          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}" 
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
 
   - name: "verify_ngc_secrets"
     commands:
@@ -444,7 +444,7 @@ command_exec:
         env:
           KUBECONFIG: "{{ global_kubeconfig }}"
           KUBECONTEXT: "{{ global_kubecontext }}"
-        ignore_errors: true 
+        ignore_errors: true
 
   - name: "create_avesha_secret"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
@@ -460,7 +460,7 @@ command_exec:
               --context={{ kubecontext | default(global_kubecontext) }} \
               create namespace smart-scaler
           fi
-          
+
           # Then handle the secret
           if kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
@@ -479,7 +479,6 @@ command_exec:
           AVESHA_DOCKER_USERNAME: "{{ avesha_docker_username }}"
           AVESHA_DOCKER_PASSWORD: "{{ avesha_docker_password }}"
           KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
-
 
   - name: "verify_avesha_secret"
     commands:
@@ -534,4 +533,3 @@ command_exec:
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
             -n nim-load-test create configmap locustfile --from-file=locustfile.py=files/locust.py
-

@@ -125,7 +125,7 @@ try:
     for node in template_vars['control_plane_nodes']:
         user = node.get('ansible_user', template_vars['default_ansible_user'])
         print(f"  - {node['name']}: {node['ansible_host']} (user: {user})")
-    
+
     if template_vars['worker_nodes']:
         print("\nWorker Nodes:")
         for node in template_vars['worker_nodes']:
@@ -162,19 +162,19 @@ def test_ssh(host, user):
 try:
     with open('user_input.yml', 'r') as f:
         data = yaml.safe_load(f)
-    
+
     default_user = '$DEFAULT_USER'
     nodes = data['kubernetes_deployment']['control_plane_nodes']
     if 'worker_nodes' in data['kubernetes_deployment']:
         nodes.extend(data['kubernetes_deployment']['worker_nodes'])
-    
+
     failed_nodes = []
     for node in nodes:
         user = node.get('ansible_user', default_user)
         print(f"\nTesting connection to {node['name']} ({node['ansible_host']}) as user '{user}'...")
         if not test_ssh(node['ansible_host'], user):
             failed_nodes.append(f"{node['name']} ({user}@{node['ansible_host']})")
-    
+
     if failed_nodes:
         print(f"\nFailed to connect to nodes: {', '.join(failed_nodes)}", file=sys.stderr)
         sys.exit(1)
@@ -208,4 +208,4 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-echo -e "${GREEN}Kubernetes deployment completed successfully!${NC}" 
+echo -e "${GREEN}Kubernetes deployment completed successfully!${NC}"
