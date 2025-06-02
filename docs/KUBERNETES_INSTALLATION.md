@@ -286,4 +286,16 @@ MASTER_IP="192.168.1.10"  # Use your master node IP
 
 ssh -i "$SSH_KEY" "$SSH_USER@$MASTER_IP" 'sudo cat /etc/kubernetes/admin.conf' > kubeconfig
 chmod 600 kubeconfig
+```
+
+### Installing Required Collections
+
+Before proceeding with the installation, install the required Ansible collections:
+
+```bash
+# Install required collections with locale settings
+LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ansible-galaxy install -r requirements.yml --force
+
+# Verify the installation
+LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ansible-galaxy collection list
 ``` 

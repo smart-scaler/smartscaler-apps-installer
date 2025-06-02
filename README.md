@@ -167,13 +167,11 @@ pip install -r requirements.txt
 4. **Install Ansible collections:**
 
 ```bash
-ansible-galaxy collection install -r requirements.yml
+# Install required collections with locale settings
+LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ansible-galaxy collection install -r requirements.yml --force
 
-# Collections installed:
-#  - community.general
-#  - kubernetes.core
-#  - ansible.posix
-#  - community.crypto
+# Verify the installation
+LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ansible-galaxy collection list | grep -E "community.general|kubernetes.core"
 ```
 
 ### SSH Key Setup
@@ -219,6 +217,13 @@ helm version
 kubernetes_deployment:
   enabled: true  # Must be set to true for K8s installation
 
+  # API Server Configuration
+  # CRITICAL: Replace <API SERVER IP ADDRESS> with your actual server IP
+  api_server:
+    host: "44.193.214.215"                   # REQUIRED: API server public IP address
+    port: 6443                               # API server port (default: 6443)
+    secure: true                             # Use HTTPS for API server connection
+
   # Firewall Configuration
   firewall:
     enabled: true                             # Enable/disable firewall configuration
@@ -238,17 +243,43 @@ kubernetes_deployment:
   # Node Configuration
   control_plane_nodes:
     - name: master-k8s                        # Hostname/identifier for the node
-      ansible_host: "YOUR_MASTER_NODE_IP"     # IP address or DNS name of the node
+      ansible_host: "44.193.214.215"         # Public IP address of the master node
       ansible_user: root                      # SSH user for this specific node
       ansible_become: true
       ansible_become_method: sudo
-      private_ip: 10.0.0.19
-
+      private_ip: 10.0.102.209               # Private IP address of the node (AWS/cloud internal IP)
 
   # Kubernetes Components Configuration
   network_plugin: calico                      # CNI plugin for pod networking (options: calico, flannel, etc.)
   container_runtime: containerd               # Container runtime (options: containerd, docker)
   dns_mode: coredns                          # DNS service for the cluster
+```
+
+**Important Notes about API Server Configuration:**
+
+- **`api_server.host`**: This must be set to the **public IP address** or **domain name** that will be used to access the Kubernetes API server
+- This IP will be:
+  - Used in the kubeconfig file as the server endpoint
+  - Added to the API server's SSL certificate as a Subject Alternative Name (SAN)
+  - The endpoint that kubectl and other clients will use to connect to the cluster
+- **Do NOT use placeholder values** like `<API SERVER IP ADDRESS>` - this will cause deployment failures
+- For cloud deployments (AWS, GCP, Azure), use the **public IP** of your master node
+- For on-premises deployments, use the **externally accessible IP** of your master node
+
+**Example configurations:**
+
+```yaml
+# For AWS EC2 instance
+api_server:
+  host: "3.239.19.44"  # AWS public IP
+  
+# For on-premises with static IP
+api_server:
+  host: "192.168.1.100"  # Your public/accessible IP
+
+# For domain-based access
+api_server:
+  host: "k8s-master.yourdomain.com"  # Your domain name
 ```
 
 2. **SSH User Configuration:**
@@ -722,13 +753,11 @@ pip install -r requirements.txt
 8. **Install Ansible collections:**
 
 ```bash
-ansible-galaxy collection install -r requirements.yml
+# Install required collections with locale settings
+LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ansible-galaxy collection install -r requirements.yml --force
 
-# Collections installed:
-#  - community.general
-#  - kubernetes.core
-#  - ansible.posix
-#  - community.crypto
+# Verify the installation
+LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ansible-galaxy collection list | grep -E "community.general|kubernetes.core"
 ```
 
 ### Deployment Process
@@ -963,7 +992,26 @@ The installer follows this systematic process:
 
 ### Common Issues
 
-1. **Python bad interpreter**
+1. **Locale Issues with Ansible**
+
+If you encounter locale-related errors like:
+```
+ERROR: Ansible could not initialize the preferred locale: unsupported locale setting
+```
+
+Fix this by running the following commands:
+```bash
+# Install and configure locales
+sudo apt-get update && sudo apt-get install -y locales
+sudo locale-gen en_US.UTF-8
+sudo update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+
+# Set locale for current session
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+```
+
+2. **Python bad interpreter**
 
 If you get this error: `smartscaler-apps-installer/venv/bin/python: bad interpreter: No such file or directory`, try to run the following commands:
 
@@ -980,7 +1028,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-2. **Failed to find required executable "rsync"**
+3. **Failed to find required executable "rsync"**
 
 ```sh
 # Ubuntu as an example
@@ -988,7 +1036,7 @@ sudo apt update
 sudo apt install rsync
 ```
 
-3. **NGC Secret Creation Fails**
+4. **NGC Secret Creation Fails**
 
 ```bash
 # Check NGC environment variables
@@ -1004,7 +1052,7 @@ kubectl describe secret ngc-secret -n nim
 kubectl describe secret ngc-api-secret -n nim
 ```
 
-4. **NIM Service Not Starting**
+5. **NIM Service Not Starting**
 
 ```bash
 # Check NIM service pods
@@ -1020,7 +1068,7 @@ kubectl get events -n nim --sort-by=.metadata.creationTimestamp
 kubectl describe nodes | grep nvidia.com/gpu
 ```
 
-5. **KEDA ScaledObject Issues**
+6. **KEDA ScaledObject Issues**
 
 ```bash
 # Check ScaledObject status
@@ -1034,7 +1082,7 @@ kubectl logs -n keda -l app=keda-operator
 kubectl exec -it -n nim deployment/meta-llama3-8b-instruct -- curl -s "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/query?query=up"
 ```
 
-6. **Smart Scaler Inference Issues**
+7. **Smart Scaler Inference Issues**
 
 ```bash
 # Check Smart Scaler pods
@@ -1050,7 +1098,7 @@ kubectl get configmap mesh-config -n smart-scaler -o yaml
 kubectl describe pod -n smart-scaler -l service=inference-tenant-app
 ```
 
-7. **Load Testing Issues**
+8. **Load Testing Issues**
 
 ```bash
 # Check Locust deployment
@@ -1063,7 +1111,7 @@ kubectl logs -n nim-load-test -l app=locust-load
 kubectl exec -it -n nim-load-test deployment/locust-load -- curl -s http://meta-llama3-8b-instruct.nim.svc.cluster.local:8000/v1/models
 ```
 
-8. **Metrics Collection Issues**
+9. **Metrics Collection Issues**
 
 ```bash
 # Check Prometheus targets

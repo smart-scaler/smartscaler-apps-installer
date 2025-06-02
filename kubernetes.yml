@@ -5,12 +5,37 @@
   become: true
   become_method: sudo
   vars_files:
-    - "{{ lookup('env', 'VARS_FILE', default='user_input.yml') }}"
+    - user_input.yml
   vars:
     inventory_dir: "{{ playbook_dir }}/inventory"
     kubespray_dir: "{{ playbook_dir }}/kubespray"
 
   pre_tasks:
+    - name: Load and verify user_input.yml
+      block:
+        - name: Load user_input.yml content
+          include_vars:
+            file: user_input.yml
+            name: user_input
+
+        - name: Set global facts
+          set_fact:
+            kubernetes_deployment: "{{ user_input.kubernetes_deployment }}"
+          when: user_input.kubernetes_deployment is defined
+
+        - name: Verify kubernetes_deployment section exists
+          fail:
+            msg: "kubernetes_deployment section not found in user_input.yml"
+          when: user_input.kubernetes_deployment is not defined
+
+        - name: Display loaded configuration
+          debug:
+            msg: |
+              Loaded configuration:
+              - Kubernetes enabled: {{ kubernetes_deployment.enabled }}
+              - API Server: {{ kubernetes_deployment.api_server.host }}
+              - SSH Key: {{ kubernetes_deployment.ssh_key_path }}
+
     - name: Check if Kubernetes deployment is enabled
       debug:
         msg: "Kubernetes deployment is disabled in user_input.yml. Skipping all tasks."
@@ -29,4 +54,8 @@
         name: kubernetes
       vars:
         deploy_kubernetes: true
+        kube_apiserver_ip: "{{ kubernetes_deployment.api_server.host }}"
+        loadbalancer_apiserver:
+          address: "{{ kubernetes_deployment.api_server.host }}"
+          port: "{{ kubernetes_deployment.api_server.port }}"
       when: kubernetes_deployment.enabled | default(false) 
