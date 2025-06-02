@@ -109,13 +109,41 @@
     mode: '0755'
   when: kubernetes_deployment.enabled | default(false)
 
+- name: Create temporary readable copy of kubeconfig on remote master
+  shell: |
+    sudo cp /etc/kubernetes/admin.conf /tmp/kubeconfig_temp
+    sudo chown {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}:{{ user_input.kubernetes_deployment.default_ansible_user | default('root') }} /tmp/kubeconfig_temp
+    sudo chmod 644 /tmp/kubeconfig_temp
+  delegate_to: "{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }}"
+    ansible_user: "{{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}"
+  when:
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result is defined
+    - kubespray_result is succeeded
+
 - name: Copy kubeconfig from first control plane node
   command:
-    cmd: "scp -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}@{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }}:/etc/kubernetes/admin.conf {{ lookup('env', 'PWD') }}/files/kubeconfig"
+    cmd: "scp -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}@{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }}:/tmp/kubeconfig_temp {{ lookup('env', 'PWD') }}/files/kubeconfig"
   when: 
     - kubernetes_deployment.enabled | default(false)
     - kubespray_result is defined
     - kubespray_result is succeeded
+
+- name: Cleanup temporary kubeconfig file on remote master
+  file:
+    path: /tmp/kubeconfig_temp
+    state: absent
+  delegate_to: "{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }}"
+    ansible_user: "{{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}"
+  when:
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result is defined
+    - kubespray_result is succeeded
+  ignore_errors: true
 
 - name: Set kubeconfig permissions
   file:
