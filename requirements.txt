@@ -1,5 +1,6 @@
 ansible==9.8.0
 # Needed for jinja2 json_query templating
+ansible-core==2.16.14
 jmespath==1.0.1
 # Needed for ansible.utils.validate module
 jsonschema==4.23.0
