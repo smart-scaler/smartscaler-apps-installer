@@ -391,7 +391,7 @@ execution_order:
 
 #### GPU Operator Configuration
 ```yaml
-gpu_operator_chart:
+  gpu_operator_chart:
   release_name: gpu-operator
   chart_ref: gpu-operator
   release_namespace: gpu-operator
@@ -407,7 +407,7 @@ gpu_operator_chart:
 
 #### Prometheus Stack Configuration
 ```yaml
-prometheus_stack:
+  prometheus_stack:
   release_name: prometheus
   chart_ref: kube-prometheus-stack
   release_namespace: monitoring
@@ -431,7 +431,7 @@ prometheus_stack:
 
 #### KEDA Configuration
 ```yaml
-keda_chart:
+  keda_chart:
   release_name: keda
   chart_ref: keda
   release_namespace: keda
@@ -440,7 +440,7 @@ keda_chart:
 
 #### NIM Operator Configuration
 ```yaml
-nim_operator_chart:
+  nim_operator_chart:
   release_name: nim
   chart_ref: k8s-nim-operator
   release_namespace: nim
@@ -471,7 +471,7 @@ nim_cache_manifest:
 ```
 
 #### NIM Service Configuration
-```yaml
+   ```yaml
 nim_service_manifest:
   name: nim-service-setup
   manifest_file: "files/nim-service.yaml.j2"
@@ -505,7 +505,7 @@ nim_service_manifest:
 ```
 
 #### KEDA ScaledObject Configuration
-```yaml
+   ```yaml
 keda_scaled_object_manifest:
   name: keda-scaled-object-setup
   manifest_file: "files/keda-scaled-object.yaml.j2"
