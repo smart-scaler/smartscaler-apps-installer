@@ -109,13 +109,38 @@
     mode: '0755'
   when: kubernetes_deployment.enabled | default(false)
 
-- name: Copy kubeconfig from first control plane node
+- name: Try direct copy of kubeconfig from first control plane node
   command:
     cmd: "scp -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}@{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }}:/etc/kubernetes/admin.conf {{ lookup('env', 'PWD') }}/files/kubeconfig"
+  register: direct_copy_result
+  ignore_errors: true
   when: 
     - kubernetes_deployment.enabled | default(false)
     - kubespray_result is defined
     - kubespray_result is succeeded
+
+- name: Try alternative copy method using sudo if direct copy fails
+  block:
+    - name: Create temporary copy of admin.conf on remote host
+      command:
+        cmd: "ssh -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}@{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }} 'sudo cp /etc/kubernetes/admin.conf /tmp/admin.conf && sudo chown {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}:{{ user_input.kubernetes_deployment.default_ansible_user | default('root') }} /tmp/admin.conf'"
+      when: direct_copy_result is failed
+
+    - name: Copy temporary admin.conf from remote host
+      command:
+        cmd: "scp -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}@{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }}:/tmp/admin.conf {{ lookup('env', 'PWD') }}/files/kubeconfig"
+      when: direct_copy_result is failed
+
+    - name: Clean up temporary admin.conf on remote host
+      command:
+        cmd: "ssh -i {{ user_input.kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ user_input.kubernetes_deployment.default_ansible_user | default('root') }}@{{ user_input.kubernetes_deployment.control_plane_nodes[0].ansible_host }} 'sudo rm -f /tmp/admin.conf'"
+      when: direct_copy_result is failed
+  ignore_errors: true
+  when:
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result is defined
+    - kubespray_result is succeeded
+    - direct_copy_result is failed
 
 - name: Set kubeconfig permissions
   file:
