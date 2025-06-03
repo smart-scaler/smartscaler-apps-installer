@@ -211,45 +211,155 @@ helm version
 1. **Update node IPs in `user_input.yml`:**
 
 ```yaml
+# =============================================================================
+# KUBERNETES CLUSTER DEPLOYMENT CONFIGURATION
+# =============================================================================
+# This section controls the setup and configuration of the Kubernetes cluster
+# using Kubespray. Set 'enabled: true' to deploy a new cluster, 'false' to skip.
+# =============================================================================
+
 kubernetes_deployment:
-  enabled: true  # Must be set to true for K8s installation
+  enabled: false                                # Set to 'true' to deploy K8s cluster, 'false' to skip
 
-  # API Server Configuration
-  # CRITICAL: Replace <API SERVER IP ADDRESS> with your actual server IP
+  # =============================================================================
+  # API SERVER CONFIGURATION
+  # =============================================================================
+  # Configure the Kubernetes API server endpoint that will be used for cluster
+  # management and kubectl/helm operations. This should be the public IP address
+  # or DNS name where the API server will be accessible.
+  # =============================================================================
   api_server:
-    host: "44.193.214.215"                   # REQUIRED: API server public IP address
-    port: 6443                               # API server port (default: 6443)
-    secure: true                             # Use HTTPS for API server connection
+    host: "<YOUR_API_SERVER_IP>"                # REQUIRED: Replace with your master node's public IP
+    port: 6443                                  # API server port (default: 6443, change if needed)
+    secure: true                                # Use HTTPS for secure API server connection
 
-  # Firewall Configuration
+  # =============================================================================
+  # FIREWALL CONFIGURATION
+  # =============================================================================
+  # Configure firewall rules for the Kubernetes cluster. The installer will
+  # automatically open required ports for K8s components (6443, 2379-2380, etc.)
+  # Use 'allow_additional_ports' to open additional custom ports if needed.
+  # =============================================================================
   firewall:
-    enabled: true                             # Enable/disable firewall configuration
-    allow_additional_ports: []                # Additional ports to allow (e.g., ["8080", "9090"])
+    enabled: true                               # Enable automatic firewall configuration
+    allow_additional_ports: []                  # Additional ports to open (e.g., ["8080", "9090", "3000"])
 
-  # NVIDIA Runtime Configuration
+  # =============================================================================
+  # NVIDIA GPU RUNTIME CONFIGURATION
+  # =============================================================================
+  # Configure NVIDIA GPU support for containerized workloads. This is required
+  # for AI/ML workloads that need GPU acceleration. The installer will set up
+  # the NVIDIA Container Toolkit and configure containerd runtime.
+  # =============================================================================
   nvidia_runtime:
-    enabled: true                            # Enable/disable NVIDIA runtime configuration
-    install_toolkit: true                     # Install NVIDIA Container Toolkit if not present
-    configure_containerd: true                # Configure containerd with NVIDIA runtime
-    create_runtime_class: true                # Create Kubernetes RuntimeClass for NVIDIA
+    enabled: true                               # Enable NVIDIA GPU runtime support
+    install_toolkit: true                       # Install NVIDIA Container Toolkit automatically
+    configure_containerd: true                  # Configure containerd with NVIDIA runtime
+    create_runtime_class: true                  # Create Kubernetes RuntimeClass for GPU workloads
 
-  # SSH Configuration
-  ssh_key_path: "/root/.ssh/k8s_rsa"         # Absolute Path to SSH private key for node access
-  default_ansible_user: "root"               # Default SSH user for node access
+  # =============================================================================
+  # SSH ACCESS CONFIGURATION
+  # =============================================================================
+  # Configure SSH access for cluster node management. Kubespray uses SSH to
+  # connect to nodes and perform installation tasks. Generate SSH keys using:
+  # ssh-keygen -t rsa -b 4096 -f ~/.ssh/k8s_rsa -N ""
+  # =============================================================================
+  ssh_key_path: "<PATH_TO_YOUR_SSH_PRIVATE_KEY>"    # REQUIRED: Full path to SSH private key
+                                                    # Example: "/home/username/.ssh/k8s_rsa"
+  default_ansible_user: "<SSH_USERNAME>"            # REQUIRED: SSH username for node access
+                                                    # Common values: "ubuntu", "root", "centos"
 
-  # Node Configuration
+  # =============================================================================
+  # CONTROL PLANE NODES CONFIGURATION
+  # =============================================================================
+  # Define the master nodes that will run the Kubernetes control plane components.
+  # For production, use 3 master nodes for high availability. For development,
+  # a single master node is sufficient.
+  # =============================================================================
   control_plane_nodes:
-    - name: master-k8s                        # Hostname/identifier for the node
-      ansible_host: "44.193.214.215"         # Public IP address of the master node
-      ansible_user: root                      # SSH user for this specific node
-      ansible_become: true
-      ansible_become_method: sudo
-      private_ip: 10.0.102.209               # Private IP address of the node (AWS/cloud internal IP)
+    - name: "<NODE_HOSTNAME>"                   # REQUIRED: Unique hostname/identifier
+                                                # Example: "k8s-master-1", "control-plane-01"
+      ansible_host: "<PUBLIC_IP_ADDRESS>"       # REQUIRED: Public IP address of the master node
+                                                # Example: "203.0.113.10"
+      ansible_user: "<SSH_USERNAME>"            # REQUIRED: SSH user for this specific node
+                                                # Should match or override default_ansible_user
+      ansible_become: true                      # Enable privilege escalation (sudo)
+      ansible_become_method: sudo               # Method for privilege escalation
+      private_ip: "<PRIVATE_IP_ADDRESS>"        # REQUIRED: Private/internal IP address
+                                                # Example: "10.0.1.10" (AWS), "192.168.1.10" (local)
 
-  # Kubernetes Components Configuration
-  network_plugin: calico                      # CNI plugin for pod networking (options: calico, flannel, etc.)
-  container_runtime: containerd               # Container runtime (options: containerd, docker)
-  dns_mode: coredns                          # DNS service for the cluster
+    # OPTIONAL: Add additional master nodes for high availability
+    # - name: "<NODE_HOSTNAME_2>"
+    #   ansible_host: "<PUBLIC_IP_ADDRESS_2>"
+    #   ansible_user: "<SSH_USERNAME>"
+    #   ansible_become: true
+    #   ansible_become_method: sudo
+    #   private_ip: "<PRIVATE_IP_ADDRESS_2>"
+
+  # =============================================================================
+  # KUBERNETES COMPONENTS CONFIGURATION
+  # =============================================================================
+  # Configure the core Kubernetes components and networking. These settings
+  # determine how your cluster will handle networking, DNS, and container runtime.
+  # =============================================================================
+  network_plugin: calico                        # Container Network Interface (CNI) plugin
+                                                # Options: calico, flannel, weave, cilium
+  container_runtime: containerd                 # Container runtime for pods
+                                                # Options: containerd, docker (deprecated)
+  dns_mode: coredns                            # DNS service for cluster
+                                                # Options: coredns, kubedns
+
+  # =============================================================================
+  # NETWORK CONFIGURATION
+  # =============================================================================
+  # Define the IP address ranges for Kubernetes services and pods. Ensure these
+  # ranges don't conflict with your existing network infrastructure.
+  # =============================================================================
+  network_config:
+    service_subnet: "10.233.0.0/18"            # CIDR for Kubernetes services
+                                                # Default range, change if conflicts exist
+    pod_subnet: "10.233.64.0/18"               # CIDR for pod network
+                                                # Default range, change if conflicts exist  
+    node_prefix: 24                             # Subnet size for each node
+                                                # Default: 24 (256 IPs per node)
+
+# =============================================================================
+# CONFIGURATION EXAMPLES
+# =============================================================================
+# 
+# Example 1: Single Master Node (Development)
+# -------------------------------------------
+# control_plane_nodes:
+#   - name: "k8s-master"
+#     ansible_host: "203.0.113.10"
+#     ansible_user: "ubuntu"
+#     ansible_become: true
+#     ansible_become_method: sudo
+#     private_ip: "10.0.1.10"
+#
+# Example 2: High Availability Setup (Production)
+# -----------------------------------------------
+# control_plane_nodes:
+#   - name: "k8s-master-1"
+#     ansible_host: "203.0.113.10"
+#     ansible_user: "ubuntu"
+#     ansible_become: true
+#     ansible_become_method: sudo
+#     private_ip: "10.0.1.10"
+#   - name: "k8s-master-2"
+#     ansible_host: "203.0.113.11"
+#     ansible_user: "ubuntu"
+#     ansible_become: true
+#     ansible_become_method: sudo
+#     private_ip: "10.0.1.11"
+#   - name: "k8s-master-3"
+#     ansible_host: "203.0.113.12"
+#     ansible_user: "ubuntu"
+#     ansible_become: true
+#     ansible_become_method: sudo
+#     private_ip: "10.0.1.12"
+#
+# =============================================================================
 ```
 
 **Important Notes about API Server Configuration:**
