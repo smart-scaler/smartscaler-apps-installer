@@ -21,24 +21,9 @@
 # RuntimeClass tasks that only need to run once (on control plane)
 - name: Configure RuntimeClass on control plane
   block:
-    - name: Set kubeconfig facts
-      set_fact:
-        kubeconfig_path: "{{ lookup('env', 'PWD') }}/files/kubeconfig"
-        kube_context: "{{ kubernetes_deployment.kube_context | default(omit) }}"
-
-    - name: Check if kubeconfig exists
-      stat:
-        path: "{{ kubeconfig_path }}"
-      register: kubeconfig_stat
-
-    - name: Fail if kubeconfig not found
-      fail:
-        msg: "Kubeconfig not found at {{ kubeconfig_path }}. Ensure Kubernetes deployment completed successfully."
-      when: not kubeconfig_stat.stat.exists
-
     - name: Check if NVIDIA RuntimeClass exists
       command: >
-        kubectl --kubeconfig={{ kubeconfig_path }} get runtimeclass nvidia
+        kubectl --kubeconfig=/etc/kubernetes/admin.conf get runtimeclass nvidia
       register: runtime_class_check
       failed_when: false
       changed_when: false
@@ -46,6 +31,7 @@
       vars:
         ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
         ansible_user: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+        ansible_become: true
       environment:
         LC_ALL: C.UTF-8
         LANG: C.UTF-8
@@ -70,11 +56,12 @@
 
     - name: Create NVIDIA RuntimeClass if not exists
       command: >
-        kubectl --kubeconfig={{ kubeconfig_path }} apply -f /tmp/nvidia-runtime-class.yaml
+        kubectl --kubeconfig=/etc/kubernetes/admin.conf apply -f /tmp/nvidia-runtime-class.yaml
       delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
       vars:
         ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
         ansible_user: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+        ansible_become: true
       environment:
         LC_ALL: C.UTF-8
         LANG: C.UTF-8
@@ -93,7 +80,7 @@
         LANG: C.UTF-8
       when: runtime_class_check.rc != 0
 
-    # Copy kubeconfig to local files directory
+    # Copy kubeconfig to local files directory (after RuntimeClass operations)
     - name: Ensure files directory exists
       file:
         path: "{{ lookup('env', 'PWD') }}/files"
@@ -120,12 +107,6 @@
       file:
         path: "{{ lookup('env', 'PWD') }}/files/kubeconfig"
         mode: '0600'
-      delegate_to: localhost
-      become: false
-
-    - name: Ensure kubeconfig is readable
-      file:
-        path: "{{ lookup('env', 'PWD') }}/files/kubeconfig"
         owner: "{{ lookup('env', 'USER') }}"
         group: "{{ lookup('env', 'USER') }}"
       delegate_to: localhost
