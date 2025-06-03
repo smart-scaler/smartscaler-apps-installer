@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-ingress-controller-custom-config
+  namespace: ingress-nginx
+data:
+  proxy-buffer-size: "128k"
+  proxy-body-size: "50m"
+  client-header-buffer-size: "64k"
+  large-client-header-buffers: "4 128k"
+  client-body-buffer-size: "128k"
+  enable-brotli: "true"
+  use-gzip: "true"
+  gzip-level: "6"
+  gzip-types: "application/atom+xml application/javascript application/x-javascript application/json application/rss+xml application/vnd.ms-fontobject application/x-font-ttf application/x-web-app-manifest+json application/xhtml+xml application/xml font/opentype image/svg+xml image/x-icon text/css text/javascript text/plain text/x-component"
