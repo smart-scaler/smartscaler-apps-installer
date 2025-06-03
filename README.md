@@ -186,15 +186,14 @@ LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ansible-galaxy collection install -r require
 LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ansible-galaxy collection list | grep -E "community.general|kubernetes.core"
 ```
 
-### SSH Key Setup
 
-1. **Generate SSH key for cluster access:**
+5. **Generate SSH key for cluster access:**
 
 ```bash
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/k8s_rsa -N ""
 ```
 
-2. **Copy SSH key to each node:**
+6. **Copy SSH key to each node:**
 
 ```bash
 # Repeat for each node in your cluster
@@ -217,10 +216,7 @@ kubectl version --client
 helm version
 ```
 
-## Kubernetes Cluster Installation
-
-
-## Mandatory user_input.yml Changes for Quick Install
+7 .## Mandatory user_input.yml Changes for Quick Kubernetes Cluster Installation
 
 **Example configurations:**
 
@@ -263,14 +259,23 @@ kubernetes_deployment:
       private_ip: "10.0.102.97"      # Internal/private IP address
                                      # Used for internal cluster communication
 ```
+8. Trigger the installation
+   
+```bash
+# Make the script executable
+chmod +x setup_kubernetes.sh
 
-### User Input Configuration Reference
+# Run the installation script with sudo
+sudo ./setup_kubernetes.sh
+```
+
+
 
 1.  **KUBERNETES CLUSTER DEPLOYMENT CONFIGURATION:**
 
 ```
 # =============================================================================
-# KUBERNETES CLUSTER DEPLOYMENT CONFIGURATION
+# KUBERNETES CLUSTER DEPLOYMENT CONFIGURATION### User Input Configuration Reference fo
 # =============================================================================
 # This section controls the setup and configuration of the Kubernetes cluster
 # using Kubespray. Set 'enabled: true' to deploy a new cluster, 'false' to skip.
@@ -449,18 +454,6 @@ kubernetes_deployment:
    ```yaml
    ansible_user: root
    ```
-
-### Installation Process
-
-⚠️ **IMPORTANT**: The **ONLY** supported method for installing Kubernetes is through the `setup_kubernetes.sh` script with sudo privileges.
-
-```bash
-# Make the script executable
-chmod +x setup_kubernetes.sh
-
-# Run the installation script with sudo
-sudo ./setup_kubernetes.sh
-```
 
 The script will:
 - Create an inventory.ini file for kubespray
