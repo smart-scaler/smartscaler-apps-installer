@@ -118,51 +118,150 @@
       {{ kubespray_result.stderr_lines | default([]) | join('\n') }}
   when: kubespray_result is defined and kubernetes_deployment.enabled | default(false)
 
+- name: Get current user
+  command: whoami
+  register: current_user
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Get current user's group
+  command: id -gn
+  register: current_group
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Get real home directory
+  command: "echo $HOME"
+  register: real_home
+  changed_when: false
+  become: false
+  delegate_to: localhost
+
 - name: Ensure files directory exists
   file:
     path: "{{ lookup('env', 'PWD') }}/files"
     state: directory
     mode: '0755'
+  become: false
   when: kubernetes_deployment.enabled | default(false)
 
-- name: Try direct copy of kubeconfig from first control plane node
-  command:
-    cmd: "scp -i {{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ kubernetes_deployment.default_ansible_user | default('root') }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}:/etc/kubernetes/admin.conf {{ lookup('env', 'PWD') }}/files/kubeconfig"
-  register: direct_copy_result
-  ignore_errors: true
-  when: 
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result is defined
-    - kubespray_result is succeeded
-
-- name: Try alternative copy method using sudo if direct copy fails
+- name: Fix files directory ownership
   block:
-    - name: Create temporary copy of admin.conf on remote host
-      command:
-        cmd: "ssh -i {{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ kubernetes_deployment.default_ansible_user | default('root') }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }} 'sudo cp /etc/kubernetes/admin.conf /tmp/admin.conf && sudo chown {{ kubernetes_deployment.default_ansible_user | default('root') }}:{{ kubernetes_deployment.default_ansible_user | default('root') }} /tmp/admin.conf'"
-      when: direct_copy_result is failed
+    - name: Try fixing directory ownership without sudo
+      file:
+        path: "{{ lookup('env', 'PWD') }}/files"
+        owner: "{{ lookup('env', 'USER') }}"
+        group: "{{ lookup('env', 'USER') }}"
+        recurse: yes
+      delegate_to: localhost
+      become: false
+      ignore_errors: true
+      register: dir_ownership_result
 
-    - name: Copy temporary admin.conf from remote host
-      command:
-        cmd: "scp -i {{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ kubernetes_deployment.default_ansible_user | default('root') }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}:/tmp/admin.conf {{ lookup('env', 'PWD') }}/files/kubeconfig"
-      when: direct_copy_result is failed
+    - name: Fix directory ownership with sudo if needed
+      shell: |
+        sudo chown -R {{ lookup('env', 'USER') }}:{{ lookup('env', 'USER') }} {{ lookup('env', 'PWD') }}/files
+        sudo chmod -R 755 {{ lookup('env', 'PWD') }}/files
+      delegate_to: localhost
+      ignore_errors: true
+      when: dir_ownership_result is failed
 
-    - name: Clean up temporary admin.conf on remote host
-      command:
-        cmd: "ssh -i {{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ kubernetes_deployment.default_ansible_user | default('root') }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }} 'sudo rm -f /tmp/admin.conf'"
-      when: direct_copy_result is failed
-  ignore_errors: true
-  when:
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result is defined
-    - kubespray_result is succeeded
-    - direct_copy_result is failed
-
-- name: Set kubeconfig permissions
+- name: Create temporary directory on remote host
   file:
+    path: "/tmp/kubeconfig-temp"
+    state: directory
+    mode: '0755'
+  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
+    ansible_become: true
+
+- name: Copy kubeconfig to temporary location with sudo
+  shell: "cp /etc/kubernetes/admin.conf /tmp/kubeconfig-temp/admin.conf && chmod 644 /tmp/kubeconfig-temp/admin.conf && chown {{ kubernetes_deployment.default_ansible_user }}:{{ kubernetes_deployment.default_ansible_user }} /tmp/kubeconfig-temp/admin.conf"
+  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
+    ansible_become: true
+
+- name: Fetch kubeconfig from temporary location
+  fetch:
+    src: "/tmp/kubeconfig-temp/admin.conf"
+    dest: "{{ lookup('env', 'PWD') }}/files/kubeconfig"
+    flat: yes
+  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
+  register: kubeconfig_fetch
+
+- name: Clean up temporary directory
+  file:
+    path: "/tmp/kubeconfig-temp"
+    state: absent
+  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
+    ansible_become: true
+  when: kubeconfig_fetch is success
+
+- name: Fix all local file permissions and ownership
+  block:
+    - name: Try fixing permissions and ownership without sudo
+      file:
+        path: "{{ item }}"
+        mode: '0644'  # Changed to allow read access for others
+        owner: "{{ lookup('env', 'USER') }}"
+        group: "{{ lookup('env', 'USER') }}"
+      with_items:
+        - "{{ lookup('env', 'PWD') }}/files/kubeconfig"
+        - "{{ lookup('env', 'PWD') }}/inventory"
+        - "{{ lookup('env', 'PWD') }}/inventory/kubespray"
+      delegate_to: localhost
+      become: false
+      ignore_errors: true
+      register: fix_perms_result
+
+    - name: Fix permissions and ownership with sudo if needed
+      shell: |
+        sudo chown -R {{ lookup('env', 'USER') }}:{{ lookup('env', 'USER') }} {{ item }}
+        sudo chmod 644 {{ item }}  # Explicit permission setting
+      with_items:
+        - "{{ lookup('env', 'PWD') }}/files/kubeconfig"
+        - "{{ lookup('env', 'PWD') }}/inventory"
+        - "{{ lookup('env', 'PWD') }}/inventory/kubespray"
+      delegate_to: localhost
+      ignore_errors: true
+      when: fix_perms_result is failed
+
+    - name: Ensure directories have execute permission
+      shell: |
+        sudo chmod 755 {{ item }}
+      with_items:
+        - "{{ lookup('env', 'PWD') }}/files"
+        - "{{ lookup('env', 'PWD') }}/inventory"
+        - "{{ lookup('env', 'PWD') }}/inventory/kubespray"
+      delegate_to: localhost
+      ignore_errors: true
+  when: kubeconfig_fetch is success
+
+- name: Verify kubeconfig exists
+  stat:
     path: "{{ lookup('env', 'PWD') }}/files/kubeconfig"
-    mode: '0600'
-  when: 
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result is defined
-    - kubespray_result is succeeded 
+  register: kubeconfig_stat
+  delegate_to: localhost
+
+- name: Display kubeconfig location
+  debug:
+    msg: |
+      Kubeconfig has been copied to:
+      - Global location: {{ lookup('env', 'PWD') }}/files/kubeconfig
+      
+      You can now use kubectl with:
+      export KUBECONFIG={{ lookup('env', 'PWD') }}/files/kubeconfig
+      kubectl get nodes
+  when: kubeconfig_stat.stat.exists 

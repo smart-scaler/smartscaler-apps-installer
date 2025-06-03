@@ -4,12 +4,22 @@
     msg: "Kubernetes deployment is disabled in user_input.yml"
   when: not kubernetes_deployment.enabled | default(false)
 
-- name: Ensure Python requirements are installed
-  pip:
-    requirements: "{{ playbook_dir }}/requirements.txt"
-    state: present
-    virtualenv: "{{ ansible_env.VIRTUAL_ENV | default(omit) }}"
+- name: Check if Python requirements are already installed
+  command: pip3 show ansible
+  register: pip_check
+  ignore_errors: true
+  changed_when: false
   when: kubernetes_deployment.enabled | default(false)
+
+- name: Install Python requirements
+  block:
+    - name: Run requirements installation script
+      command: "{{ playbook_dir }}/files/install_requirements.sh"
+      register: install_output
+  become: true
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - pip_check.rc != 0
 
 - name: Display current working directory
   command: pwd
@@ -79,8 +89,11 @@
     creates: "{{ inventory_dir }}/kubespray/group_vars/all"
   when: kubernetes_deployment.enabled | default(false)
 
-- name: Setup firewall prerequisites
-  include_tasks: firewall_prerequisites.yml
+- name: Setup firewall and prerequisites
+  block:
+    - name: Setup firewall prerequisites
+      include_tasks: firewall_prerequisites.yml
+  become: true
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Deploy Kubernetes cluster
@@ -97,16 +110,18 @@
     - kubernetes_deployment.enabled | default(false)
     - deploy_kubernetes | default(true) | bool
 
-- name: Configure NVIDIA runtime firewall rules
-  include_tasks: firewall_config.yml
-  when: 
-    - kubernetes_deployment.enabled | default(false)
-    - kubernetes_deployment.nvidia_runtime.enabled | default(false)
-    - deploy_kubernetes | default(true) | bool
+- name: Configure NVIDIA runtime and firewall
+  block:
+    - name: Configure NVIDIA runtime firewall rules
+      include_tasks: firewall_config.yml
+      when:
+        - kubernetes_deployment.nvidia_runtime.enabled | default(false)
+        - deploy_kubernetes | default(true) | bool
 
-- name: Configure NVIDIA runtime
-  include_tasks: nvidia_runtime_config.yml
-  when: 
-    - kubernetes_deployment.enabled | default(false)
-    - kubernetes_deployment.nvidia_runtime.enabled | default(false)
-    - deploy_kubernetes | default(true) | bool 
+    - name: Configure NVIDIA runtime
+      include_tasks: nvidia_runtime_config.yml
+      when:
+        - kubernetes_deployment.nvidia_runtime.enabled | default(false)
+        - deploy_kubernetes | default(true) | bool
+  become: true
+  when: kubernetes_deployment.enabled | default(false) 
