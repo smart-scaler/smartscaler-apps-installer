@@ -1,88 +1,119 @@
-# user_input.yml
 ---
-# Kubernetes Deployment Configuration
-# Controls the setup and configuration of the Kubernetes cluster using Kubespray
+################################################################################
+# USER INPUT CONFIGURATION
+# Last updated: JUNE 3, 2025
+################################################################################
+
+###############################################################################
+# KUBERNETES DEPLOYMENT CONFIGURATION
+# Controls whether to deploy a new Kubernetes cluster using Kubespray
+###############################################################################
+
 kubernetes_deployment:
-  enabled: false # Enable/disable Kubernetes cluster deployment
+  # Master switch for Kubernetes deployment
+  enabled: false  # Set to false to skip Kubernetes cluster deployment entirely
+                 # Set to true if you want to deploy a new Kubernetes cluster
 
   # API Server Configuration
+  # Defines how clients will connect to the Kubernetes API server
   api_server:
-    host: "<API SERVER IP ADDRESS>" # API server host IP or DNS name
-    port: 6443 # API server port
-    secure: true # Use HTTPS for API server connection
+    host: "<API_SERVER_IP>"  # The IP address or hostname where the API server will be accessible
+                            # Usually the public IP of your first control plane node
+    port: 6443              # The port for the Kubernetes API server
+                           # 6443 is the default secure port for Kubernetes
+    secure: true           # Whether to use HTTPS for API server connections
+                          # Should always be true in production environments
+
+  # SSH Access Configuration
+  # Required for Kubespray to access and configure nodes
+  ssh_key_path: "/path/to/your/ssh/key.pem"  # Full path to the SSH private key file
+                                            # Used to authenticate with the cluster nodes
+  default_ansible_user: "ubuntu"             # Default SSH user for all nodes
+                                           # Common values: ubuntu (Ubuntu), ec2-user (AWS)
+
+  # Control Plane Node Configuration
+  # Defines the master nodes that will run the Kubernetes control plane
+  control_plane_nodes:
+    - name: "master-1"                # Unique identifier for the control plane node
+      ansible_host: "<PUBLIC_IP>"     # Public IP address for SSH access
+      ansible_user: "<SSH_USER>"      # SSH username for this specific node
+                                     # Overrides default_ansible_user if different
+      ansible_become: true            # Enable privilege escalation (sudo)
+      ansible_become_method: sudo     # Method for privilege escalation
+      ansible_become_user: root       # Target user for privilege escalation
+      private_ip: "<PRIVATE_IP>"      # Internal/private IP address
+                                     # Used for internal cluster communication
+
+  # Kubernetes Network Configuration
+  # Defines the network ranges for various Kubernetes components
+  network_config:
+    service_subnet: "10.233.0.0/18"  # CIDR range for Kubernetes services
+                                    # Must not overlap with pod_subnet or node network
+    pod_subnet: "10.233.64.0/18"    # CIDR range for Kubernetes pods
+                                   # Must not overlap with service_subnet or node network
+    node_prefix: 24                 # Subnet mask for node network
+                                  # /24 allows 256 IP addresses per subnet
 
   # Firewall Configuration
+  # Controls access to cluster nodes
   firewall:
-    enabled: true # Enable/disable firewall configuration
-    allow_additional_ports: [] # Additional ports to allow (e.g., ["8080", "9090"])
+    enabled: true                            # Whether to configure firewall rules
+    allow_additional_ports: []               # Extra ports to open in the firewall
+                                           # Example: ["8080", "9090"]
+                                           # Leave empty [] for default ports only
 
-  # NVIDIA Runtime Configuration
+  # NVIDIA Container Runtime Configuration
+  # Required for GPU support in the cluster
   nvidia_runtime:
-    enabled: true # Enable/disable NVIDIA runtime configuration
-    install_toolkit: true # Install NVIDIA Container Toolkit if not present
-    configure_containerd: true # Configure containerd with NVIDIA runtime
-    create_runtime_class: true # Create Kubernetes RuntimeClass for NVIDIA
+    enabled: true                           # Enable NVIDIA container runtime
+                                          # Set to true if using NVIDIA GPUs
+    install_toolkit: true                   # Install NVIDIA Container Toolkit
+                                          # Required for GPU support
+    configure_containerd: true              # Configure containerd for NVIDIA runtime
+    create_runtime_class: true              # Create Kubernetes RuntimeClass for NVIDIA
 
-  # SSH Configuration
-  # Required for Kubespray to access and configure nodes
-  ssh_key_path: "/home/richie/Downloads/scm-test.pem"          # Absolute Path to SSH private key for node access
-  default_ansible_user: "ubuntu" # Default SSH user for node access
-
-  # Node Configuration
-  # Define the control plane (master) nodes for the Kubernetes cluster
-  control_plane_nodes: # List of control plane nodes
-    - name: master-k8s # Hostname/identifier for the node
-      ansible_host: "<PUBLIC IP ADDRESS>"  # IP address or DNS name of the node
-      ansible_user: <SSH USER> # SSH user for this specific node
-      ansible_become: true
-      ansible_become_method: sudo
-      ansible_become_user: root
-      private_ip: <PRIVATE IP ADDRESS>          
-
-  # Kubernetes Components Configuration
-  network_plugin: calico # CNI plugin for pod networking (options: calico, flannel, etc.)
-  container_runtime: containerd # Container runtime (options: containerd, docker)
-  dns_mode: coredns # DNS service for the cluster
+  # Kubernetes Component Configuration
+  # Core Kubernetes infrastructure choices
+  network_plugin: "calico"                  # Container Network Interface (CNI) choice
+                                          # Options: calico, flannel, weave, cilium
   
-  # Network Configuration
-  network_config:
-    service_subnet: "10.233.0.0/18"  # Kubernetes service network CIDR
-    pod_subnet: "10.233.64.0/18"     # Kubernetes pod network CIDR
-    node_prefix: 24                   # Node subnet size
+  container_runtime: "containerd"           # Container runtime for Kubernetes
+                                          # containerd is the current standard
+  
+  dns_mode: "coredns"                      # DNS service for the cluster
+                                         # CoreDNS is the default since Kubernetes 1.13
 
-# Global image pull secret settings
-global_image_pull_secret:
-  repository: "https://index.docker.io/v1/"
-  username: ""
-  password: ""
+###############################################################################
+# REQUIRED SETTINGS
+# These settings must be configured regardless of deployment type
+###############################################################################
 
-# Kubeconfig settings
-global_kubeconfig: "files/kubeconfig"
-global_kubecontext: "kubernetes-admin@cluster.local"
-use_global_context: true
-
-# Helm repository settings
-use_local_charts: false
-local_charts_path: "charts"
-global_chart_repo_url: ""
-global_repo_username: ""
-global_repo_password: ""
-readd_helm_repos: true
-
-# NGC and Avesha credentials from environment variables
-ngc_api_key: "{{ lookup('env', 'NGC_API_KEY') }}"
-ngc_docker_api_key: "{{ lookup('env', 'NGC_DOCKER_API_KEY') }}"
-avesha_docker_username: "{{ lookup('env', 'AVESHA_DOCKER_USERNAME') }}"
-avesha_docker_password: "{{ lookup('env', 'AVESHA_DOCKER_PASSWORD') }}"
-
-# Validation Configuration
+# Validation and Execution Settings
 validate_prerequisites:
-  enabled: true
+  enabled: true                              # Required: Must be enabled for validation
 
-# Execution Configuration
-execution_order_enabled: true # Enable/disable execution order tasks
+execution_order_enabled: true                # Required: Must be enabled for ordered execution
 
-# Execution configuration
+# Required Kubeconfig Settings
+global_kubeconfig: "files/kubeconfig"        # Required: Path to kubeconfig file
+global_kubecontext: "kubernetes-admin@cluster.local"  # Required: Kubernetes context
+use_global_context: true                     # Required: Use global context
+
+# Required Helm Settings
+use_local_charts: false                      # Required: Use local Helm charts
+local_charts_path: "charts"                  # Required: Path to local charts
+global_chart_repo_url: ""                    # Required: Global Helm repository URL
+global_repo_username: ""                     # Required: Repo username if using private repos
+global_repo_password: ""                     # Required: Repo password if using private repos
+readd_helm_repos: true                       # Required: Re-add Helm repos
+
+# Required Credentials
+ngc_api_key: "{{ lookup('env', 'NGC_API_KEY') }}"              # Required for NGC access
+ngc_docker_api_key: "{{ lookup('env', 'NGC_DOCKER_API_KEY') }}" # Required for NGC Docker registry
+avesha_docker_username: "{{ lookup('env', 'AVESHA_DOCKER_USERNAME') }}" # Required for Avesha images
+avesha_docker_password: "{{ lookup('env', 'AVESHA_DOCKER_PASSWORD') }}" # Required for Avesha images
+
+# Required Execution Order
 execution_order:
   - gpu_operator_chart
   - prometheus_stack
@@ -100,17 +131,33 @@ execution_order:
   - create_locust_configmap
   - locust_manifest
 
+###############################################################################
+# OPTIONAL CONFIGURATION
+# These settings can be modified based on your requirements
+###############################################################################
+
+# Optional Docker Registry Configuration
+global_image_pull_secret:
+  repository: "https://index.docker.io/v1/"  # Optional: Docker registry URL
+  username: "<REGISTRY_USERNAME>"            # Optional: Registry username
+  password: "<REGISTRY_PASSWORD>"            # Optional: Registry password
+
+###############################################################################
+# HELM CHARTS CONFIGURATION
+###############################################################################
+
 helm_charts:
+  # OPTIONAL: GPU Operator Chart
   gpu_operator_chart:
-    release_name: gpu-operator
-    chart_ref: gpu-operator
-    release_namespace: gpu-operator
+    release_name: "gpu-operator"
+    chart_ref: "gpu-operator"
+    release_namespace: "gpu-operator"
     create_namespace: true
     wait: true
-    chart_version: v25.3.0
+    chart_version: "v25.3.0"
     release_values:
       mig:
-        strategy: none
+        strategy: "none"
       dcgm:
         enabled: true
       driver:
@@ -119,18 +166,19 @@ helm_charts:
         default: true
         enabled: true
       hostPaths:
-        driverInstallDir: /home/kubernetes/bin/nvidia
+        driverInstallDir: "/home/kubernetes/bin/nvidia"
       toolkit:
-        installDir: /home/kubernetes/bin/nvidia
+        installDir: "/home/kubernetes/bin/nvidia"
         env:
-          - name: CONTAINERD_RUNTIME_CLASS
+          - name: "CONTAINERD_RUNTIME_CLASS"
             value: "nvidia"
     chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
 
+  # OPTIONAL: Prometheus Stack
   prometheus_stack:
-    release_name: prometheus
-    chart_ref: kube-prometheus-stack
-    release_namespace: monitoring
+    release_name: "prometheus"
+    chart_ref: "kube-prometheus-stack"
+    release_namespace: "monitoring"
     create_namespace: true
     wait: true
     chart_repo_url: "https://prometheus-community.github.io/helm-charts"
@@ -138,95 +186,98 @@ helm_charts:
     release_values:
       kubeEtcd:
         enabled: false
-
       prometheus:
         prometheusSpec:
-          retention: 15d
+          retention: "15d"
           additionalScrapeConfigs:
-            - job_name: gpu-metrics
-              scrape_interval: 1s
-              metrics_path: /metrics
-              scheme: http
+            - job_name: "gpu-metrics"
+              scrape_interval: "1s"
+              metrics_path: "/metrics"
+              scheme: "http"
               kubernetes_sd_configs:
-                - role: endpoints
+                - role: "endpoints"
                   namespaces:
                     names:
-                      - monitoring
-                      - gpu-operator
+                      - "monitoring"
+                      - "gpu-operator"
               relabel_configs:
-                - source_labels: [__meta_kubernetes_endpoints_name]
-                  action: drop
-                  regex: .*-node-feature-discovery-master
-                - source_labels: [__meta_kubernetes_pod_node_name]
-                  action: replace
-                  target_label: kubernetes_node
-
+                - source_labels: ["__meta_kubernetes_endpoints_name"]
+                  action: "drop"
+                  regex: ".*-node-feature-discovery-master"
+                - source_labels: ["__meta_kubernetes_pod_node_name"]
+                  action: "replace"
+                  target_label: "kubernetes_node"
       prometheusOperator:
         enabled: true
         admissionWebhooks:
           enabled: true
           patch:
             enabled: true
-
       kubelet:
         serviceMonitor:
           https: false
-
       grafana:
         enabled: true
         persistence:
           enabled: true
-          size: 1Gi
-
+          size: "1Gi"
       defaultRules:
         rules:
           etcd: false
 
+  # OPTIONAL: KEDA Chart
   keda_chart:
-    release_name: keda
-    chart_ref: keda
-    release_namespace: keda
+    release_name: "keda"
+    chart_ref: "keda"
+    release_namespace: "keda"
     create_namespace: true
     wait: true
     chart_repo_url: "https://kedacore.github.io/charts"
     chart_version: "2.12.1"
 
+  # OPTIONAL: NIM Operator Chart
   nim_operator_chart:
-    release_name: nim
-    chart_ref: k8s-nim-operator
-    release_namespace: nim
+    release_name: "nim"
+    chart_ref: "k8s-nim-operator"
+    release_namespace: "nim"
     create_namespace: true
     wait: true
     chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
     chart_version: "v1.0.1"
 
+###############################################################################
+# KUBERNETES MANIFESTS CONFIGURATION
+###############################################################################
+
 manifests:
+  # OPTIONAL: Pushgateway Manifest
   pushgateway_manifest:
-    name: pushgateway-setup
+    name: "pushgateway-setup"
     manifest_file: "files/pushgateway.yaml"
-    namespace: pushgateway-system
+    namespace: "pushgateway-system"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
     variables:
-      namespace: monitoring
+      namespace: "monitoring"
     wait: true
     wait_timeout: 300
     wait_condition:
-      type: Available
+      type: "Available"
       status: "True"
     validate: true
     strict_validation: true
 
+  # OPTIONAL: NIM Cache Manifest
   nim_cache_manifest:
-    name: nim-cache-setup
+    name: "nim-cache-setup"
     manifest_file: "files/nim-cache.yaml.j2"
-    namespace: nim
+    namespace: "nim"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
     wait: true
     wait_timeout: 600
     wait_condition:
-      type: Available
+      type: "Available"
       status: "True"
     validate: true
     strict_validation: true
@@ -400,7 +451,10 @@ manifests:
       locust_memory_limit: "2Gi"
       locust_configmap_name: "locustfile"
 
-# Command execution configuration
+###############################################################################
+# COMMAND EXECUTION CONFIGURATION
+###############################################################################
+
 command_exec:
   - name: "create_ngc_secrets"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
