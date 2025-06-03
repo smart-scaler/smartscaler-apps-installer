@@ -1373,3 +1373,313 @@ To deploy the Kubernetes cluster, run:
 ```bash
 ansible-playbook kubernetes.yml --ask-become-pass
 ```
+
+---
+
+# Part 3: Enterprise Grid Scale (EGS) Deployment
+
+## Overview
+
+Enterprise Grid Scale (EGS) is a comprehensive cloud management and cost optimization platform that provides:
+
+- **Multi-cluster management** across hybrid and multi-cloud environments
+- **Cost optimization** with real-time pricing data and resource right-sizing
+- **Automated scaling** based on workload patterns and cost efficiency
+- **Grid computing capabilities** for distributed workloads
+- **Enterprise-grade security** and compliance features
+
+## Prerequisites
+
+Before deploying EGS, ensure you have:
+
+1. **Kubernetes Cluster**
+   - A functional Kubernetes cluster (from Part 1 or existing cluster)
+   - Cluster admin privileges (`cluster-admin` role)
+   - Minimum 3 worker nodes for high availability
+
+2. **System Requirements**
+   - **CPU**: 16+ cores total across cluster
+   - **RAM**: 32GB+ total across cluster  
+   - **Storage**: 1TB+ persistent storage available
+   - **Network**: Stable internet connectivity for cloud integration
+
+3. **Access Requirements**
+   - `kubectl` configured with cluster admin access
+   - `helm` v3.15+ installed
+   - `yq` and `jq` tools for YAML/JSON processing
+
+## EGS Installation Guide
+
+### Quick Start
+
+For detailed installation instructions, prerequisites, and configuration options, refer to the official EGS installation repository:
+
+**📖 [EGS Installation Documentation](https://github.com/kubeslice-ent/egs-installation)**
+
+### Key Components
+
+The EGS installation includes:
+
+#### 1. **EGS Controller** 
+- Central management plane for grid operations
+- Multi-cluster orchestration and policy enforcement
+- Cost optimization engine and recommendations
+
+#### 2. **EGS Worker Agents**
+- Deployed on managed clusters  
+- Resource monitoring and telemetry collection
+- Policy enforcement and workload scheduling
+
+#### 3. **Cost Management Services**
+- Cloud pricing data integration
+- Resource utilization tracking
+- Cost allocation and chargeback reports
+
+#### 4. **Grid Computing Framework**
+- Distributed job scheduling across clusters
+- Resource aggregation and federation
+- Workload placement optimization
+
+### Installation Methods
+
+#### Method 1: Automated Installation Script
+
+```bash
+# Clone the EGS installation repository
+git clone https://github.com/kubeslice-ent/egs-installation.git
+cd egs-installation
+
+# Run preflight checks
+./egs-preflight-check.sh --invoke-wrappers namespace_preflight_checks,pvc_preflight_checks
+
+# Configure your installation
+cp egs-installer-config.yaml.example egs-installer-config.yaml
+# Edit egs-installer-config.yaml with your environment details
+
+# Run the installer
+./egs-installer.sh --config egs-installer-config.yaml
+```
+
+#### Method 2: Manual Helm Installation
+
+```bash
+# Add EGS Helm repository
+helm repo add avesha https://kubeslice.aveshalabs.io/repository/kubeslice-helm-ent-prod/
+helm repo update
+
+# Install EGS Controller
+helm install egs-controller avesha/egs-controller \
+  --namespace egs-system \
+  --create-namespace \
+  --set global.registry.imagePullSecrets="{regcred}" \
+  --set controller.endpoint="https://your-cluster-endpoint"
+
+# Install EGS Workers (repeat for each managed cluster)
+helm install egs-worker avesha/egs-worker \
+  --namespace egs-system \
+  --set worker.controllerEndpoint="https://egs-controller-endpoint"
+```
+
+### Configuration
+
+#### Basic Configuration Example
+
+```yaml
+# egs-installer-config.yaml
+global:
+  cluster:
+    name: "production-cluster"
+    endpoint: "https://your-k8s-api-server:6443"
+  
+  registry:
+    server: "docker.io"
+    username: "${DOCKER_USERNAME}"
+    password: "${DOCKER_PASSWORD}"
+
+controller:
+  enabled: true
+  namespace: "egs-system"
+  resources:
+    requests:
+      cpu: "2"
+      memory: "4Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+
+worker:
+  enabled: true
+  clusters:
+    - name: "cluster-1"
+      endpoint: "https://cluster1-api:6443"
+      kubeconfig: "/path/to/cluster1-kubeconfig"
+    - name: "cluster-2" 
+      endpoint: "https://cluster2-api:6443"
+      kubeconfig: "/path/to/cluster2-kubeconfig"
+
+costOptimization:
+  enabled: true
+  cloudProviders:
+    - aws
+    - gcp
+    - azure
+  pricingDataRefresh: "1h"
+```
+
+### Custom Pricing Configuration
+
+EGS supports custom cloud pricing data for accurate cost calculations:
+
+```yaml
+# custom-pricing-data.yaml
+kubernetes:
+  kubeconfig: "/path/to/kubeconfig"
+  kubecontext: "your-context"
+  namespace: "egs-system"
+  service: "kubetally-pricing-service"
+
+cloud_providers:
+  - name: "aws"
+    instances:
+      - region: "us-east-1"
+        component: "Compute Instance"
+        instance_type: "m5.large"
+        vcpu: 2
+        price: 0.096
+        gpu: 0
+      - region: "us-east-1"
+        component: "Compute Instance"
+        instance_type: "p3.2xlarge"
+        vcpu: 8
+        price: 3.06
+        gpu: 1
+```
+
+```bash
+# Upload custom pricing data
+./custom-pricing-upload.sh
+```
+
+## Post-Installation Verification
+
+### 1. Verify Controller Installation
+
+```bash
+# Check EGS controller pods
+kubectl get pods -n egs-system -l app=egs-controller
+
+# Check controller logs
+kubectl logs -n egs-system -l app=egs-controller -f
+
+# Verify controller service
+kubectl get svc -n egs-system egs-controller
+```
+
+### 2. Verify Worker Registration
+
+```bash
+# List registered clusters
+kubectl get clusters -n egs-system
+
+# Check worker status
+kubectl get pods -n egs-system -l app=egs-worker
+
+# Verify cluster connectivity
+kubectl get events -n egs-system --sort-by=.metadata.creationTimestamp
+```
+
+### 3. Access EGS Dashboard
+
+```bash
+# Port forward to EGS UI
+kubectl port-forward -n egs-system svc/egs-ui 8080:80
+
+# Access dashboard at http://localhost:8080
+```
+
+## Integration with Smart Scaler
+
+EGS seamlessly integrates with Smart Scaler components deployed in Part 2:
+
+### 1. **Monitoring Integration**
+- EGS automatically discovers Prometheus and Grafana instances
+- Imports existing GPU and inference metrics
+- Provides unified dashboards across clusters
+
+### 2. **Cost-Aware Scaling**
+- Smart Scaler policies can include cost optimization rules
+- EGS provides real-time cost per inference calculations
+- Automatic scale-down during high-cost periods
+
+### 3. **Multi-Cluster Inference**
+- NIM services can be scheduled across multiple clusters
+- Load balancing based on cost and performance metrics
+- Automatic failover for high availability
+
+## Troubleshooting EGS
+
+### Common Issues
+
+#### 1. **Controller Installation Fails**
+
+```bash
+# Check prerequisites
+./egs-preflight-check.sh --invoke-wrappers k8s_privilege_preflight_checks
+
+# Verify cluster resources
+kubectl top nodes
+kubectl describe nodes
+
+# Check image pull secrets
+kubectl get secrets -n egs-system regcred
+```
+
+#### 2. **Worker Registration Issues**
+
+```bash
+# Verify network connectivity between clusters
+kubectl exec -it -n egs-system deployment/egs-controller -- \
+  curl -k https://worker-cluster-endpoint:6443/healthz
+
+# Check worker logs
+kubectl logs -n egs-system -l app=egs-worker
+
+# Verify RBAC permissions
+kubectl auth can-i "*" "*" --as=system:serviceaccount:egs-system:egs-worker
+```
+
+#### 3. **Cost Data Not Loading**
+
+```bash
+# Check pricing service
+kubectl get pods -n egs-system -l app=kubetally-pricing-service
+
+# Verify cloud provider credentials
+kubectl get secrets -n egs-system cloud-credentials
+
+# Test pricing API
+kubectl port-forward -n egs-system svc/kubetally-pricing-service 9091:80
+curl http://localhost:9091/api/v1/prices
+```
+
+## Documentation and Support
+
+For comprehensive documentation, examples, and support:
+
+- **📚 [Official EGS Documentation](https://github.com/kubeslice-ent/egs-installation)**
+- **🔧 [Configuration Examples](https://github.com/kubeslice-ent/egs-installation/tree/main/examples)**  
+- **🚀 [Quick Start Guide](https://github.com/kubeslice-ent/egs-installation#quick-start)**
+- **🛠️ [Troubleshooting Guide](https://github.com/kubeslice-ent/egs-installation#troubleshooting)**
+- **📋 [Preflight Checks](https://github.com/kubeslice-ent/egs-installation#preflight-checks)**
+
+### Additional Resources
+
+- **Installation Scripts**: Pre-configured automation scripts
+- **Helm Charts**: Production-ready Helm charts for all components  
+- **Configuration Templates**: Sample configurations for various environments
+- **Monitoring Dashboards**: Pre-built Grafana dashboards for EGS metrics
+- **API Documentation**: Complete REST API reference for integration
+
+---
+
+## Troubleshooting
