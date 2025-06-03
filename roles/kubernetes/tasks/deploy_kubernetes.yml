@@ -88,10 +88,12 @@
       {{ kubespray_dir }}/cluster.yml
       -e @{{ inventory_dir }}/kubespray/group_vars/all/all.yml
       -e @{{ inventory_dir }}/kubespray/group_vars/all/api_server.yml
+      -e @{{ inventory_dir }}/kubespray/group_vars/k8s_cluster/addons.yml
       -e "kube_apiserver_ip={{ kubernetes_deployment.api_server.host }}"
       -e "loadbalancer_apiserver={address: '{{ kubernetes_deployment.api_server.host }}', port: {{ kubernetes_deployment.api_server.port }}}"
       -e "apiserver_loadbalancer_domain_name={{ kubernetes_deployment.api_server.host }}"
       -e "supplementary_addresses_in_ssl_keys=['{{ kubernetes_deployment.api_server.host }}']"
+      -e "kubernetes_deployment={{ kubernetes_deployment }}"
       --become
       --become-method={{ kubespray_become_method }}
       --become-user={{ kubespray_become_user }}

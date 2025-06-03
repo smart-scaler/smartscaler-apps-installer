@@ -69,37 +69,36 @@ local_volume_provisioner_enabled: false
 gateway_api_enabled: false
 
 # Nginx ingress controller deployment
-ingress_nginx_enabled: false
-# ingress_nginx_host_network: false
-# ingress_nginx_service_type: LoadBalancer
-# ingress_nginx_service_annotations:
-#   example.io/loadbalancerIPs: 1.2.3.4
+ingress_nginx_enabled: "{{ kubernetes_deployment.addons.ingress_nginx_enabled | default(false) }}"
+ingress_nginx_host_network: false
+ingress_nginx_service_type: "{{ kubernetes_deployment.addons.ingress_nginx_controller_service_type | default('LoadBalancer') }}"
+ingress_nginx_service_annotations: "{{ kubernetes_deployment.addons.ingress_nginx_controller_service_annotations | default({}) }}"
 # ingress_nginx_service_nodeport_http: 30080
 # ingress_nginx_service_nodeport_https: 30081
 ingress_publish_status_address: ""
 # ingress_nginx_nodeselector:
 #   kubernetes.io/os: "linux"
-# ingress_nginx_tolerations:
-#   - key: "node-role.kubernetes.io/control-plane"
-#     operator: "Equal"
-#     value: ""
-#     effect: "NoSchedule"
-# ingress_nginx_namespace: "ingress-nginx"
-# ingress_nginx_insecure_port: 80
-# ingress_nginx_secure_port: 443
-# ingress_nginx_configmap:
-#   map-hash-bucket-size: "128"
-#   ssl-protocols: "TLSv1.2 TLSv1.3"
-# ingress_nginx_configmap_tcp_services:
-#   9000: "default/example-go:8080"
-# ingress_nginx_configmap_udp_services:
-#   53: "kube-system/coredns:53"
-# ingress_nginx_extra_args:
-#   - --default-ssl-certificate=default/foo-tls
-# ingress_nginx_termination_grace_period_seconds: 300
-# ingress_nginx_class: nginx
-# ingress_nginx_without_class: true
-# ingress_nginx_default: false
+ingress_nginx_tolerations: "{{ kubernetes_deployment.addons.ingress_nginx_controller_tolerations | default([{'key': 'node-role.kubernetes.io/control-plane', 'operator': 'Equal', 'value': '', 'effect': 'NoSchedule'}]) }}"
+ingress_nginx_namespace: "{{ kubernetes_deployment.addons.ingress_nginx_namespace | default('ingress-nginx') }}"
+ingress_nginx_insecure_port: 80
+ingress_nginx_secure_port: 443
+ingress_nginx_configmap: "{{ kubernetes_deployment.addons.ingress_nginx_configmap | default({'map-hash-bucket-size': '128', 'ssl-protocols': 'TLSv1.2 TLSv1.3'}) }}"
+ingress_nginx_configmap_tcp_services: "{{ kubernetes_deployment.addons.ingress_nginx_configmap.get('tcp-services', {}) }}"
+ingress_nginx_configmap_udp_services: "{{ kubernetes_deployment.addons.ingress_nginx_configmap.get('udp-services', {}) }}"
+ingress_nginx_extra_args: "{{ kubernetes_deployment.addons.ingress_nginx_controller_extra_args | default([]) }}"
+ingress_nginx_termination_grace_period_seconds: 300
+ingress_nginx_class: nginx
+ingress_nginx_without_class: true
+ingress_nginx_default: false
+ingress_nginx_controller_kind: "{{ kubernetes_deployment.addons.ingress_nginx_controller_kind | default('DaemonSet') }}"
+ingress_nginx_controller_daemonset_enable: "{{ true if kubernetes_deployment.addons.ingress_nginx_controller_kind == 'DaemonSet' else false }}"
+ingress_nginx_controller_replicas: "{{ kubernetes_deployment.addons.ingress_nginx_controller_replicas | default(1) }}"
+ingress_nginx_controller_hostport_enabled: "{{ kubernetes_deployment.addons.ingress_nginx_controller_hostport_enabled | default(true) }}"
+ingress_nginx_controller_metrics_enabled: "{{ kubernetes_deployment.addons.ingress_nginx_controller_metrics_enabled | default(true) }}"
+ingress_nginx_controller_service_monitor: "{{ kubernetes_deployment.addons.ingress_nginx_controller_service_monitor | default(true) }}"
+ingress_nginx_controller_resources: "{{ kubernetes_deployment.addons.ingress_nginx_controller_resources | default({'requests': {'cpu': '100m', 'memory': '256Mi'}, 'limits': {'cpu': '300m', 'memory': '512Mi'}}) }}"
+ingress_nginx_controller_config: "{{ kubernetes_deployment.addons.ingress_nginx_controller_config | default({}) }}"
+ingress_nginx_controller_extra_env: "{{ kubernetes_deployment.addons.ingress_nginx_controller_extra_env | default([]) }}"
 
 # ALB ingress controller deployment
 ingress_alb_enabled: false
@@ -145,68 +144,33 @@ cert_manager_enabled: false
 #   - "--dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53"
 
 # MetalLB deployment
-metallb_enabled: false
-metallb_speaker_enabled: "{{ metallb_enabled }}"
-metallb_namespace: "metallb-system"
-# metallb_protocol: "layer2"
-# metallb_port: "7472"
-# metallb_memberlist_port: "7946"
-# metallb_config:
-#   speaker:
-#     nodeselector:
-#       kubernetes.io/os: "linux"
-#     tolerations:
-#       - key: "node-role.kubernetes.io/control-plane"
-#         operator: "Equal"
-#         value: ""
-#         effect: "NoSchedule"
-#   controller:
-#     nodeselector:
-#       kubernetes.io/os: "linux"
-#     tolerations:
-#       - key: "node-role.kubernetes.io/control-plane"
-#         operator: "Equal"
-#         value: ""
-#         effect: "NoSchedule"
-#   address_pools:
-#     primary:
-#       ip_range:
-#         - 10.5.0.0/16
-#       auto_assign: true
-#     pool1:
-#       ip_range:
-#         - 10.6.0.0/16
-#       auto_assign: true
-#     pool2:
-#       ip_range:
-#         - 10.10.0.0/16
-#       auto_assign: true
-#   layer2:
-#     - primary
-#   layer3:
-#     defaults:
-#       peer_port: 179
-#       hold_time: 120s
-#     communities:
-#       vpn-only: "1234:1"
-#       NO_ADVERTISE: "65535:65282"
-#     metallb_peers:
-#         peer1:
-#           peer_address: 10.6.0.1
-#           peer_asn: 64512
-#           my_asn: 4200000000
-#           communities:
-#             - vpn-only
-#           address_pool:
-#             - pool1
-#         peer2:
-#           peer_address: 10.10.0.1
-#           peer_asn: 64513
-#           my_asn: 4200000000
-#           communities:
-#             - NO_ADVERTISE
-#           address_pool:
-#             - pool2
+metallb_enabled: "{{ kubernetes_deployment.addons.metallb_enabled | default(false) }}"
+metallb_speaker_enabled: "{{ kubernetes_deployment.addons.metallb_speaker_enabled | default(metallb_enabled) }}"
+metallb_namespace: "{{ kubernetes_deployment.addons.metallb_namespace | default('metallb-system') }}"
+metallb_protocol: "{{ kubernetes_deployment.addons.metallb_protocol | default('layer2') }}"
+metallb_port: "{{ kubernetes_deployment.addons.metallb_port | default('7472') }}"
+metallb_memberlist_port: "{{ kubernetes_deployment.addons.metallb_port | default('7946') }}"
+metallb_version: "{{ kubernetes_deployment.addons.metallb_version | default('v0.13.12') }}"
+metallb_auto_assign: "{{ kubernetes_deployment.addons.metallb_auto_assign | default(true) }}"
+metallb_pool_name: "{{ kubernetes_deployment.addons.metallb_pool_name | default('default') }}"
+metallb_limits_cpu: "{{ kubernetes_deployment.addons.metallb_limits_cpu | default('100m') }}"
+metallb_limits_mem: "{{ kubernetes_deployment.addons.metallb_limits_mem | default('100Mi') }}"
+metallb_controller_enabled: "{{ kubernetes_deployment.addons.metallb_controller_enabled | default(true) }}"
+metallb_config:
+  speaker:
+    nodeselector:
+      kubernetes.io/os: "linux"
+    tolerations: "{{ kubernetes_deployment.addons.metallb_speaker_tolerations | default([{'key': 'node-role.kubernetes.io/control-plane', 'operator': 'Equal', 'value': '', 'effect': 'NoSchedule'}]) }}"
+    resources:
+      limits:
+        cpu: "{{ metallb_limits_cpu }}"
+        memory: "{{ metallb_limits_mem }}"
+  controller:
+    nodeselector:
+      kubernetes.io/os: "linux"
+    tolerations: "{{ kubernetes_deployment.addons.metallb_speaker_tolerations | default([{'key': 'node-role.kubernetes.io/control-plane', 'operator': 'Equal', 'value': '', 'effect': 'NoSchedule'}]) }}"
+  address_pools: "{{ kubernetes_deployment.addons.metallb_address_pools | default({'primary': {'ip_range': ['10.5.0.0/16'], 'auto_assign': true}}) }}"
+  layer2: "{{ kubernetes_deployment.addons.metallb_address_pools.keys() | list if kubernetes_deployment.addons.metallb_protocol == 'layer2' else ['primary'] }}"
 
 argocd_enabled: false
 # argocd_namespace: argocd
