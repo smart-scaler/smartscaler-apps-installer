@@ -1376,310 +1376,168 @@ ansible-playbook kubernetes.yml --ask-become-pass
 
 ---
 
-# Part 3: Enterprise Grid Scale (EGS) Deployment
-
-## Overview
-
-Enterprise Grid Scale (EGS) is a comprehensive cloud management and cost optimization platform that provides:
-
-- **Multi-cluster management** across hybrid and multi-cloud environments
-- **Cost optimization** with real-time pricing data and resource right-sizing
-- **Automated scaling** based on workload patterns and cost efficiency
-- **Grid computing capabilities** for distributed workloads
-- **Enterprise-grade security** and compliance features
-
-## Prerequisites
-
-Before deploying EGS, ensure you have:
-
-1. **Kubernetes Cluster**
-   - A functional Kubernetes cluster (from Part 1 or existing cluster)
-   - Cluster admin privileges (`cluster-admin` role)
-   - Minimum 3 worker nodes for high availability
-
-2. **System Requirements**
-   - **CPU**: 16+ cores total across cluster
-   - **RAM**: 32GB+ total across cluster  
-   - **Storage**: 1TB+ persistent storage available
-   - **Network**: Stable internet connectivity for cloud integration
-
-3. **Access Requirements**
-   - `kubectl` configured with cluster admin access
-   - `helm` v3.15+ installed
-   - `yq` and `jq` tools for YAML/JSON processing
-
-## EGS Installation Guide
-
-### Quick Start
-
-For detailed installation instructions, prerequisites, and configuration options, refer to the official EGS installation repository:
-
-**📖 [EGS Installation Documentation](https://github.com/kubeslice-ent/egs-installation)**
-
-### Key Components
-
-The EGS installation includes:
-
-#### 1. **EGS Controller** 
-- Central management plane for grid operations
-- Multi-cluster orchestration and policy enforcement
-- Cost optimization engine and recommendations
-
-#### 2. **EGS Worker Agents**
-- Deployed on managed clusters  
-- Resource monitoring and telemetry collection
-- Policy enforcement and workload scheduling
-
-#### 3. **Cost Management Services**
-- Cloud pricing data integration
-- Resource utilization tracking
-- Cost allocation and chargeback reports
-
-#### 4. **Grid Computing Framework**
-- Distributed job scheduling across clusters
-- Resource aggregation and federation
-- Workload placement optimization
-
-### Installation Methods
-
-#### Method 1: Automated Installation Script
-
-```bash
-# Clone the EGS installation repository
-git clone https://github.com/kubeslice-ent/egs-installation.git
-cd egs-installation
-
-# Run preflight checks
-./egs-preflight-check.sh --invoke-wrappers namespace_preflight_checks,pvc_preflight_checks
-
-# Configure your installation
-cp egs-installer-config.yaml.example egs-installer-config.yaml
-# Edit egs-installer-config.yaml with your environment details
-
-# Run the installer
-./egs-installer.sh --config egs-installer-config.yaml
-```
-
-#### Method 2: Manual Helm Installation
-
-```bash
-# Add EGS Helm repository
-helm repo add avesha https://kubeslice.aveshalabs.io/repository/kubeslice-helm-ent-prod/
-helm repo update
-
-# Install EGS Controller
-helm install egs-controller avesha/egs-controller \
-  --namespace egs-system \
-  --create-namespace \
-  --set global.registry.imagePullSecrets="{regcred}" \
-  --set controller.endpoint="https://your-cluster-endpoint"
-
-# Install EGS Workers (repeat for each managed cluster)
-helm install egs-worker avesha/egs-worker \
-  --namespace egs-system \
-  --set worker.controllerEndpoint="https://egs-controller-endpoint"
-```
-
-### Configuration
-
-#### Basic Configuration Example
-
-```yaml
-# egs-installer-config.yaml
-global:
-  cluster:
-    name: "production-cluster"
-    endpoint: "https://your-k8s-api-server:6443"
-  
-  registry:
-    server: "docker.io"
-    username: "${DOCKER_USERNAME}"
-    password: "${DOCKER_PASSWORD}"
-
-controller:
-  enabled: true
-  namespace: "egs-system"
-  resources:
-    requests:
-      cpu: "2"
-      memory: "4Gi"
-    limits:
-      cpu: "4"
-      memory: "8Gi"
-
-worker:
-  enabled: true
-  clusters:
-    - name: "cluster-1"
-      endpoint: "https://cluster1-api:6443"
-      kubeconfig: "/path/to/cluster1-kubeconfig"
-    - name: "cluster-2" 
-      endpoint: "https://cluster2-api:6443"
-      kubeconfig: "/path/to/cluster2-kubeconfig"
-
-costOptimization:
-  enabled: true
-  cloudProviders:
-    - aws
-    - gcp
-    - azure
-  pricingDataRefresh: "1h"
-```
-
-### Custom Pricing Configuration
-
-EGS supports custom cloud pricing data for accurate cost calculations:
-
-```yaml
-# custom-pricing-data.yaml
-kubernetes:
-  kubeconfig: "/path/to/kubeconfig"
-  kubecontext: "your-context"
-  namespace: "egs-system"
-  service: "kubetally-pricing-service"
-
-cloud_providers:
-  - name: "aws"
-    instances:
-      - region: "us-east-1"
-        component: "Compute Instance"
-        instance_type: "m5.large"
-        vcpu: 2
-        price: 0.096
-        gpu: 0
-      - region: "us-east-1"
-        component: "Compute Instance"
-        instance_type: "p3.2xlarge"
-        vcpu: 8
-        price: 3.06
-        gpu: 1
-```
-
-```bash
-# Upload custom pricing data
-./custom-pricing-upload.sh
-```
-
-## Post-Installation Verification
-
-### 1. Verify Controller Installation
-
-```bash
-# Check EGS controller pods
-kubectl get pods -n egs-system -l app=egs-controller
-
-# Check controller logs
-kubectl logs -n egs-system -l app=egs-controller -f
-
-# Verify controller service
-kubectl get svc -n egs-system egs-controller
-```
-
-### 2. Verify Worker Registration
-
-```bash
-# List registered clusters
-kubectl get clusters -n egs-system
-
-# Check worker status
-kubectl get pods -n egs-system -l app=egs-worker
-
-# Verify cluster connectivity
-kubectl get events -n egs-system --sort-by=.metadata.creationTimestamp
-```
-
-### 3. Access EGS Dashboard
-
-```bash
-# Port forward to EGS UI
-kubectl port-forward -n egs-system svc/egs-ui 8080:80
-
-# Access dashboard at http://localhost:8080
-```
-
-## Integration with Smart Scaler
-
-EGS seamlessly integrates with Smart Scaler components deployed in Part 2:
-
-### 1. **Monitoring Integration**
-- EGS automatically discovers Prometheus and Grafana instances
-- Imports existing GPU and inference metrics
-- Provides unified dashboards across clusters
-
-### 2. **Cost-Aware Scaling**
-- Smart Scaler policies can include cost optimization rules
-- EGS provides real-time cost per inference calculations
-- Automatic scale-down during high-cost periods
-
-### 3. **Multi-Cluster Inference**
-- NIM services can be scheduled across multiple clusters
-- Load balancing based on cost and performance metrics
-- Automatic failover for high availability
-
-## Troubleshooting EGS
-
-### Common Issues
-
-#### 1. **Controller Installation Fails**
-
-```bash
-# Check prerequisites
-./egs-preflight-check.sh --invoke-wrappers k8s_privilege_preflight_checks
-
-# Verify cluster resources
-kubectl top nodes
-kubectl describe nodes
-
-# Check image pull secrets
-kubectl get secrets -n egs-system regcred
-```
-
-#### 2. **Worker Registration Issues**
-
-```bash
-# Verify network connectivity between clusters
-kubectl exec -it -n egs-system deployment/egs-controller -- \
-  curl -k https://worker-cluster-endpoint:6443/healthz
-
-# Check worker logs
-kubectl logs -n egs-system -l app=egs-worker
-
-# Verify RBAC permissions
-kubectl auth can-i "*" "*" --as=system:serviceaccount:egs-system:egs-worker
-```
-
-#### 3. **Cost Data Not Loading**
-
-```bash
-# Check pricing service
-kubectl get pods -n egs-system -l app=kubetally-pricing-service
-
-# Verify cloud provider credentials
-kubectl get secrets -n egs-system cloud-credentials
-
-# Test pricing API
-kubectl port-forward -n egs-system svc/kubetally-pricing-service 9091:80
-curl http://localhost:9091/api/v1/prices
-```
-
-## Documentation and Support
-
-For comprehensive documentation, examples, and support:
-
-- **📚 [Official EGS Documentation](https://github.com/kubeslice-ent/egs-installation)**
-- **🔧 [Configuration Examples](https://github.com/kubeslice-ent/egs-installation/tree/main/examples)**  
-- **🚀 [Quick Start Guide](https://github.com/kubeslice-ent/egs-installation#quick-start)**
-- **🛠️ [Troubleshooting Guide](https://github.com/kubeslice-ent/egs-installation#troubleshooting)**
-- **📋 [Preflight Checks](https://github.com/kubeslice-ent/egs-installation#preflight-checks)**
-
-### Additional Resources
-
-- **Installation Scripts**: Pre-configured automation scripts
-- **Helm Charts**: Production-ready Helm charts for all components  
-- **Configuration Templates**: Sample configurations for various environments
-- **Monitoring Dashboards**: Pre-built Grafana dashboards for EGS metrics
-- **API Documentation**: Complete REST API reference for integration
+# Part 3: EGS Installation Guide
+
+## Getting Started
+
+### Prerequisites
+
+Before you begin, ensure the following steps are completed:
+
+1. **📝 Registration:**
+   - Complete the registration process at [Avesha Registration](https://avesha.io/kubeslice-registration) to receive the image pull secrets required for running the script.
+
+2. **🔧 Required Binaries:**
+   - Verify that the following binaries are installed and available in your system's `PATH`:
+     - **yq** 📄 (minimum version: 4.44.2)
+     - **helm** 🛠️ (minimum version: 3.15.0)
+     - **kubectl** ⚙️ (minimum version: 1.23.6)
+     - **jq** 📦 (minimum version: 1.6.0)
+
+3. **🌐 Kubernetes Access:**
+   - Confirm that you have administrative access to the necessary Kubernetes clusters and the appropriate `kubeconfig` files are available.
+
+4. **📂 Clone the Repository:**
+   - Start by cloning the EGS installation Git repository:
+     ```bash
+     git clone https://github.com/kubeslice-ent/egs-installation
+     ```
+
+5. **✅ Run EGS Preflight Check Script (Optional):**
+   - To ensure your environment meets all installation requirements, you can optionally run the **EGS Preflight Check Script**.
+     - Refer to the [EGS Preflight Check Guide](https://github.com/kubeslice-ent/egs-installation#egs-preflight-check) for detailed instructions.
+     - Example command:
+       ```bash
+       ./egs-preflight-check.sh \
+         --kubeconfig ~/.kube/config \
+         --kubecontext-list context1,context2
+       ```
+     - This step validates namespaces, permissions, PVCs, and services, helping to identify and resolve potential issues before installation.
+
+6. **🗂️ Pre-create Required Namespaces (Optional):**
+   - If your cluster enforces namespace creation policies, pre-create the namespaces required for installation before running the script.
+     - Use the provided namespace creation script with the appropriate configuration to create the necessary namespaces:
+       - Refer to the [Namespace Creation Script](https://github.com/kubeslice-ent/egs-installation#namespace-creation) for details.
+     - Example command:
+       ```bash
+       ./create-namespaces.sh \
+         --input-yaml namespace-input.yaml \
+         --kubeconfig ~/.kube/config \
+         --kubecontext-list context1,context2
+       ```
+     - Ensure that all required annotations and labels for policy enforcement are correctly configured in the YAML file.
+
+7. **🚀 Install Prerequisites for EGS (Optional):**
+   - To install prerequisites like GPU Operator, Prometheus for EGS inventory, and PostgreSQL for cost information visibility, you can run the **Prerequisites Installer Script**:
+     - Example command:
+       ```bash
+       ./egs-install-prerequisites.sh --input-yaml egs-installer-config.yaml
+       ```
+     - **Note:** This step is optional but recommended if an existing instance of these services is not already running and configured. If skipped, some features might be broken or unavailable.
 
 ---
 
-## Troubleshooting
+## 🛠️ Installation Steps
+
+### 1. **📂 Clone the Repository:**
+   - Start by cloning the EGS installation Git repository:
+     ```bash
+     git clone https://github.com/kubeslice-ent/egs-installation
+     ```
+
+### 2. **📝 Modify the Configuration File (Mandatory):**
+   - Navigate to the cloned repository and locate the input configuration YAML file `egs-installer-config.yaml`.
+   - Update the following mandatory parameters:
+
+     - **🔑 Image Pull Secrets (Mandatory):**
+       - Insert the image pull secrets received via email as part of the registration process:
+         ```yaml
+         global_image_pull_secret:
+           repository: "https://index.docker.io/v1/"
+           username: ""  # Global Docker registry username (MANDATORY)
+           password: ""  # Global Docker registry password (MANDATORY)
+         ```
+
+     - **⚙️ Kubernetes Configuration (Mandatory) :**
+       - Set the global `kubeconfig` and `kubecontext` parameters:
+         ```yaml
+         global_kubeconfig: ""  # Relative path to global kubeconfig file from base_path default is script directory (MANDATORY)
+         global_kubecontext: ""  # Global kubecontext (MANDATORY)
+         use_global_context: true  # If true, use the global kubecontext for all operations by default
+         ```
+
+     - **⚙️ Additional Configuration (Optional):**
+       - Configure installation stages and additional applications:
+         ```yaml
+         # Enable or disable specific stages of the installation
+         enable_install_controller: true               # Enable the installation of the Kubeslice controller
+         enable_install_ui: true                       # Enable the installation of the Kubeslice UI
+         enable_install_worker: true                   # Enable the installation of Kubeslice workers
+
+         # Enable or disable the installation of additional applications (prometheus, gpu-operator, postgresql)
+         enable_install_additional_apps: false          # Set to true to enable additional apps installation
+
+         # Enable custom applications
+         # Set this to true if you want to allow custom applications to be deployed.
+         # This is specifically useful for enabling NVIDIA driver installation on your nodes.
+         enable_custom_apps: false
+
+         # Command execution settings
+         # Set this to true to allow the execution of commands for configuring NVIDIA MIG.
+         # This includes modifications to the NVIDIA ClusterPolicy and applying node labels
+         # based on the MIG strategy defined in the YAML (e.g., single or mixed strategy).
+         run_commands: false
+         ```
+
+         ⚙️ **PostgreSQL Connection Configuration (*Mandatory only if `kubetallyEnabled` is set to `true` (Optional otherwise)*)** 
+
+         📌 **Note:** The secret is created in the `kubeslice-controller` namespace during installation. If you prefer to use a pre-created secret, leave all values empty and specify only the secret name.
+         - **`postgresSecretName`**: The name of the Kubernetes Secret containing PostgreSQL credentials.
+         - The secret must contain the following key-value pairs:
+           
+           | Key               | Description                                  |
+           |-------------------|----------------------------------------------|
+           | `postgresAddr`    | The PostgreSQL service endpoint              |
+           | `postgresPort`    | The PostgreSQL service port (default: 5432)  |
+           | `postgresUser`    | The PostgreSQL username                      |
+           | `postgresPassword`| The PostgreSQL password                      |
+           | `postgresDB`      | The PostgreSQL database name                 |
+           | `postgresSslmode` | The SSL mode for PostgreSQL connection       |
+           
+    
+         **Example Configuration to use pre-created secret**
+         
+            ```yaml
+            postgresSecretName: kubetally-db-credentials   # Secret name in kubeslice-controller namespace for PostgreSQL credentials.
+                                                           # Created by install, all the below values must be specified.
+                                                           # Alternatively, leave all values empty and provide a pre-created secret.
+            postgresAddr: ""  # Change to your PostgreSQL endpoint
+            postgresPort: ""   # Change this to match your PostgreSQL service port
+            postgresUser: ""  # Set your PostgreSQL username
+            postgresPassword: ""  # Set your PostgreSQL password
+            postgresDB: ""  # Set your PostgreSQL database name
+            postgresSslmode: ""  # Change this based on your SSL configuration
+            ```
+            
+         
+           📌 **Alternatively**, if you provide all values with a secret name as specified for `postgresSecretName` in the values file, using the key-value format below, it will automatically create the specified secret in the `kubeslice-controller` namespace with the provided values.
+   
+            **Example Configuration to auto-create secret with provided values**
+            
+          ```yaml
+              postgresSecretName: kubetally-db-credentials   # Secret name in kubeslice-controller namespace for PostgreSQL credentials created by install, all the below values must be specified 
+                                                             # then a secret will be created with specified name. 
+                                                             # alternatively you can make all below values empty and provide a pre-created secret name with below connection details format
+              postgresAddr: "kt-postgresql.kt-postgresql.svc.cluster.local" # Change this Address to your postgresql endpoint
+              postgresPort: 5432                     # Change this Port for the PostgreSQL service to your values 
+              postgresUser: "postgres"               # Change this PostgreSQL username to your values
+              postgresPassword: "postgres"           # Change this PostgreSQL password to your value
+              postgresDB: "postgres"                 # Change this PostgreSQL database name to your value
+              postgresSslmode: disable               # Change this SSL mode for PostgreSQL connection to your value
+          ```
+         
+### 3. **🚀 Run the Installation Script:**
+   - Execute the installation script using the following command:
+     ```bash
+     ./egs-installer.sh --input-yaml egs-installer-config.yaml
+     ```
