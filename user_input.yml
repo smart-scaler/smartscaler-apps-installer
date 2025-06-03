@@ -9,8 +9,6 @@
 # Controls whether to deploy a new Kubernetes cluster using Kubespray
 ###############################################################################
 
-# Global Variables
-global_control_plane_ip: "<PUBLIC-IP>"  # Single source of truth for control plane IP
 
 kubernetes_deployment:
   # Master switch for Kubernetes deployment
@@ -19,7 +17,7 @@ kubernetes_deployment:
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
   api_server:
-    host: "{{ global_control_plane_ip }}"  # Reference global IP
+    host: "PUBLIC IP"  # Reference global IP
     port: 6443              # The port for the Kubernetes API server
                            # 6443 is the default secure port for Kubernetes
     secure: true           # Whether to use HTTPS for API server connections
@@ -40,7 +38,7 @@ kubernetes_deployment:
   # Defines the master nodes that will run the Kubernetes control plane
   control_plane_nodes:
     - name: "master-1"                # Unique identifier for the control plane node
-      ansible_host: "{{ global_control_plane_ip }}"  # Reference global IP
+      ansible_host: "PUBLIC IP"  # Reference global IP
       ansible_user: "ubuntu"      # SSH username for this specific node
                                      # Overrides default_ansible_user if different
       ansible_become: true            # Enable privilege escalation (sudo)
