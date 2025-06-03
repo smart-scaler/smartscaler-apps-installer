@@ -112,6 +112,7 @@ smartscaler-apps-installer/
 ---
 
 # Part 1: Kubernetes Cluster Setup
+⚠️ **IMPORTANT**: The **ONLY** supported method for installing Kubernetes is through the `setup_kubernetes.sh` script with sudo privileges.
 
 ## Prerequisites
 
@@ -218,26 +219,56 @@ helm version
 
 ## Kubernetes Cluster Installation
 
-⚠️ **IMPORTANT**: The **ONLY** supported method for installing Kubernetes is through the `setup_kubernetes.sh` script with sudo privileges.
 
-### Configuration
+## Mandatory user_input.yml Changes for Quick Install
 
-1. **Update node IPs in `user_input.yml`:**
+**Example configurations:**
 
-Update the following locations in `user_input.yml`:
-```yaml
-# API Server
-api_server:
-  host: "YOUR_PUBLIC_IP"
-
-# Control Plane Node
-control_plane_nodes:
-  - ansible_host: "YOUR_PUBLIC_IP"
-    private_ip: "YOUR_PRIVATE_IP"
 ```yaml
 
-2. **KUBERNETES CLUSTER DEPLOYMENT CONFIGURATION:**
+kubernetes_deployment:
+  # Master switch for Kubernetes deployment
+  enabled: true                           # Enable kubernetes deployment
+  
+  # API Server Configuration
+  # Defines how clients will connect to the Kubernetes API server
+  api_server:
+    host: "44.201.11.82"  # Reference global IP
+    port: 6443              # The port for the Kubernetes API server
+                           # 6443 is the default secure port for Kubernetes
+    secure: true           # Whether to use HTTPS for API server connections
+                          # Should always be true in production environments
 
+  # SSH Access Configuration
+  # Required for Kubespray to access and configure nodes
+  ssh_key_path: "/home/richie/Downloads/scm-test.pem"  # Full path to the SSH private key file
+                                            # Used to authenticate with the cluster nodes
+  default_ansible_user: "ubuntu"         # Default SSH user for all nodes
+                                           # Common values: ubuntu (Ubuntu), ec2-user (AWS)
+  # Ansible Sudo Password Configuration
+  # Optional: Can be set here, via ANSIBLE_SUDO_PASS environment variable,
+  # or will prompt if neither is set
+  ansible_sudo_pass: ""  # Leave empty to use environment variable or prompt
+
+  # Control Plane Node Configuration
+  # Defines the master nodes that will run the Kubernetes control plane
+  control_plane_nodes:
+    - name: "master-1"                # Unique identifier for the control plane node
+      ansible_host: "44.201.11.82"  # Reference global IP
+      ansible_user: "ubuntu"      # SSH username for this specific node
+                                     # Overrides default_ansible_user if different
+      ansible_become: true            # Enable privilege escalation (sudo)
+      ansible_become_method: "sudo"     # Method for privilege escalation
+      ansible_become_user: "root"       # Target user for privilege escalation
+      private_ip: "10.0.102.97"      # Internal/private IP address
+                                     # Used for internal cluster communication
+```
+
+### User Input Configuration Reference
+
+1.  **KUBERNETES CLUSTER DEPLOYMENT CONFIGURATION:**
+
+```
 # =============================================================================
 # KUBERNETES CLUSTER DEPLOYMENT CONFIGURATION
 # =============================================================================
@@ -389,7 +420,8 @@ kubernetes_deployment:
 # =============================================================================
 ```
 
-**Important Notes about API Server Configuration:**
+
+**API Server Configurations:**
 
 - **`api_server.host`**: This must be set to the **public IP address** or **domain name** that will be used to access the Kubernetes API server
 - This IP will be:
@@ -400,21 +432,6 @@ kubernetes_deployment:
 - For cloud deployments (AWS, GCP, Azure), use the **public IP** of your master node
 - For on-premises deployments, use the **externally accessible IP** of your master node
 
-**Example configurations:**
-
-```yaml
-# For AWS EC2 instance
-api_server:
-  host: "3.239.19.44"  # AWS public IP
-  
-# For on-premises with static IP
-api_server:
-  host: "192.168.1.100"  # Your public/accessible IP
-
-# For domain-based access
-api_server:
-  host: "k8s-master.yourdomain.com"  # Your domain name
-```
 
 2. **SSH User Configuration:**
 
