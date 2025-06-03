@@ -12,7 +12,7 @@
 kubernetes_deployment:
   # Master switch for Kubernetes deployment
   enabled: true  # Set to true to deploy a new Kubernetes cluster
-
+  
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
   api_server:
@@ -29,6 +29,10 @@ kubernetes_deployment:
                                             # Used to authenticate with the cluster nodes
   default_ansible_user: "<SSH_USER>"         # Default SSH user for all nodes
                                            # Common values: ubuntu (Ubuntu), ec2-user (AWS)
+  # Ansible Sudo Password Configuration
+  # Optional: Can be set here, via ANSIBLE_SUDO_PASS environment variable,
+  # or will prompt if neither is set
+  ansible_sudo_pass: ""  # Leave empty to use environment variable or prompt
 
   # Control Plane Node Configuration
   # Defines the master nodes that will run the Kubernetes control plane
@@ -80,6 +84,11 @@ kubernetes_deployment:
   
   dns_mode: "coredns"                      # DNS service for the cluster
                                          # CoreDNS is the default since Kubernetes 1.13
+  # Async Execution Configuration
+  # Controls timeout and polling for long-running tasks
+  async_config:
+    timeout: 10                          # Maximum time (in seconds) to wait for task completion
+    poll_interval: 5                       # How often (in seconds) to check task status
 
   # Nginx Ingress Controller Configuration
   # Enable and configure nginx ingress controller
