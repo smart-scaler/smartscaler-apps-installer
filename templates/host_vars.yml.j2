@@ -1,0 +1,7 @@
+---
+ansible_host: {{ item.ansible_host }}
+ansible_user: {{ item.ansible_user }}
+ansible_become: {{ item.ansible_become | default(true) }}
+ansible_become_method: {{ item.ansible_become_method | default('sudo') }}
+ansible_become_user: {{ item.ansible_become_user | default('root') }}
+private_ip: {{ item.private_ip }}
