@@ -9,15 +9,17 @@
 # Controls whether to deploy a new Kubernetes cluster using Kubespray
 ###############################################################################
 
+# Global Variables
+global_control_plane_ip: "13.219.244.18"  # Single source of truth for control plane IP
+
 kubernetes_deployment:
   # Master switch for Kubernetes deployment
-  enabled: false  # Set to true to deploy a new Kubernetes cluster
+  enabled: true                           # Enable kubernetes deployment
   
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
   api_server:
-    host: "13.219.244.18"  # The IP address or hostname where the API server will be accessible
-                            # Usually the public IP of your first control plane node
+    host: "{{ global_control_plane_ip }}"  # Reference global IP
     port: 6443              # The port for the Kubernetes API server
                            # 6443 is the default secure port for Kubernetes
     secure: true           # Whether to use HTTPS for API server connections
@@ -38,15 +40,14 @@ kubernetes_deployment:
   # Defines the master nodes that will run the Kubernetes control plane
   control_plane_nodes:
     - name: "master-1"                # Unique identifier for the control plane node
-      ansible_host: "13.219.244.18"     # Public IP address for SSH access
+      ansible_host: "{{ global_control_plane_ip }}"  # Reference global IP
       ansible_user: "ubuntu"      # SSH username for this specific node
                                      # Overrides default_ansible_user if different
       ansible_become: true            # Enable privilege escalation (sudo)
-      ansible_become_method: sudo     # Method for privilege escalation
-      ansible_become_user: root       # Target user for privilege escalation
+      ansible_become_method: "sudo"     # Method for privilege escalation
+      ansible_become_user: "root"       # Target user for privilege escalation
       private_ip: "10.0.102.206"      # Internal/private IP address
                                      # Used for internal cluster communication
-
   # Kubernetes Network Configuration
   # Defines the network ranges for various Kubernetes components
   network_config:
@@ -61,7 +62,9 @@ kubernetes_deployment:
   # Controls access to cluster nodes
   firewall:
     enabled: true                            # Whether to configure firewall rules
-    allow_additional_ports: ["80", "443"]    # Extra ports to open in the firewall
+    allow_additional_ports:
+      - "80"
+      - "443"
                                            # Added 80,443 for nginx-ingress
 
   # NVIDIA Container Runtime Configuration
@@ -87,7 +90,7 @@ kubernetes_deployment:
   # Async Execution Configuration
   # Controls timeout and polling for long-running tasks
   async_config:
-    timeout: 10                          # Maximum time (in seconds) to wait for task completion
+    timeout: 3600                          # Maximum time (in seconds) to wait for task completion
     poll_interval: 5                       # How often (in seconds) to check task status
 
 ###############################################################################
@@ -128,6 +131,7 @@ execution_order:
   - metallb_ip_pool              # Configure IP address pool
   - nginx_ingress_chart          # Install Nginx Ingress Controller
   - nginx_ingress_config         # Apply Nginx Ingress configuration
+
   # Existing Applications
   - gpu_operator_chart
   - prometheus_stack
@@ -152,22 +156,21 @@ execution_order:
 # MetalLB Configuration
 metallb:
   enabled: true                          # Enable MetalLB
-  ip_range_start: "10.233.0.100"        # Start of IP range for LoadBalancer services
-  ip_range_end: "10.233.0.200"          # End of IP range for LoadBalancer services
-  protocol: "layer2"                     # Use Layer 2 mode
   namespace: "metallb"                   # Namespace for MetalLB deployment
+  control_plane_ip: "{{ global_control_plane_ip }}"  # Reference global IP
+  protocol: "layer2"                     # Use Layer 2 mode
 
 # Nginx Ingress Configuration
 nginx_ingress:
-  enabled: true                          # Enable Nginx Ingress
-  namespace: "ingress-nginx"             # Namespace for Nginx Ingress Controller
-  replica_count: 1                       # Number of controller pods
-  service_type: "LoadBalancer"           # Use LoadBalancer for external access
-  metrics_enabled: true                  # Enable Prometheus metrics
-  default_ssl_certificate: false         # Whether to use a default SSL certificate
-  enable_proxy_protocol: false           # Enable proxy protocol
-  enable_real_ip: true                   # Enable real IP configuration
-  load_balancer_ip: "{{ metallb.ip_range_start }}"  # Use first IP from MetalLB pool
+  enabled: true
+  namespace: "ingress-nginx"
+  replica_count: 1
+  service_type: "LoadBalancer"
+  metrics_enabled: true
+  default_ssl_certificate: false
+  enable_proxy_protocol: false
+  enable_real_ip: true
+  load_balancer_ip: "{{ global_control_plane_ip }}"  # Reference global IP
 
 # Optional Docker Registry Configuration
 global_image_pull_secret:
@@ -188,8 +191,9 @@ helm_charts:
     create_namespace: true
     wait: true
     timeout: 300
+    dependencies: []  # No dependencies for first chart
     chart_repo_url: "https://metallb.github.io/metallb"
-    chart_version: "0.13.12"  # Using stable version
+    chart_version: "0.13.12"
     release_values:
       prometheus:
         serviceMonitor:
@@ -209,28 +213,28 @@ helm_charts:
   nginx_ingress_chart:
     release_name: "ingress-nginx"
     chart_ref: "ingress-nginx"
-    release_namespace: "{{ nginx_ingress.namespace }}"
+    release_namespace: "ingress-nginx"
     create_namespace: true
     wait: true
-    timeout: 600  # Increased timeout to 10 minutes
+    timeout: 600
+    dependencies:
+      - metallb_chart     # Only depend on MetalLB chart
     chart_repo_url: "https://kubernetes.github.io/ingress-nginx"
-    chart_repo_name: "ingress-nginx"  # Added explicit repo name
-    chart_version: "4.7.1"  # Using stable version
+    chart_repo_name: "ingress-nginx"
+    chart_version: "4.7.1"
     release_values:
       controller:
-        replicaCount: "{{ nginx_ingress.replica_count }}"
+        replicaCount: 1
         service:
           enabled: true
-          type: "{{ nginx_ingress.service_type }}"
-          loadBalancerIP: "{{ nginx_ingress.load_balancer_ip }}"
-          annotations:
-            metallb.universe.tf/allow-shared-ip: "true"  # Added MetalLB annotation
+          type: "LoadBalancer"
+          loadBalancerIP: "{{ global_control_plane_ip }}"  # Use global IP directly
         metrics:
-          enabled: "{{ nginx_ingress.metrics_enabled }}"
+          enabled: true
           serviceMonitor:
-            enabled: "{{ nginx_ingress.metrics_enabled }}"
+            enabled: true
         config:
-          use-proxy-protocol: "{{ nginx_ingress.enable_proxy_protocol }}"
+          use-proxy-protocol: false
           real-ip-header: "proxy_protocol"
           proxy-real-ip-cidr: "0.0.0.0/0"
           use-forwarded-headers: "true"
@@ -240,7 +244,7 @@ helm_charts:
           enabled: true
           patch:
             enabled: true
-            timeoutSeconds: 30  # Added timeout for webhook operations
+            timeoutSeconds: 30
         resources:
           requests:
             cpu: "100m"
@@ -248,11 +252,11 @@ helm_charts:
           limits:
             cpu: "200m"
             memory: "180Mi"
-        readinessProbe:  # Added readiness probe configuration
+        readinessProbe:
           initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 5
-        livenessProbe:  # Added liveness probe configuration
+        livenessProbe:
           initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 5
@@ -268,30 +272,108 @@ helm_charts:
             cpu: "20m"
             memory: "40Mi"
 
-  # OPTIONAL: GPU Operator Chart
   gpu_operator_chart:
     release_name: "gpu-operator"
     chart_ref: "gpu-operator"
-    release_namespace: "{{ metallb.namespace }}"
+    release_namespace: "gpu-operator"
     create_namespace: true
     wait: true
-    timeout: 300
-    chart_repo_url: "https://gpu-operator.github.io/gpu-operator"
-    chart_version: "1.13.0"  # Using stable version
+    chart_version: "v25.3.0"
     release_values:
-      prometheus:
-        serviceMonitor:
-          enabled: true
-      controller:
-        logLevel: info
-      speaker:
-        logLevel: info
-        frr:
-          enabled: false
-      crds:
+      mig:
+        strategy: "none"
+      dcgm:
         enabled: true
-      rbac:
-        create: true
+      driver:
+        enabled: false
+      cdi:
+        default: true
+        enabled: true
+      hostPaths:
+        driverInstallDir: "/home/kubernetes/bin/nvidia"
+      toolkit:
+        installDir: "/home/kubernetes/bin/nvidia"
+        env:
+          - name: "CONTAINERD_RUNTIME_CLASS"
+            value: "nvidia"
+    chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
+    dependencies: []  # Can start independently
+
+  # OPTIONAL: Prometheus Stack
+  prometheus_stack:
+    release_name: "prometheus"
+    chart_ref: "kube-prometheus-stack"
+    release_namespace: "monitoring"
+    create_namespace: true
+    wait: true
+    chart_repo_url: "https://prometheus-community.github.io/helm-charts"
+    chart_version: "55.5.0"
+    release_values:
+      kubeEtcd:
+        enabled: false
+      prometheus:
+        prometheusSpec:
+          retention: "15d"
+          additionalScrapeConfigs:
+            - job_name: "gpu-metrics"
+              scrape_interval: "1s"
+              metrics_path: "/metrics"
+              scheme: "http"
+              kubernetes_sd_configs:
+                - role: "endpoints"
+                  namespaces:
+                    names:
+                      - "monitoring"
+                      - "gpu-operator"
+              relabel_configs:
+                - source_labels: ["__meta_kubernetes_endpoints_name"]
+                  action: "drop"
+                  regex: ".*-node-feature-discovery-master"
+                - source_labels: ["__meta_kubernetes_pod_node_name"]
+                  action: "replace"
+                  target_label: "kubernetes_node"
+      prometheusOperator:
+        enabled: true
+        admissionWebhooks:
+          enabled: true
+          patch:
+            enabled: true
+      kubelet:
+        serviceMonitor:
+          https: false
+      grafana:
+        enabled: true
+        persistence:
+          enabled: true
+          size: "1Gi"
+      defaultRules:
+        rules:
+          etcd: false
+    dependencies: []  # Can start independently
+
+  # OPTIONAL: KEDA Chart
+  keda_chart:
+    release_name: "keda"
+    chart_ref: "keda"
+    release_namespace: "keda"
+    create_namespace: true
+    wait: true
+    chart_repo_url: "https://kedacore.github.io/charts"
+    chart_version: "2.12.1"
+    dependencies: 
+      - prometheus_stack  # KEDA might need Prometheus for metrics
+
+  # OPTIONAL: NIM Operator Chart
+  nim_operator_chart:
+    release_name: "nim"
+    chart_ref: "k8s-nim-operator"
+    release_namespace: "nim"
+    create_namespace: true
+    wait: true
+    chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
+    chart_version: "v1.0.1"
+    dependencies:
+      - gpu_operator_chart  # NIM operator needs GPU operator
 
 ###############################################################################
 # KUBERNETES MANIFESTS CONFIGURATION
@@ -306,11 +388,11 @@ manifests:
       kind: IPAddressPool
       metadata:
         name: first-pool
-        namespace: {{ metallb.namespace }}
+        namespace: metallb
       spec:
         addresses:
-        - "{{ metallb.ip_range_start }}-{{ metallb.ip_range_end }}"
-    namespace: "{{ metallb.namespace }}"
+        - {{ global_control_plane_ip }}  # Use global IP directly
+    namespace: "metallb"
     wait: true
     wait_timeout: 60
     validate: true
@@ -326,11 +408,11 @@ manifests:
       kind: L2Advertisement
       metadata:
         name: l2
-        namespace: {{ metallb.namespace }}
+        namespace: metallb
       spec:
         ipAddressPools:
         - first-pool
-    namespace: "{{ metallb.namespace }}"
+    namespace: "metallb"
     wait: true
     wait_timeout: 60
     validate: true
@@ -365,6 +447,7 @@ manifests:
     strict_validation: true
     dependencies:
       - nginx_ingress_chart  # Ensure chart is installed first
+      - metallb_ip_pool      # Ensure MetalLB IP pool is configured
 
   # OPTIONAL: Pushgateway Manifest
   pushgateway_manifest:
