@@ -164,6 +164,7 @@ source venv/bin/activate  # On Linux/Mac
 
 ```bash
 # Option 1: Install with sudo (recommended for system-wide tools)
+chmod +x files/install_requirements.sh
 sudo ./files/install_requirements.sh
 
 # The requirements include:
