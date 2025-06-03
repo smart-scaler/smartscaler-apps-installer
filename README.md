@@ -166,9 +166,6 @@ source venv/bin/activate  # On Linux/Mac
 # Option 1: Install with sudo (recommended for system-wide tools)
 sudo ./files/install_requirements.sh
 
-# Option 2: Run through Ansible with sudo prompt
-ansible-playbook kubernetes.yml -K
-
 # The requirements include:
 # - ansible>=2.10
 # - openshift
