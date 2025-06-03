@@ -1329,5 +1329,3 @@ To deploy the Kubernetes cluster, run:
 ```bash
 ansible-playbook kubernetes.yml --ask-become-pass
 ```
-
-This will prompt for your sudo password which is required for certain operations.
