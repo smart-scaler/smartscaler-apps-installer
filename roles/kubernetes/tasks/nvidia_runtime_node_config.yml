@@ -104,7 +104,14 @@
     LANG: C.UTF-8
 
 - name: Check if NVIDIA runtime is already configured
-  command: grep -q "nvidia" /etc/containerd/config.toml
+  shell: |
+    if grep -q "plugins.*containerd.runtimes.nvidia" /etc/containerd/config.toml; then
+      echo "NVIDIA runtime already configured"
+      exit 0
+    else
+      echo "NVIDIA runtime not configured"
+      exit 1
+    fi
   register: nvidia_grep
   ignore_errors: true
   changed_when: false
@@ -116,36 +123,52 @@
     LC_ALL: C.UTF-8
     LANG: C.UTF-8
 
-- name: Add NVIDIA runtime configuration
-  lineinfile:
-    path: /etc/containerd/config.toml
-    insertafter: '^\[plugins."io.containerd.grpc.v1.cri".containerd.runtimes\]'
-    line: |
-      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
-        runtime_type = "io.containerd.runc.v2"
-        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
-          BinaryName = "/usr/bin/nvidia-container-runtime"
-  when: nvidia_grep.rc != 0
+- name: Create temporary containerd config
+  template:
+    src: containerd-config.toml.j2
+    dest: /tmp/containerd-config.toml
   delegate_to: "{{ target_node.ansible_host }}"
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ target_node.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  when: nvidia_grep.rc != 0
+
+- name: Apply containerd config
+  copy:
+    src: /tmp/containerd-config.toml
+    dest: /etc/containerd/config.toml
+    remote_src: yes
+    mode: '0644'
+  delegate_to: "{{ target_node.ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ target_node.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  when: nvidia_grep.rc != 0
+  register: containerd_config_updated
+
+- name: Restart containerd service
+  systemd:
+    name: containerd
+    state: restarted
+    daemon_reload: yes
+  delegate_to: "{{ target_node.ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ target_node.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  when: containerd_config_updated.changed
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8
 
-- name: Restart containerd after config change
-  systemd:
-    name: containerd
-    state: restarted
-  when: nvidia_grep.rc != 0
+- name: Remove temporary containerd config
+  file:
+    path: /tmp/containerd-config.toml
+    state: absent
   delegate_to: "{{ target_node.ansible_host }}"
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ target_node.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
-  environment:
-    LC_ALL: C.UTF-8
-    LANG: C.UTF-8
+  when: nvidia_grep.rc != 0
 
 # Add status messages
 - name: Display NVIDIA Container Toolkit check status
@@ -159,5 +182,5 @@
 
 - name: Display NVIDIA runtime configuration status
   debug:
-    msg: "{{ 'NVIDIA runtime is already configured in containerd.' if nvidia_grep.rc == 0 else 'NVIDIA runtime not found in containerd config. Adding it...' }}"
+    msg: "{{ nvidia_grep.stdout if nvidia_grep.rc == 0 else 'Adding NVIDIA runtime to containerd config...' }}"
   when: nvidia_grep is defined 

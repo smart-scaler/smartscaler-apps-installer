@@ -1,6 +1,54 @@
 # site.yml
 # Master playbook for smartscaler-apps-installer
 ---
+# Main playbook for cluster deployment
+- name: Load global variables
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Include user input variables
+      include_vars:
+        file: user_input.yml
+        name: user_input
+
+    - name: Set kubernetes_deployment fact
+      set_fact:
+        kubernetes_deployment: "{{ user_input.kubernetes_deployment }}"
+
+- name: Prepare cluster nodes
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Ensure required directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      with_items:
+        - /etc/kubernetes/manifests
+        - /etc/kubernetes/addons
+      become: true
+      when: kubernetes_deployment.enabled | default(false)
+
+    - name: Copy MetalLB configuration
+      template:
+        src: templates/metallb-config.yml.j2
+        dest: /etc/kubernetes/addons/metallb-config.yml
+      become: true
+      when: kubernetes_deployment.metallb.enabled | default(false)
+
+    - name: Copy Nginx Ingress configuration
+      template:
+        src: templates/nginx-ingress-config.yml.j2
+        dest: /etc/kubernetes/addons/nginx-ingress-config.yml
+      become: true
+      when: kubernetes_deployment.ingress_nginx.enabled | default(false)
+
+- name: Import Kubespray cluster playbook
+  import_playbook: kubespray/cluster.yml
+  vars:
+    ansible_sudo_pass: "{{ kubernetes_deployment.ansible_sudo_pass | default('') }}"
+
 - name: Deploy Smart Scaler Components
   hosts: localhost
   gather_facts: true
