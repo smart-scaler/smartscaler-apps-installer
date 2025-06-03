@@ -1,7 +1,24 @@
 ---
+# Basic connection settings
 ansible_host: {{ item.ansible_host }}
 ansible_user: {{ item.ansible_user }}
 ansible_become: {{ item.ansible_become | default(true) }}
 ansible_become_method: {{ item.ansible_become_method | default('sudo') }}
 ansible_become_user: {{ item.ansible_become_user | default('root') }}
-private_ip: {{ item.private_ip }}
+
+# Network configurations
+ip: {{ item.private_ip }}
+access_ip: {{ item.private_ip }}
+
+# etcd specific configurations
+etcd_member_name: {{ item.name | regex_replace('-', '') }}
+etcd_ip: {{ item.private_ip }}
+etcd_peer_port: 2380
+etcd_client_port: 2379
+
+# Force etcd to bind to the correct private IP
+etcd_listen_peer_urls: "https://{{ item.private_ip }}:2380"
+etcd_listen_client_urls: "https://{{ item.private_ip }}:2379,https://127.0.0.1:2379"
+etcd_initial_advertise_peer_urls: "https://{{ item.private_ip }}:2380"
+etcd_initial_cluster: "{{ item.name | regex_replace('-', '') }}=https://{{ item.private_ip }}:2380"
+etcd_advertise_client_urls: "https://{{ item.private_ip }}:2379"
