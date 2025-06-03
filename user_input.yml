@@ -126,8 +126,8 @@ execution_order:
   - metallb_chart                 # Install MetalLB Helm chart first
   - metallb_l2_config            # Configure MetalLB L2 mode
   - metallb_ip_pool              # Configure IP address pool
-  - nginx_ingress_chart          # Install Nginx Ingress Controller
   - nginx_ingress_config         # Apply Nginx Ingress configuration
+  - nginx_ingress_chart          # Install Nginx Ingress Controller
 
   # Existing Applications
   - gpu_operator_chart
@@ -154,7 +154,7 @@ execution_order:
 metallb:
   enabled: true                          # Enable MetalLB
   namespace: "metallb"                   # Namespace for MetalLB deployment
-  control_plane_ip: "{{ global_control_plane_ip }}"  # Reference global IP
+  address_range: 172.18.1.1-172.18.1.16  # Reference global IP
   protocol: "layer2"                     # Use Layer 2 mode
 
 # Nginx Ingress Configuration
@@ -167,7 +167,6 @@ nginx_ingress:
   default_ssl_certificate: false
   enable_proxy_protocol: false
   enable_real_ip: true
-  load_balancer_ip: "{{ global_control_plane_ip }}"  # Reference global IP
 
 # Optional Docker Registry Configuration
 global_image_pull_secret:
@@ -190,7 +189,7 @@ helm_charts:
     timeout: 300
     dependencies: []  # No dependencies for first chart
     chart_repo_url: "https://metallb.github.io/metallb"
-    chart_version: "0.13.12"
+    chart_version: "0.15.0"
     release_values:
       prometheus:
         serviceMonitor:
@@ -225,11 +224,10 @@ helm_charts:
         service:
           enabled: true
           type: "LoadBalancer"
-          loadBalancerIP: "{{ global_control_plane_ip }}"  # Use global IP directly
         metrics:
           enabled: true
           serviceMonitor:
-            enabled: true
+            enabled: false
         config:
           use-proxy-protocol: false
           real-ip-header: "proxy_protocol"
@@ -380,38 +378,30 @@ manifests:
   # MetalLB IP Pool Configuration
   metallb_ip_pool:
     name: "metallb-ip-pool"
-    manifest: |
-      apiVersion: metallb.io/v1beta1
-      kind: IPAddressPool
-      metadata:
-        name: first-pool
-        namespace: metallb
-      spec:
-        addresses:
-        - {{ global_control_plane_ip }}  # Use global IP directly
+    manifest_file: "files/metallb-ip-pool.yaml.j2"
     namespace: "metallb"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
     wait: true
     wait_timeout: 60
+    wait_condition:
+      type: "Available"
+      status: "True"
     validate: true
     strict_validation: true
-    dependencies:
-      - metallb_chart  # Ensure chart is installed first
 
   # MetalLB L2 Advertisement Configuration
   metallb_l2_config:
     name: "metallb-l2-config"
-    manifest: |
-      apiVersion: metallb.io/v1beta1
-      kind: L2Advertisement
-      metadata:
-        name: l2
-        namespace: metallb
-      spec:
-        ipAddressPools:
-        - first-pool
+    manifest_file: "files/metallb-l2-config.yaml.j2"
     namespace: "metallb"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
     wait: true
     wait_timeout: 60
+    wait_condition:
+      type: "Available"
+      status: "True"
     validate: true
     strict_validation: true
     dependencies: []
@@ -419,25 +409,15 @@ manifests:
   # Nginx Ingress Additional Configuration
   nginx_ingress_config:
     name: "nginx-ingress-config"
-    manifest: |
-      apiVersion: v1
-      kind: ConfigMap
-      metadata:
-        name: nginx-ingress-controller-custom-config
-        namespace: {{ nginx_ingress.namespace }}
-      data:
-        proxy-buffer-size: "128k"
-        proxy-body-size: "50m"
-        client-header-buffer-size: "64k"
-        large-client-header-buffers: "4 128k"
-        client-body-buffer-size: "128k"
-        enable-brotli: "true"
-        use-gzip: "true"
-        gzip-level: "6"
-        gzip-types: "application/atom+xml application/javascript application/x-javascript application/json application/rss+xml application/vnd.ms-fontobject application/x-font-ttf application/x-web-app-manifest+json application/xhtml+xml application/xml font/opentype image/svg+xml image/x-icon text/css text/javascript text/plain text/x-component"
-    namespace: "{{ nginx_ingress.namespace }}"
+    manifest_file: "files/nginx-ingress-config.yaml.j2"
+    namespace: "ingress-nginx"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
     wait: true
     wait_timeout: 60
+    wait_condition:
+      type: "Available"
+      status: "True"
     validate: true
     strict_validation: true
     dependencies: []

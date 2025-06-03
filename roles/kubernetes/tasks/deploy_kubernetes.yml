@@ -81,6 +81,82 @@
     kubespray_poll_interval: "{{ kubernetes_deployment.async_config.poll_interval | default(10) }}"
   when: kubernetes_deployment.enabled | default(false)
 
+- name: Clear Ansible fact cache to prevent IP conflicts
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "~/.ansible/tmp"
+    - "~/.ansible/cp"
+    - "/tmp/ansible-facts-*"
+  ignore_errors: true
+  delegate_to: localhost
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Force refresh network facts on target hosts
+  setup:
+    gather_subset: '!all,network'
+    filter: "ansible_default_ipv4"
+  delegate_to: "{{ item.ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  ignore_errors: true
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Create host_vars directory for explicit IP configuration
+  file:
+    path: "{{ inventory_dir }}/kubespray/host_vars"
+    state: directory
+    mode: '0755'
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Create host_vars files for control plane nodes with explicit IP settings
+  template:
+    src: "{{ playbook_dir }}/templates/host_vars.yml.j2"
+    dest: "{{ inventory_dir }}/kubespray/host_vars/{{ item.name }}.yml"
+  vars:
+    node_private_ip: "{{ item.private_ip }}"
+    node_access_ip: "{{ item.private_ip }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes }}"
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Create host_vars files for worker nodes with explicit IP settings
+  template:
+    src: "{{ playbook_dir }}/templates/host_vars.yml.j2"
+    dest: "{{ inventory_dir }}/kubespray/host_vars/{{ item.name }}.yml"
+  vars:
+    node_private_ip: "{{ item.private_ip }}"
+    node_access_ip: "{{ item.private_ip }}"
+  loop: "{{ kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Verify IP configuration before deployment
+  debug:
+    msg: |
+      === IP Configuration Verification ===
+      Control Plane Nodes:
+      {% for node in kubernetes_deployment.control_plane_nodes %}
+      - {{ node.name }}: 
+        - ansible_host (public): {{ node.ansible_host }}
+        - private_ip (etcd only): {{ node.private_ip }}
+        - host_vars file: {{ inventory_dir }}/kubespray/host_vars/{{ node.name }}.yml
+      {% endfor %}
+      {% if kubernetes_deployment.worker_nodes is defined and kubernetes_deployment.worker_nodes|length > 0 %}
+      Worker Nodes:
+      {% for node in kubernetes_deployment.worker_nodes %}
+      - {{ node.name }}:
+        - ansible_host (public): {{ node.ansible_host }}
+        - private_ip (etcd only): {{ node.private_ip }}
+        - host_vars file: {{ inventory_dir }}/kubespray/host_vars/{{ node.name }}.yml
+      {% endfor %}
+      {% endif %}
+      
+      IMPORTANT: Only etcd-specific variables are overridden to fix binding issues.
+      API Server will remain accessible on public IP: {{ kubernetes_deployment.api_server.host }}:{{ kubernetes_deployment.api_server.port }}
+  when: kubernetes_deployment.enabled | default(false)
+
 - name: Run Kubespray cluster deployment
   command:
     cmd: >
@@ -193,6 +269,19 @@
     ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
     ansible_become: true
 
+- name: Wait for kubeconfig file to be created
+  wait_for:
+    path: /etc/kubernetes/admin.conf
+    state: present
+    timeout: 600
+  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
+    ansible_become: true
+  register: kubeconfig_wait
+  ignore_errors: true
+
 - name: Copy kubeconfig to temporary location with sudo
   shell: "cp /etc/kubernetes/admin.conf /tmp/kubeconfig-temp/admin.conf && chmod 644 /tmp/kubeconfig-temp/admin.conf && chown {{ kubernetes_deployment.default_ansible_user }}:{{ kubernetes_deployment.default_ansible_user }} /tmp/kubeconfig-temp/admin.conf"
   delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
@@ -202,11 +291,12 @@
     ansible_become: true
   ignore_errors: true
   register: kubeconfig_copy_result
+  when: kubeconfig_wait is success
 
 - name: Display warning if kubeconfig copy failed
   debug:
     msg: "WARNING: Failed to copy kubeconfig from /etc/kubernetes/admin.conf. This is expected if the cluster is not yet fully initialized."
-  when: kubeconfig_copy_result is failed
+  when: kubeconfig_copy_result is failed or kubeconfig_wait is failed
 
 - name: Fetch kubeconfig from temporary location
   fetch:
@@ -218,6 +308,7 @@
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
   register: kubeconfig_fetch
+  when: kubeconfig_copy_result is success
 
 - name: Clean up temporary directory
   file:
