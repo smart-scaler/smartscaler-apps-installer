@@ -144,7 +144,21 @@
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ target_node.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
   when: nvidia_grep.rc != 0
-  notify: Restart containerd
+  register: containerd_config_updated
+
+- name: Restart containerd service
+  systemd:
+    name: containerd
+    state: restarted
+    daemon_reload: yes
+  delegate_to: "{{ target_node.ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ target_node.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+  when: containerd_config_updated.changed
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
 
 - name: Remove temporary containerd config
   file:
