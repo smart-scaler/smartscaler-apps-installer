@@ -101,7 +101,7 @@ validate_prerequisites:
 execution_order_enabled: true                # Required: Must be enabled for ordered execution
 
 # Required Kubeconfig Settings
-global_control_plane_ip: "PUBLIC_IP"         # Provide the public IP
+global_control_plane_ip: "PUBLIC_IP"         # Provide the public IP for metallb/Nginx
 global_kubeconfig: "files/kubeconfig"        # Required: Path to kubeconfig file
 global_kubecontext: "kubernetes-admin@cluster.local"  # Required: Kubernetes context
 use_global_context: true                     # Required: Use global context
