@@ -224,7 +224,20 @@ helm version
 
 1. **Update node IPs in `user_input.yml`:**
 
+Update the following locations in `user_input.yml`:
 ```yaml
+# API Server
+api_server:
+  host: "YOUR_PUBLIC_IP"
+
+# Control Plane Node
+control_plane_nodes:
+  - ansible_host: "YOUR_PUBLIC_IP"
+    private_ip: "YOUR_PRIVATE_IP"
+```yaml
+
+2. **KUBERNETES CLUSTER DEPLOYMENT CONFIGURATION:**
+
 # =============================================================================
 # KUBERNETES CLUSTER DEPLOYMENT CONFIGURATION
 # =============================================================================
@@ -479,6 +492,8 @@ chmod 600 files/kubeconfig
 2. **Update kubeconfig settings in user_input.yml:**
 
 ```yaml
+# Global Control Plane IP
+global_control_plane_ip: "YOUR_PUBLIC_IP"
 global_kubeconfig: "files/kubeconfig"
 global_kubecontext: "your-cluster-context"
 ```
@@ -511,7 +526,6 @@ Before proceeding with the applications deployment:
      ```yaml
      kubernetes_deployment:
        enabled: false  # Must be false for apps deployment
-     ```
 
 ## Required Environment Variables
 
