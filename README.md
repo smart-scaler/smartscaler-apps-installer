@@ -902,7 +902,7 @@ LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ansible-galaxy collection list | grep -E "co
 1. **Deployment with explicit credentials:**
 
 ```bash
-ansible-playbook site.yml \
+sudo ansible-playbook site.yml \
   -e "ngc_api_key=$NGC_API_KEY" \
   -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
   -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \
@@ -912,7 +912,7 @@ ansible-playbook site.yml \
 2. **Debug deployment with verbose output:**
 
 ```bash
-ansible-playbook site.yml \
+sudo ansible-playbook site.yml \
   -e "ngc_api_key=$NGC_API_KEY" \
   -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
   -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \
