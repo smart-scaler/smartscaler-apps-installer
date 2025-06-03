@@ -241,7 +241,7 @@ kubernetes_deployment:
 
   # SSH Access Configuration
   # Required for Kubespray to access and configure nodes
-  ssh_key_path: "/home/richie/Downloads/scm-test.pem"  # Full path to the SSH private key file
+  ssh_key_path: "/path/to/pem/file.pem"  # Full path to the SSH private key file
                                             # Used to authenticate with the cluster nodes
   default_ansible_user: "ubuntu"         # Default SSH user for all nodes
                                            # Common values: ubuntu (Ubuntu), ec2-user (AWS)
