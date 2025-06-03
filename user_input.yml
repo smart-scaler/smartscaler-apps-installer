@@ -10,11 +10,11 @@
 ###############################################################################
 
 # Global Variables
-global_control_plane_ip: "13.219.244.18"  # Single source of truth for control plane IP
+global_control_plane_ip: "<PUBLIC-IP>"  # Single source of truth for control plane IP
 
 kubernetes_deployment:
   # Master switch for Kubernetes deployment
-  enabled: true                           # Enable kubernetes deployment
+  enabled: false                           # Enable kubernetes deployment
   
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
@@ -27,7 +27,7 @@ kubernetes_deployment:
 
   # SSH Access Configuration
   # Required for Kubespray to access and configure nodes
-  ssh_key_path: "/home/richie/Downloads/scm-test.pem"  # Full path to the SSH private key file
+  ssh_key_path: "/home/user/path/"  # Full path to the SSH private key file
                                             # Used to authenticate with the cluster nodes
   default_ansible_user: "ubuntu"         # Default SSH user for all nodes
                                            # Common values: ubuntu (Ubuntu), ec2-user (AWS)
@@ -46,7 +46,7 @@ kubernetes_deployment:
       ansible_become: true            # Enable privilege escalation (sudo)
       ansible_become_method: "sudo"     # Method for privilege escalation
       ansible_become_user: "root"       # Target user for privilege escalation
-      private_ip: "10.0.102.206"      # Internal/private IP address
+      private_ip: "PRIVATE IP"      # Internal/private IP address
                                      # Used for internal cluster communication
   # Kubernetes Network Configuration
   # Defines the network ranges for various Kubernetes components
@@ -417,9 +417,7 @@ manifests:
     wait_timeout: 60
     validate: true
     strict_validation: true
-    dependencies:
-      - metallb_chart     # Ensure chart is installed first
-      - metallb_ip_pool   # Ensure IP pool exists first
+    dependencies: []
 
   # Nginx Ingress Additional Configuration
   nginx_ingress_config:
@@ -445,9 +443,7 @@ manifests:
     wait_timeout: 60
     validate: true
     strict_validation: true
-    dependencies:
-      - nginx_ingress_chart  # Ensure chart is installed first
-      - metallb_ip_pool      # Ensure MetalLB IP pool is configured
+    dependencies: []
 
   # OPTIONAL: Pushgateway Manifest
   pushgateway_manifest:
