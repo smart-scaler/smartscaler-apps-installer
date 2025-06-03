@@ -193,6 +193,19 @@
     ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
     ansible_become: true
 
+- name: Wait for kubeconfig file to be created
+  wait_for:
+    path: /etc/kubernetes/admin.conf
+    state: present
+    timeout: 300
+  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
+    ansible_become: true
+  register: kubeconfig_wait
+  ignore_errors: true
+
 - name: Copy kubeconfig to temporary location with sudo
   shell: "cp /etc/kubernetes/admin.conf /tmp/kubeconfig-temp/admin.conf && chmod 644 /tmp/kubeconfig-temp/admin.conf && chown {{ kubernetes_deployment.default_ansible_user }}:{{ kubernetes_deployment.default_ansible_user }} /tmp/kubeconfig-temp/admin.conf"
   delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
@@ -202,6 +215,7 @@
     ansible_become: true
   ignore_errors: true
   register: kubeconfig_copy_result
+  when: kubeconfig_wait is success
 
 - name: Display warning if kubeconfig copy failed
   debug:
