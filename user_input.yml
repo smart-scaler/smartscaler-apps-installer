@@ -11,8 +11,7 @@
 
 kubernetes_deployment:
   # Master switch for Kubernetes deployment
-  enabled: false  # Set to false to skip Kubernetes cluster deployment entirely
-                 # Set to true if you want to deploy a new Kubernetes cluster
+  enabled: true  # Set to true to deploy a new Kubernetes cluster
 
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
@@ -28,7 +27,7 @@ kubernetes_deployment:
   # Required for Kubespray to access and configure nodes
   ssh_key_path: "/path/to/your/ssh/key.pem"  # Full path to the SSH private key file
                                             # Used to authenticate with the cluster nodes
-  default_ansible_user: "<SSH_USER>"             # Default SSH user for all nodes
+  default_ansible_user: "<SSH_USER>"         # Default SSH user for all nodes
                                            # Common values: ubuntu (Ubuntu), ec2-user (AWS)
 
   # Control Plane Node Configuration
@@ -58,9 +57,8 @@ kubernetes_deployment:
   # Controls access to cluster nodes
   firewall:
     enabled: true                            # Whether to configure firewall rules
-    allow_additional_ports: []               # Extra ports to open in the firewall
-                                           # Example: ["8080", "9090"]
-                                           # Leave empty [] for default ports only
+    allow_additional_ports: ["80", "443"]    # Extra ports to open in the firewall
+                                           # Added 80,443 for nginx-ingress
 
   # NVIDIA Container Runtime Configuration
   # Required for GPU support in the cluster
@@ -82,6 +80,34 @@ kubernetes_deployment:
   
   dns_mode: "coredns"                      # DNS service for the cluster
                                          # CoreDNS is the default since Kubernetes 1.13
+
+  # Nginx Ingress Controller Configuration
+  # Enable and configure nginx ingress controller
+  ingress_nginx:
+    enabled: true                          # Enable nginx ingress controller
+    controller_kind: "DaemonSet"           # Deploy as DaemonSet for HA
+    controller_daemonset_enable: true      # Enable DaemonSet deployment
+    namespace: "ingress-nginx"             # Namespace for nginx ingress
+    configmap:
+      tcp-services: {}
+      udp-services: {}
+    service_type: "LoadBalancer"           # Use LoadBalancer service type
+    controller_metrics_enabled: true       # Enable prometheus metrics
+
+  # MetalLB Configuration
+  # Enable and configure MetalLB for bare metal load balancing
+  metallb:
+    enabled: true                          # Enable MetalLB
+    namespace: "metallb-system"            # Namespace for MetalLB
+    protocol: "layer2"                     # Use Layer 2 mode
+    addresses:                             # IP address pools for LoadBalancer services
+      - "<METALLB_IP_RANGE_START>-<METALLB_IP_RANGE_END>"  # Example: "192.168.1.240-192.168.1.250"
+    additional_address_pools:
+      kube_service_pool:
+        ip_range:
+          - "<METALLB_IP_RANGE_START>-<METALLB_IP_RANGE_END>"
+        protocol: "layer2"
+        auto_assign: true
 
 ###############################################################################
 # REQUIRED SETTINGS

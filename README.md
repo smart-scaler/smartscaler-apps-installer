@@ -14,6 +14,18 @@ Before proceeding with the Smart Scaler applications deployment, ensure:
    - The `kubernetes_deployment.enabled` flag in `user_input.yml` must be set to `false` before running apps installation
    - This prevents unintended cluster setup operations during app deployment
 
+3. **Sudo Access Requirements**
+   - Some installation steps require sudo privileges for:
+     - Installing system-wide Python packages
+     - Configuring firewall rules
+     - Setting up NVIDIA runtime (if enabled)
+   - You can provide sudo access in one of these ways:
+     - Set password in `user_input.yml`: `kubernetes_deployment.ansible_sudo_pass`
+     - Set environment variable: `export ANSIBLE_SUDO_PASS="your_password"`
+     - Use the `-K` flag when running playbooks to be prompted for the password
+
+   > **Note**: If you're using a virtual environment, some Python packages still need to be installed system-wide for proper functionality with Ansible and Kubernetes tools.
+
 ## Ansible Project Structure
 
 ```sh
@@ -151,7 +163,11 @@ source venv/bin/activate  # On Linux/Mac
 3. **Install Python dependencies:**
 
 ```bash
-pip install -r requirements.txt
+# Option 1: Install with sudo (recommended for system-wide tools)
+sudo ./files/install_requirements.sh
+
+# Option 2: Run through Ansible with sudo prompt
+ansible-playbook kubernetes.yml -K
 
 # The requirements include:
 # - ansible>=2.10
@@ -204,7 +220,7 @@ helm version
 
 ## Kubernetes Cluster Installation
 
-⚠️ **IMPORTANT**: The **ONLY** supported method for installing Kubernetes is through the `setup_kubernetes.sh` script.
+⚠️ **IMPORTANT**: The **ONLY** supported method for installing Kubernetes is through the `setup_kubernetes.sh` script with sudo privileges.
 
 ### Configuration
 
@@ -408,15 +424,17 @@ api_server:
 
 ### Installation Process
 
-1. **Execute the Kubernetes setup script:**
+⚠️ **IMPORTANT**: The **ONLY** supported method for installing Kubernetes is through the `setup_kubernetes.sh` script with sudo privileges.
 
 ```bash
+# Make the script executable
 chmod +x setup_kubernetes.sh
-./setup_kubernetes.sh
+
+# Run the installation script with sudo
+sudo ./setup_kubernetes.sh
 ```
 
 The script will:
-
 - Create an inventory.ini file for kubespray
 - Validate your configuration
 - Test SSH connectivity to all nodes
@@ -426,11 +444,25 @@ The script will:
 - Setup firewall rules if enabled
 - Verify the installation
 
-2. **Verify the installation:**
+> **Note**: The script requires sudo privileges for:
+> - Installing system packages
+> - Configuring firewall rules
+> - Setting up container runtime
+> - Configuring network interfaces
+> - Installing NVIDIA drivers (if enabled)
+
+### Post-Installation Verification
+
+After the script completes, verify the installation:
 
 ```bash
+# Check node status
 kubectl get nodes -o wide
+
+# View cluster info
 kubectl cluster-info
+
+# Check all pods
 kubectl get pods --all-namespaces
 ```
 
