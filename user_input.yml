@@ -8,8 +8,6 @@
 # KUBERNETES DEPLOYMENT CONFIGURATION
 # Controls whether to deploy a new Kubernetes cluster using Kubespray
 ###############################################################################
-
-
 kubernetes_deployment:
   # Master switch for Kubernetes deployment
   enabled: false                           # Enable kubernetes deployment
@@ -17,7 +15,7 @@ kubernetes_deployment:
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
   api_server:
-    host: "PUBLIC IP"  # Reference global IP
+    host: "PUBLIC_IP"  # Reference global IP
     port: 6443              # The port for the Kubernetes API server
                            # 6443 is the default secure port for Kubernetes
     secure: true           # Whether to use HTTPS for API server connections
@@ -38,7 +36,7 @@ kubernetes_deployment:
   # Defines the master nodes that will run the Kubernetes control plane
   control_plane_nodes:
     - name: "master-1"                # Unique identifier for the control plane node
-      ansible_host: "PUBLIC IP"  # Reference global IP
+      ansible_host: "PUBLIC_IP"  # Reference global IP
       ansible_user: "ubuntu"      # SSH username for this specific node
                                      # Overrides default_ansible_user if different
       ansible_become: true            # Enable privilege escalation (sudo)
@@ -103,6 +101,7 @@ validate_prerequisites:
 execution_order_enabled: true                # Required: Must be enabled for ordered execution
 
 # Required Kubeconfig Settings
+global_control_plane_ip: "PUBLIC_IP"         # Provide the public IP
 global_kubeconfig: "files/kubeconfig"        # Required: Path to kubeconfig file
 global_kubecontext: "kubernetes-admin@cluster.local"  # Required: Kubernetes context
 use_global_context: true                     # Required: Use global context
