@@ -42,7 +42,7 @@ kubernetes_deployment:
       ansible_become: true            # Enable privilege escalation (sudo)
       ansible_become_method: "sudo"     # Method for privilege escalation
       ansible_become_user: "root"       # Target user for privilege escalation
-      private_ip: "PRIVATE IP"      # Internal/private IP address
+      private_ip: "PRIVATE_IP"      # Internal/private IP address
                                      # Used for internal cluster communication
   # Kubernetes Network Configuration
   # Defines the network ranges for various Kubernetes components
