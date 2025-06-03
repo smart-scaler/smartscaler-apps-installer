@@ -200,6 +200,13 @@
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
     ansible_become: true
+  ignore_errors: true
+  register: kubeconfig_copy_result
+
+- name: Display warning if kubeconfig copy failed
+  debug:
+    msg: "WARNING: Failed to copy kubeconfig from /etc/kubernetes/admin.conf. This is expected if the cluster is not yet fully initialized."
+  when: kubeconfig_copy_result is failed
 
 - name: Fetch kubeconfig from temporary location
   fetch:
