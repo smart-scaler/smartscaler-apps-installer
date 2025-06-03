@@ -87,36 +87,8 @@ kubernetes_deployment:
   # Async Execution Configuration
   # Controls timeout and polling for long-running tasks
   async_config:
-    timeout: 10                          # Maximum time (in seconds) to wait for task completion
+    timeout: 3600                          # Maximum time (in seconds) to wait for task completion
     poll_interval: 5                       # How often (in seconds) to check task status
-
-  # Nginx Ingress Controller Configuration
-  # Enable and configure nginx ingress controller
-  ingress_nginx:
-    enabled: true                          # Enable nginx ingress controller
-    controller_kind: "DaemonSet"           # Deploy as DaemonSet for HA
-    controller_daemonset_enable: true      # Enable DaemonSet deployment
-    namespace: "ingress-nginx"             # Namespace for nginx ingress
-    configmap:
-      tcp-services: {}
-      udp-services: {}
-    service_type: "LoadBalancer"           # Use LoadBalancer service type
-    controller_metrics_enabled: true       # Enable prometheus metrics
-
-  # MetalLB Configuration
-  # Enable and configure MetalLB for bare metal load balancing
-  metallb:
-    enabled: true                          # Enable MetalLB
-    namespace: "metallb-system"            # Namespace for MetalLB
-    protocol: "layer2"                     # Use Layer 2 mode
-    addresses:                             # IP address pools for LoadBalancer services
-      - "<METALLB_IP_RANGE_START>-<METALLB_IP_RANGE_END>"  # Example: "192.168.1.240-192.168.1.250"
-    additional_address_pools:
-      kube_service_pool:
-        ip_range:
-          - "<METALLB_IP_RANGE_START>-<METALLB_IP_RANGE_END>"
-        protocol: "layer2"
-        auto_assign: true
 
 ###############################################################################
 # REQUIRED SETTINGS
