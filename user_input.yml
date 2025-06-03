@@ -28,7 +28,7 @@ kubernetes_deployment:
   # Required for Kubespray to access and configure nodes
   ssh_key_path: "/path/to/your/ssh/key.pem"  # Full path to the SSH private key file
                                             # Used to authenticate with the cluster nodes
-  default_ansible_user: "ubuntu"             # Default SSH user for all nodes
+  default_ansible_user: "<SSH_USER>"             # Default SSH user for all nodes
                                            # Common values: ubuntu (Ubuntu), ec2-user (AWS)
 
   # Control Plane Node Configuration
