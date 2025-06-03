@@ -1,9 +1,9 @@
 [all]
 {% for node in control_plane_nodes %}
-{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} {% if loop.first %}access_ip={{ kube_apiserver_ip }}{% endif %}
+{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} ip={{ node.private_ip }} access_ip={{ node.ansible_host }}
 {% endfor %}
 {% for node in worker_nodes %}
-{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }}
+{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} ip={{ node.private_ip }} access_ip={{ node.ansible_host }}
 {% endfor %}
 
 [kube_control_plane]
@@ -38,4 +38,6 @@ kube_network_plugin=calico
 container_manager=containerd
 
 # DNS mode (coredns, nodelocaldns)
-dns_mode=coredns 
+dns_mode=coredns
+
+supplementary_addresses_in_ssl_keys=[{% for node in control_plane_nodes %}"{{ node.ansible_host }}"{% if not loop.last %}, {% endif %}{% endfor %}] 
