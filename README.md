@@ -120,8 +120,9 @@ sudo ./setup_kubernetes.sh
 ```
 
 ### Step 5 Change ownership of the kubeconfig file
+```bash
 sudo chown $(whoami):$(whoami) files/kubeconfig
-
+```
 
 ### Step 6: Verify Installation
 
