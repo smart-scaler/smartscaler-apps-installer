@@ -78,26 +78,55 @@ ssh-copy-id -i ~/.ssh/k8s_rsa.pub user@node-ip
 
 Edit `user_input.yml` with your cluster configuration:
 
+### `kubernetes_deployment` Configuration
+
+This section defines the settings required to enable and configure a Kubernetes cluster deployment using Ansible.
+
+- **enabled**: Set to `true` to enable Kubernetes deployment.
+  
+#### `api_server`
+- **host**: The public IP address of the master/control plane node. Replace with the actual IP.
+- **port**: Port for the Kubernetes API server (default is 6443).
+- **secure**: Set to `true` to use HTTPS when accessing the API server.
+
+#### SSH & Ansible Settings
+- **ssh_key_path**: Absolute path to the SSH private key used to connect to the nodes.
+- **default_ansible_user**: The SSH user for all nodes unless overridden in individual node definitions.
+- **ansible_sudo_pass**: (Optional) Sudo password for Ansible. Leave blank to be prompted during playbook execution.
+
+#### `control_plane_nodes`
+List of master/control plane nodes in the cluster. Each node entry includes:
+- **name**: Friendly identifier for the node.
+- **ansible_host**: Public IP for SSH access.
+- **ansible_user**: SSH username (overrides the default if provided).
+- **ansible_become**: Enable privilege escalation (usually set to `true`).
+- **ansible_become_method**: Method used to escalate privileges (e.g., `sudo`).
+- **private_ip**: Internal/private IP used for cluster communication.
+
+> 🔧 **Note**: Replace placeholders like `YOUR_MASTER_PUBLIC_IP` and `YOUR_MASTER_PRIVATE_IP` with actual values before running the playbook.
+
+
 ```yaml
 kubernetes_deployment:
-  enabled: true                           # Enable kubernetes deployment
+  enabled: true                           # Enable or disable Kubernetes deployment via Ansible
   
   api_server:
-    host: "YOUR_MASTER_PUBLIC_IP"        # Replace with master node's public IP
-    port: 6443                           # API server port
-    secure: true                         # Use HTTPS
-  
-  ssh_key_path: "/path/to/.ssh/k8s_rsa"  # Absolute Path to SSH private key
-  default_ansible_user: "ubuntu"         # SSH username
-  ansible_sudo_pass: ""                   # Leave empty to be prompted
+    host: "YOUR_MASTER_PUBLIC_IP"        # Public IP address of the Kubernetes API server (control plane)
+    port: 6443                           # Default port for Kubernetes API server
+    secure: true                         # Set to true to use HTTPS when connecting to the API server
+
+  ssh_key_path: "/path/to/.ssh/k8s_rsa"  # Full path to the SSH private key used to access the nodes
+  default_ansible_user: "ubuntu"         # Default SSH username for Ansible to connect to nodes
+  ansible_sudo_pass: ""                  # Optional: Sudo password; leave empty to be prompted at runtime
   
   control_plane_nodes:
-    - name: "master-1"
-      ansible_host: "YOUR_MASTER_PUBLIC_IP"
-      ansible_user: "ubuntu"
-      ansible_become: true
-      ansible_become_method: "sudo"
-      private_ip: "YOUR_MASTER_PRIVATE_IP"
+    - name: "master-1"                   # Identifier name for the control plane node
+      ansible_host: "YOUR_MASTER_PUBLIC_IP"   # Public IP address of the control plane node for SSH
+      ansible_user: "ubuntu"             # SSH username for this node (overrides default if set)
+      ansible_become: true               # Enable privilege escalation (sudo) on this node
+      ansible_become_method: "sudo"      # Method used for privilege escalation
+      private_ip: "YOUR_MASTER_PRIVATE_IP"    # Private/internal IP used for cluster communication, leave blank if not available
+
   
 ```
 
