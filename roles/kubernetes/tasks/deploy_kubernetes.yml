@@ -159,8 +159,15 @@
 
 - name: Set node IP variables
   set_fact:
-    node_private_ip: "{{ item.private_ip | default(ansible_default_ipv4.address) }}"
-  loop: "{{ kubernetes_deployment.control_plane_nodes }}"
+    control_plane_ips: >-
+      {{ kubernetes_deployment.control_plane_nodes | map(attribute='private_ip') | 
+         map('default', ansible_default_ipv4.address) | list }}
+    worker_node_ips: >-
+      {{ kubernetes_deployment.worker_nodes | default([]) | map(attribute='private_ip') | 
+         map('default', ansible_default_ipv4.address) | list }}
+    first_control_plane_ip: >-
+      {{ kubernetes_deployment.control_plane_nodes[0].private_ip | 
+         default(hostvars[groups['kube_control_plane'][0]].ansible_default_ipv4.address) }}
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Run Kubespray cluster deployment
@@ -173,9 +180,9 @@
       -e "kube_apiserver_ip={{ kubernetes_deployment.api_server.host }}"
       -e "loadbalancer_apiserver={address: '{{ kubernetes_deployment.api_server.host }}', port: {{ kubernetes_deployment.api_server.port }}}"
       -e "apiserver_loadbalancer_domain_name={{ kubernetes_deployment.api_server.host }}"
-      -e "supplementary_addresses_in_ssl_keys=['{{ kubernetes_deployment.api_server.host }}', '{{ hostvars[groups['kube_control_plane'][0]].node_private_ip }}']"
-      -e "kube_apiserver_bind_address={{ hostvars[groups['kube_control_plane'][0]].node_private_ip }}"
-      -e "kube_apiserver_advertise_address={{ hostvars[groups['kube_control_plane'][0]].node_private_ip }}"
+      -e "supplementary_addresses_in_ssl_keys=['{{ kubernetes_deployment.api_server.host }}'] + {{ control_plane_ips | to_json }} + {{ worker_node_ips | to_json }}"
+      -e "kube_apiserver_bind_address={{ first_control_plane_ip }}"
+      -e "kube_apiserver_advertise_address={{ first_control_plane_ip }}"
       -e "kubernetes_deployment={{ kubernetes_deployment }}"
       --become
       --become-method={{ kubespray_become_method }}
