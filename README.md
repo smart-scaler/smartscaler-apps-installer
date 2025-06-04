@@ -271,8 +271,8 @@ locust-load-54748fd47d-tndsr   1/1     Running   0          97m
 
 ```bash
 # Port forward to access services (examples)
-kubectl port-forward -n monitoring svc/prometheus-server 9090:80
-kubectl port-forward -n smart-scaler svc/smart-scaler-inference 9900:9900
+kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
+kubectl port-forward -n nim svc/meta-llama3-8b-instruct 8000:8000
 ```
 
 ---
@@ -313,8 +313,6 @@ kubectl port-forward -n smart-scaler svc/smart-scaler-inference 9900:9900
 ### Debug Commands
 
 ```bash
-# Debug with verbose Ansible output
-sudo ansible-playbook site.yml -vvvv
 
 # Check specific namespace issues
 kubectl describe pods -n <namespace>
