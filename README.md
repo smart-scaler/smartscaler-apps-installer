@@ -142,13 +142,19 @@ export AVESHA_DOCKER_USERNAME="your_avesha_username"
 export AVESHA_DOCKER_PASSWORD="your_avesha_password"
 ```
 
-### Configuration Requirements
+### Configure user_input.yml
 
 **Important**: Set `kubernetes_deployment.enabled` to `false` in `user_input.yml` before running apps installation:
 
 ```yaml
 kubernetes_deployment:
   enabled: false  # Must be false for apps-only deployment
+
+# Required Kubeconfig Settings
+global_control_plane_ip: "YOUR_MASTER_PUBLIC_IP"         # Provide the public IP for metallb/Nginx
+global_kubeconfig: "files/kubeconfig"                    # Required: Path to kubeconfig file
+global_kubecontext: "kubernetes-admin@cluster.local"     # Required: Kubernetes context
+use_global_context: true                                 # Required: Use global context
 ```
 
 ### Required Files
