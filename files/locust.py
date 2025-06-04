@@ -189,11 +189,11 @@ class CustomShape(LoadTestShape):
         {"amplitude": 120, "rate": 20, "offset": 0},
         {"amplitude": 210, "rate": 20, "offset": 3},
         {"amplitude": 200, "rate": 20, "offset": 6},
-        {"amplitude": 120, "rate": 20, "offset": 12},
+        {"amplitude": 320, "rate": 20, "offset": 12},
     ]
 
     decay_steps = [
-        {"amplitude": 120, "rate": 20, "offset": 18},
+        {"amplitude": 320, "rate": 20, "offset": 18},
         {"amplitude": 200, "rate": 20, "offset": 24},
         {"amplitude": 210, "rate": 20, "offset": 27},
         {"amplitude": 120, "rate": 20, "offset": 30},
