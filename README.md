@@ -82,27 +82,6 @@ Edit `user_input.yml` with your cluster configuration:
 
 This section defines the settings required to enable and configure a Kubernetes cluster deployment using Ansible.
 
-- **enabled**: Set to `true` to enable Kubernetes deployment.
-  
-#### `api_server`
-- **host**: The public IP address of the master/control plane node. Replace with the actual IP.
-- **port**: Port for the Kubernetes API server (default is 6443).
-- **secure**: Set to `true` to use HTTPS when accessing the API server.
-
-#### SSH & Ansible Settings
-- **ssh_key_path**: Absolute path to the SSH private key used to connect to the nodes.
-- **default_ansible_user**: The SSH user for all nodes unless overridden in individual node definitions.
-- **ansible_sudo_pass**: (Optional) Sudo password for Ansible. Leave blank to be prompted during playbook execution.
-
-#### `control_plane_nodes`
-List of master/control plane nodes in the cluster. Each node entry includes:
-- **name**: Friendly identifier for the node.
-- **ansible_host**: Public IP for SSH access.
-- **ansible_user**: SSH username (overrides the default if provided).
-- **ansible_become**: Enable privilege escalation (usually set to `true`).
-- **ansible_become_method**: Method used to escalate privileges (e.g., `sudo`).
-- **private_ip**: Internal/private IP used for cluster communication.
-
 > 🔧 **Note**: Replace placeholders like `YOUR_MASTER_PUBLIC_IP` and `YOUR_MASTER_PRIVATE_IP` with actual values before running the playbook.
 
 
@@ -140,7 +119,11 @@ chmod +x setup_kubernetes.sh
 sudo ./setup_kubernetes.sh
 ```
 
-### Step 5: Verify Installation
+### Step 5 Change ownership of the kubeconfig file to the current user (optional but recommended)
+sudo chown $(whoami):$(whoami) files/kubeconfig
+
+
+### Step 6: Verify Installation
 
 ```bash
 # Check cluster status
@@ -174,6 +157,7 @@ export AVESHA_DOCKER_PASSWORD="your_avesha_password"
 ### Configure user_input.yml
 
 **Important**: Set `kubernetes_deployment.enabled` to `false` in `user_input.yml` before running apps installation:
+
 
 ```yaml
 kubernetes_deployment:
