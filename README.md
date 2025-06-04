@@ -257,7 +257,7 @@ keda-operator-6465596cb9-4j54h                    1/1     Running   1 (98m ago) 
 keda-operator-metrics-apiserver-dc4dd6d79-gzxpq   1/1     Running   0             98m
 
 # AI/ML
-meta-llama3-8b-instruct-pod             0/1     Pending   0          97m
+meta-llama3-8b-instruct-pod             1/1     Running   0          97m
 nim-k8s-nim-operator-7565b7477b-6d7rs   1/1     Running   0          98m
 
 # Smart Scaler
