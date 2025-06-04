@@ -246,7 +246,7 @@ helm_charts:
             memory: "90Mi"
           limits:
             cpu: "200m"
-            memory: "180Mi"
+            memory: "512Mi"
         readinessProbe:
           initialDelaySeconds: 10
           periodSeconds: 10
@@ -435,7 +435,7 @@ manifests:
   pushgateway_manifest:
     name: "pushgateway-setup"
     manifest_file: "files/pushgateway.yaml"
-    namespace: "pushgateway-system"
+    namespace: "monitoring"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
     variables:
