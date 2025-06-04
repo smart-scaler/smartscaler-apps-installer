@@ -1,5 +1,27 @@
 ---
 # Configure firewall rules for Kubernetes NVIDIA runtime communication
+- name: Check if UFW is installed
+  command: which ufw
+  register: ufw_check
+  ignore_errors: true
+  changed_when: false
+  when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+  tags: nvidia_ports
+
+- name: Set UFW availability fact
+  set_fact:
+    ufw_available: "{{ ufw_check.rc == 0 }}"
+  when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+  tags: nvidia_ports
+
+- name: Display warning if UFW is not available
+  debug:
+    msg: "WARNING: UFW is not installed. Firewall configuration will be skipped. Please ensure your firewall allows the following ports: TCP 8080, 3476, and 10250 between cluster nodes."
+  when: 
+    - kubernetes_deployment.nvidia_runtime.enabled | default(false)
+    - not ufw_available | default(false)
+  tags: nvidia_ports
+
 - name: Combine all node IPs
   set_fact:
     all_node_ips: >-
@@ -7,7 +29,9 @@
         (kubernetes_deployment.control_plane_nodes | map(attribute='ansible_host') | list) +
         (kubernetes_deployment.worker_nodes | default([]) | map(attribute='ansible_host') | list)
       }}
-  when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+  when: 
+    - kubernetes_deployment.nvidia_runtime.enabled | default(false)
+    - ufw_available | default(false)
   tags: nvidia_ports
 
 - name: Configure NVIDIA Container Runtime ports
@@ -18,7 +42,9 @@
     proto: tcp
     comment: "NVIDIA Container Runtime"
   loop: "{{ all_node_ips | product(['8080', '3476']) | list }}"
-  when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+  when: 
+    - kubernetes_deployment.nvidia_runtime.enabled | default(false)
+    - ufw_available | default(false)
   delegate_to: "{{ inventory_hostname }}"
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
@@ -36,7 +62,9 @@
     proto: tcp
     comment: "Containerd for NVIDIA Runtime"
   loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
-  when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+  when: 
+    - kubernetes_deployment.nvidia_runtime.enabled | default(false)
+    - ufw_available | default(false)
   delegate_to: "{{ item.ansible_host }}"
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
@@ -44,11 +72,14 @@
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8
+  tags: nvidia_ports
 
 - name: Reload UFW
   ufw:
     state: reloaded
-  when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+  when: 
+    - kubernetes_deployment.nvidia_runtime.enabled | default(false)
+    - ufw_available | default(false)
   delegate_to: "{{ item.ansible_host }}"
   loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
   vars:
@@ -56,4 +87,4 @@
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
   environment:
     LC_ALL: C.UTF-8
-    LANG: C.UTF-8 
+    LANG: C.UTF-8
