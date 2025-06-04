@@ -157,18 +157,32 @@
       API Server will remain accessible on public IP: {{ kubernetes_deployment.api_server.host }}:{{ kubernetes_deployment.api_server.port }}
   when: kubernetes_deployment.enabled | default(false)
 
+- name: Set node IP variables
+  set_fact:
+    control_plane_ips: >-
+      {{ kubernetes_deployment.control_plane_nodes | map(attribute='private_ip') | 
+         map('default', ansible_default_ipv4.address) | list }}
+    worker_node_ips: >-
+      {{ kubernetes_deployment.worker_nodes | default([]) | map(attribute='private_ip') | 
+         map('default', ansible_default_ipv4.address) | list }}
+    first_control_plane_ip: >-
+      {{ kubernetes_deployment.control_plane_nodes[0].private_ip | 
+         default(hostvars[groups['kube_control_plane'][0]].ansible_default_ipv4.address) }}
+  when: kubernetes_deployment.enabled | default(false)
+
 - name: Run Kubespray cluster deployment
   command:
     cmd: >
       ansible-playbook -i {{ inventory_dir }}/kubespray/inventory.ini
       {{ kubespray_dir }}/cluster.yml
       -e @{{ inventory_dir }}/kubespray/group_vars/all/all.yml
-      -e @{{ inventory_dir }}/kubespray/group_vars/all/api_server.yml
       -e @{{ inventory_dir }}/kubespray/group_vars/k8s_cluster/addons.yml
       -e "kube_apiserver_ip={{ kubernetes_deployment.api_server.host }}"
       -e "loadbalancer_apiserver={address: '{{ kubernetes_deployment.api_server.host }}', port: {{ kubernetes_deployment.api_server.port }}}"
       -e "apiserver_loadbalancer_domain_name={{ kubernetes_deployment.api_server.host }}"
-      -e "supplementary_addresses_in_ssl_keys=['{{ kubernetes_deployment.api_server.host }}']"
+      -e "supplementary_addresses_in_ssl_keys=['{{ kubernetes_deployment.api_server.host }}'] + {{ control_plane_ips | to_json }} + {{ worker_node_ips | to_json }}"
+      -e "kube_apiserver_bind_address={{ first_control_plane_ip }}"
+      -e "kube_apiserver_advertise_address={{ first_control_plane_ip }}"
       -e "kubernetes_deployment={{ kubernetes_deployment }}"
       --become
       --become-method={{ kubespray_become_method }}

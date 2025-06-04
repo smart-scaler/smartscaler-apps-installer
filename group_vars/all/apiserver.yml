@@ -1,0 +1,16 @@
+---
+# Configure API server to listen on both internal and external IPs
+apiserver_extra_vars:
+  # Add both internal and external IPs to bind addresses
+  kube_apiserver_bind_address: "{{ ansible_default_ipv4_address }}"
+  kube_apiserver_advertise_address: "{{ ansible_default_ipv4_address }}"
+  # Add both IPs to the certificate SANs
+  supplementary_addresses_in_ssl_keys: 
+    - "{{ kubernetes_deployment.api_server.host }}"  # Public IP from user input
+    - "{{ ansible_default_ipv4_address }}"          # Private IP from node
+  # Configure the API server endpoint
+  kubeadm_config_api_fqdn: "{{ kubernetes_deployment.api_server.host }}"
+  # Configure loadbalancer settings from user input
+  loadbalancer_apiserver:
+    address: "{{ kubernetes_deployment.api_server.host }}"
+    port: "{{ kubernetes_deployment.api_server.port }}" 
