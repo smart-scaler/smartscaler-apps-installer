@@ -267,12 +267,6 @@ kubectl port-forward -n smart-scaler svc/smart-scaler-inference 9900:9900
 
 ## Documentation Links
 
-### Core Guides
-- **[Advanced Configuration Guide](docs/advanced-configuration.md)** - Detailed configuration options
-- **[Additional Applications](docs/additional-applications.md)** - Optional application configurations
-- **[Theoretical Background](docs/theoretical-background.md)** - Architecture and concepts
-
-### Existing Documentation
 - **[User Input Configuration Guide](docs/USER_INPUT_CONFIGURATION.md)** - Complete user_input.yml guide
 - **[User Input Reference](docs/USER_INPUT_REFERENCE.md)** - All configuration options
 - **[Kubernetes Configuration](docs/KUBERNETES_CONFIGURATION.md)** - Cluster setup details
