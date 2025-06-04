@@ -2,7 +2,7 @@
 # Configure etcd to listen on both internal and external IPs
 etcd_extra_vars:
   # Add both internal and external IPs to listen addresses
-  ETCD_LISTEN_CLIENT_URLS: "https://{{ ansible_default_ipv4_address }}:2379,https://127.0.0.1:2379,https://{{ ansible_host }}:2379"
-  ETCD_ADVERTISE_CLIENT_URLS: "https://{{ ansible_default_ipv4_address }}:2379,https://{{ ansible_host }}:2379"
-  ETCD_LISTEN_PEER_URLS: "https://{{ ansible_default_ipv4_address }}:2380"
-  ETCD_INITIAL_ADVERTISE_PEER_URLS: "https://{{ ansible_default_ipv4_address }}:2380" 
+  ETCD_LISTEN_CLIENT_URLS: "https://{{ item.private_ip | default(ansible_default_ipv4_address) }}:2379,https://127.0.0.1:2379,https://{{ ansible_host }}:2379"
+  ETCD_ADVERTISE_CLIENT_URLS: "https://{{ item.private_ip | default(ansible_default_ipv4_address) }}:2379,https://{{ ansible_host }}:2379"
+  ETCD_LISTEN_PEER_URLS: "https://{{ item.private_ip | default(ansible_default_ipv4_address) }}:2380"
+  ETCD_INITIAL_ADVERTISE_PEER_URLS: "https://{{ item.private_ip | default(ansible_default_ipv4_address) }}:2380" 
