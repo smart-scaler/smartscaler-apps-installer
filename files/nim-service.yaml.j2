@@ -1,26 +1,26 @@
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
-  name: {{ nim_service_name | default('meta-llama3-8b-instruct') }}
-  namespace: {{ nim_service_namespace | default('nim') }}
-{% if nim_service_labels is defined %}
+  name: {{ manifest_vars.nim_service_name | default('meta-llama3-8b-instruct') }}
+  namespace: {{ manifest_vars.nim_service_namespace | default('nim') }}
+{% if manifest_vars.nim_service_labels is defined %}
   labels:
-{% for key, value in nim_service_labels.items() %}
+{% for key, value in manifest_vars.nim_service_labels.items() %}
     {{ key }}: "{{ value }}"
 {% endfor %}
 {% endif %}
 spec:
-{% if nim_service_env is defined %}
+{% if manifest_vars.nim_service_env is defined %}
   env:
-{% for env in nim_service_env %}
+{% for env in manifest_vars.nim_service_env %}
     - name: {{ env.name }}
       value: "{{ env.value }}"
 {% endfor %}
 {% endif %}
-  runtimeClassName: {{ nim_service_runtime_class | default('nvidia') }}
-{% if nim_service_tolerations is defined %}
+  runtimeClassName: {{ manifest_vars.nim_service_runtime_class | default('nvidia') }}
+{% if manifest_vars.nim_service_tolerations is defined %}
   tolerations:
-{% for toleration in nim_service_tolerations %}
+{% for toleration in manifest_vars.nim_service_tolerations %}
     - key: "{{ toleration.key | default('nvidia.com/gpu') }}"
       operator: "{{ toleration.operator | default('Exists') }}"
       effect: "{{ toleration.effect | default('NoSchedule') }}"
@@ -35,26 +35,26 @@ spec:
       effect: "NoSchedule"
 {% endif %}
   image:
-    repository: {{ nim_service_image_repository | default('nvcr.io/nim/meta/llama-3.1-8b-instruct') }}
-    tag: {{ nim_service_image_tag | default('1.8.4') }}
-    pullPolicy: {{ nim_service_image_pull_policy | default('IfNotPresent') }}
-{% if nim_service_image_pull_secrets is defined %}
+    repository: {{ manifest_vars.nim_service_image_repository | default('nvcr.io/nim/meta/llama-3.1-8b-instruct') }}
+    tag: {{ manifest_vars.nim_service_image_tag | default('1.8.4') }}
+    pullPolicy: {{ manifest_vars.nim_service_image_pull_policy | default('IfNotPresent') }}
+{% if manifest_vars.nim_service_image_pull_secrets is defined %}
     pullSecrets:
-{% for secret in nim_service_image_pull_secrets %}
+{% for secret in manifest_vars.nim_service_image_pull_secrets %}
       - {{ secret }}
 {% endfor %}
 {% else %}
     pullSecrets:
       - ngc-secret
 {% endif %}
-  authSecret: {{ nim_service_auth_secret | default('ngc-api-secret') }}
-{% if nim_service_metrics is defined %}
+  authSecret: {{ manifest_vars.nim_service_auth_secret | default('ngc-api-secret') }}
+{% if manifest_vars.nim_service_metrics is defined %}
   metrics:
-    enabled: {{ nim_service_metrics.enabled | default(true) }}
-{% if nim_service_metrics.service_monitor is defined %}
+    enabled: {{ manifest_vars.nim_service_metrics.enabled | default(true) }}
+{% if manifest_vars.nim_service_metrics.service_monitor is defined %}
     serviceMonitor:
       additionalLabels:
-{% for key, value in nim_service_metrics.service_monitor.additional_labels.items() %}
+{% for key, value in manifest_vars.nim_service_metrics.service_monitor.additional_labels.items() %}
         {{ key }}: {{ value }}
 {% endfor %}
 {% endif %}
@@ -67,20 +67,20 @@ spec:
 {% endif %}
   storage:
     nimCache:
-      name: {{ nim_service_storage_cache_name | default('meta-llama3-8b-instruct') }}
-      profile: {{ nim_service_storage_cache_profile | default('4f904d571fe60ff24695b5ee2aa42da58cb460787a968f1e8a09f5a7e862728d') }}
-  replicas: {{ nim_service_replicas | default(1) }}
-{% if nim_service_resources is defined %}
+      name: {{ manifest_vars.nim_service_storage_cache_name | default('meta-llama3-8b-instruct') }}
+      profile: {{ manifest_vars.nim_service_storage_cache_profile | default('4f904d571fe60ff24695b5ee2aa42da58cb460787a968f1e8a09f5a7e862728d') }}
+  replicas: {{ manifest_vars.nim_service_replicas | default(1) }}
+{% if manifest_vars.nim_service_resources is defined %}
   resources:
-{% if nim_service_resources.requests is defined %}
+{% if manifest_vars.nim_service_resources.requests is defined %}
     requests:
-{% for resource, value in nim_service_resources.requests.items() %}
+{% for resource, value in manifest_vars.nim_service_resources.requests.items() %}
       {{ resource }}: {{ value }}
 {% endfor %}
 {% endif %}
-{% if nim_service_resources.limits is defined %}
+{% if manifest_vars.nim_service_resources.limits is defined %}
     limits:
-{% for resource, value in nim_service_resources.limits.items() %}
+{% for resource, value in manifest_vars.nim_service_resources.limits.items() %}
       {{ resource }}: {{ value }}
 {% endfor %}
 {% endif %}
@@ -91,5 +91,5 @@ spec:
 {% endif %}
   expose:
     service:
-      type: {{ nim_service_expose_type | default('ClusterIP') }}
-      port: {{ nim_service_expose_port | default(8000) }} 
+      type: {{ manifest_vars.nim_service_expose_type | default('ClusterIP') }}
+      port: {{ manifest_vars.nim_service_expose_port | default(8000) }} 

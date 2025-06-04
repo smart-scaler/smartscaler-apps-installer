@@ -1,8 +1,8 @@
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
-  name: first-pool
-  namespace: metallb
+  name: {{ manifest_vars.metallb_pool_name | default('first-pool') }}
+  namespace: {{ manifest_vars.metallb_namespace | default('metallb') }}
 spec:
   addresses:
-  - 172.18.1.1-172.18.1.16 
+  - {{ manifest_vars.metallb_address_range | default('172.18.1.1-172.18.1.16') }}
