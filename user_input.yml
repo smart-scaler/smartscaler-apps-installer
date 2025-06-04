@@ -294,7 +294,8 @@ helm_charts:
     chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
     dependencies: []  # Can start independently
 
-  # OPTIONAL: Prometheus Stack
+
+# OPTIONAL: Prometheus Stack
   prometheus_stack:
     release_name: "prometheus"
     chart_ref: "kube-prometheus-stack"
@@ -309,6 +310,14 @@ helm_charts:
       prometheus:
         prometheusSpec:
           retention: "15d"
+          storageSpec:
+            volumeClaimTemplate:
+              spec:
+                storageClassName: local-path
+                accessModes: ["ReadWriteOnce"]
+                resources:
+                  requests:
+                    storage: 1Gi
           additionalScrapeConfigs:
             - job_name: "gpu-metrics"
               scrape_interval: "1s"
