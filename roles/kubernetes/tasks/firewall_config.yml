@@ -8,6 +8,7 @@
         (kubernetes_deployment.worker_nodes | default([]) | map(attribute='ansible_host') | list)
       }}
   when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
+  tags: nvidia_ports
 
 - name: Configure NVIDIA Container Runtime ports
   ufw:
@@ -25,6 +26,7 @@
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8
+  tags: nvidia_ports
 
 - name: Allow containerd communication
   ufw:
