@@ -45,7 +45,7 @@
     src: "{{ item.manifest_file }}"
     dest: "/tmp/{{ item.name }}-rendered-manifest.yaml"
   vars:
-    namespace: "{{ item.variables.namespace | default('default') }}"
+    manifest_vars: "{{ item.variables | default({}) }}"
   when: item.manifest_file is defined and item.manifest_file != None
   register: temp_rendered_manifest
 

@@ -1,8 +1,8 @@
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
-  name: l2
-  namespace: metallb
+  name: {{ manifest_vars.metallb_l2_name | default('l2') }}
+  namespace: {{ manifest_vars.metallb_namespace | default('metallb') }}
 spec:
   ipAddressPools:
-  - first-pool 
+  - {{ manifest_vars.metallb_pool_name | default('first-pool') }} 

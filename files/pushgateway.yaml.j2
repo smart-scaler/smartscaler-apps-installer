@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ manifest_vars.pushgateway_name | default('pushgateway') }}
+  namespace: {{ manifest_vars.pushgateway_namespace | default('monitoring') }}
+  labels:
+    function: pushgateway
+spec:
+  replicas: {{ manifest_vars.pushgateway_replicas | default(1) }}
+  selector:
+    matchLabels:
+      function: pushgateway
+  template:
+    metadata:
+      labels:
+        function: pushgateway
+    spec:
+      containers:
+      - name: pushgateway
+        image: {{ manifest_vars.pushgateway_image | default('prom/pushgateway') }}
+        imagePullPolicy: {{ manifest_vars.pushgateway_image_pull_policy | default('IfNotPresent') }}
+        ports:
+        - name: metrics
+          containerPort: {{ manifest_vars.pushgateway_service_port | default(9091) }}
+        resources:
+          requests:
+            cpu: {{ manifest_vars.pushgateway_resources_requests_cpu | default('100m') }}
+            memory: {{ manifest_vars.pushgateway_resources_requests_memory | default('64Mi') }}
+          limits:
+            cpu: {{ manifest_vars.pushgateway_resources_limits_cpu | default('200m') }}
+            memory: {{ manifest_vars.pushgateway_resources_limits_memory | default('128Mi') }}
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: metrics
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: metrics
+          initialDelaySeconds: 15
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ manifest_vars.pushgateway_service_name | default('pushgateway') }}
+  namespace: {{ manifest_vars.pushgateway_namespace | default('monitoring') }}
+  labels:
+    function: 'pushgateway-target'
+spec:
+  type: {{ manifest_vars.pushgateway_service_type | default('ClusterIP') }}
+  selector:
+    function: 'pushgateway'
+  ports:
+    # 'name' is important, it will be referred by ServiceMonitor configuration
+    - name: 'pushgateway'
+      protocol: {{ manifest_vars.pushgateway_service_protocol | default('TCP') }}
+      port: {{ manifest_vars.pushgateway_service_port | default(9091) }}
+      targetPort: {{ manifest_vars.pushgateway_service_target_port | default(9091) }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ manifest_vars.pushgateway_monitor_name | default('pushgateway') }}
+  namespace: {{ manifest_vars.pushgateway_namespace | default('monitoring') }}
+  labels:
+    release: {{ manifest_vars.pushgateway_monitor_release | default('prometheus') }}
+spec:
+  endpoints:
+  - port: 'pushgateway' # must match the label from Service declaration
+    path: {{ manifest_vars.pushgateway_monitor_path | default('/metrics') }}
+    interval: {{ manifest_vars.pushgateway_monitor_interval | default('5s') }}
+  namespaceSelector:
+    matchNames:
+    - {{ manifest_vars.pushgateway_namespace | default('monitoring') }}
+  selector:
+    matchLabels:
+      function: 'pushgateway-target' 
