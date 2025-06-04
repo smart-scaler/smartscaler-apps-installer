@@ -119,7 +119,7 @@ chmod +x setup_kubernetes.sh
 sudo ./setup_kubernetes.sh
 ```
 
-### Step 5 Change ownership of the kubeconfig file to the current user (optional but recommended)
+### Step 5 Change ownership of the kubeconfig file
 sudo chown $(whoami):$(whoami) files/kubeconfig
 
 
