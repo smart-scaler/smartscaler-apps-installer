@@ -18,7 +18,7 @@
     comment: "NVIDIA Container Runtime"
   loop: "{{ all_node_ips | product(['8080', '3476']) | list }}"
   when: kubernetes_deployment.nvidia_runtime.enabled | default(false)
-  delegate_to: "{{ hostvars[inventory_hostname].ansible_host }}"
+  delegate_to: "{{ inventory_hostname }}"
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
