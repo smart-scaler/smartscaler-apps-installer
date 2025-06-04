@@ -125,7 +125,7 @@ kubernetes_deployment:
       ansible_user: "ubuntu"             # SSH username for this node (overrides default if set)
       ansible_become: true               # Enable privilege escalation (sudo) on this node
       ansible_become_method: "sudo"      # Method used for privilege escalation
-      private_ip: "YOUR_MASTER_PRIVATE_IP"    # Private/internal IP used for cluster communication, leave blank if not available
+      private_ip: "YOUR_MASTER_PRIVATE_IP"    # Private/internal IP used for cluster communication, use same public ip if not available
 
   
 ```
