@@ -92,7 +92,7 @@ kubernetes_deployment:
     port: 6443                           # Default port for Kubernetes API server
     secure: true                         # Set to true to use HTTPS when connecting to the API server
 
-  ssh_key_path: "/path/to/.ssh/k8s_rsa"  # Full path to the SSH private key used to access the nodes
+  ssh_key_path: "/absolute/path/to/.ssh/k8s_rsa"  # Full path to the SSH private key used to access the nodes
   default_ansible_user: "ubuntu"         # Default SSH username for Ansible to connect to nodes
   ansible_sudo_pass: ""                  # Optional: Sudo password; leave empty to be prompted at runtime
   
