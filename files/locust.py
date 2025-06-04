@@ -185,18 +185,31 @@ from math import exp
 
 class CustomShape(LoadTestShape):
     # Define growth and decay steps
-    growth_steps = [
-        {"amplitude": 120, "rate": 20, "offset": 0},
-        {"amplitude": 210, "rate": 20, "offset": 3},
-        {"amplitude": 200, "rate": 20, "offset": 6},
-        {"amplitude": 320, "rate": 20, "offset": 12},
-    ]
+    # growth_steps = [
+    #     {"amplitude": 120, "rate": 20, "offset": 0},
+    #     {"amplitude": 210, "rate": 20, "offset": 3},
+    #     {"amplitude": 200, "rate": 20, "offset": 6},
+    #     {"amplitude": 320, "rate": 20, "offset": 12},
+    # ]
 
+    # decay_steps = [
+    #     {"amplitude": 320, "rate": 20, "offset": 18},
+    #     {"amplitude": 200, "rate": 20, "offset": 24},
+    #     {"amplitude": 210, "rate": 20, "offset": 27},
+    #     {"amplitude": 120, "rate": 20, "offset": 30},
+    # ]
+
+    growth_steps = [
+        {"amplitude": 300, "rate": 20, "offset": 0},
+        {"amplitude": 525, "rate": 20, "offset": 3},
+        {"amplitude": 500, "rate": 20, "offset": 6},
+        {"amplitude": 800, "rate": 20, "offset": 12},
+    ]
     decay_steps = [
-        {"amplitude": 320, "rate": 20, "offset": 18},
-        {"amplitude": 200, "rate": 20, "offset": 24},
-        {"amplitude": 210, "rate": 20, "offset": 27},
-        {"amplitude": 120, "rate": 20, "offset": 30},
+        {"amplitude": 800, "rate": 20, "offset": 18},
+        {"amplitude": 500, "rate": 20, "offset": 24},
+        {"amplitude": 525, "rate": 20, "offset": 27},
+        {"amplitude": 300, "rate": 20, "offset": 30},
     ]
 
     def safe_exp(self, x):
