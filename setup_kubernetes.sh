@@ -132,10 +132,26 @@ try:
     env = Environment(loader=FileSystemLoader('templates'))
     template = env.get_template('inventory.ini.j2')
 
+    # Process nodes to ensure they have private_ip
+    def process_nodes(nodes):
+        for node in nodes:
+            if 'private_ip' not in node:
+                print(f"Warning: private_ip not found for node {node['name']}, using ansible_host as private_ip", file=sys.stderr)
+                node['private_ip'] = node['ansible_host']
+        return nodes
+
+    # Get node configurations
+    control_plane_nodes = user_input['kubernetes_deployment']['control_plane_nodes']
+    worker_nodes = user_input['kubernetes_deployment'].get('worker_nodes', [])
+
+    # Process both control plane and worker nodes
+    control_plane_nodes = process_nodes(control_plane_nodes)
+    worker_nodes = process_nodes(worker_nodes)
+
     # Prepare template variables
     template_vars = {
-        'control_plane_nodes': user_input['kubernetes_deployment']['control_plane_nodes'],
-        'worker_nodes': user_input['kubernetes_deployment'].get('worker_nodes', []),
+        'control_plane_nodes': control_plane_nodes,
+        'worker_nodes': worker_nodes,
         'ssh_key_path': os.path.expanduser(user_input['kubernetes_deployment']['ssh_key_path']),
         'default_ansible_user': user_input['kubernetes_deployment']['default_ansible_user'],
         'kubernetes_deployment': user_input['kubernetes_deployment']
@@ -153,13 +169,13 @@ try:
     print("\nControl Plane Nodes:")
     for node in template_vars['control_plane_nodes']:
         user = node.get('ansible_user', template_vars['default_ansible_user'])
-        print(f"  - {node['name']}: {node['ansible_host']} (user: {user})")
+        print(f"  - {node['name']}: Public IP: {node['ansible_host']}, Private IP: {node['private_ip']} (user: {user})")
 
     if template_vars['worker_nodes']:
         print("\nWorker Nodes:")
         for node in template_vars['worker_nodes']:
             user = node.get('ansible_user', template_vars['default_ansible_user'])
-            print(f"  - {node['name']}: {node['ansible_host']} (user: {user})")
+            print(f"  - {node['name']}: Public IP: {node['ansible_host']}, Private IP: {node['private_ip']} (user: {user})")
 
 except FileNotFoundError as e:
     print(f"Error: File not found - {str(e)}", file=sys.stderr)
