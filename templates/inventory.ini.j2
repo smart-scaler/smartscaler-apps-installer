@@ -1,9 +1,9 @@
 [all]
 {% for node in control_plane_nodes %}
-{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} access_ip={{ node.private_ip }} ansible_default_ipv4={'address': '{{ node.private_ip }}'}
+{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} access_ip={{ node.private_ip }} ansible_default_ipv4_address={{ node.private_ip }}
 {% endfor %}
 {% for node in worker_nodes %}
-{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} access_ip={{ node.private_ip }} ansible_default_ipv4={'address': '{{ node.private_ip }}'}
+{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} access_ip={{ node.private_ip }} ansible_default_ipv4_address={{ node.private_ip }}
 {% endfor %}
 
 [kube_control_plane]
