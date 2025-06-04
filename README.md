@@ -78,8 +78,6 @@ ssh-copy-id -i ~/.ssh/k8s_rsa.pub user@node-ip
 
 Edit `user_input.yml` with your cluster configuration:
 
-### `kubernetes_deployment` Configuration
-
 This section defines the settings required to enable and configure a Kubernetes cluster deployment using Ansible.
 
 > 🔧 **Note**: Replace placeholders like `YOUR_MASTER_PUBLIC_IP` and `YOUR_MASTER_PRIVATE_IP` with actual values before running the playbook.
