@@ -87,7 +87,7 @@ kubernetes_deployment:
     port: 6443                           # API server port
     secure: true                         # Use HTTPS
   
-  ssh_key_path: "/path/to/.ssh/k8s_rsa"  # Path to SSH private key
+  ssh_key_path: "/path/to/.ssh/k8s_rsa"  # Absolute Path to SSH private key
   default_ansible_user: "ubuntu"         # SSH username
   ansible_sudo_pass: ""                   # Leave empty to be prompted
   
