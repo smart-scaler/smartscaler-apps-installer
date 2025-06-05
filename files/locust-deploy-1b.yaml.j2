@@ -24,7 +24,7 @@ spec:
             - "/locust/locustfile.py"
             - "--headless"
             - "--host"
-            - "{{ manifest_vars.locust_target_host | default('http://meta-llama3-8b-instruct.nim.svc.cluster.local:8000') }}"
+            - "{{ manifest_vars.locust_target_host | default('http://meta-llama3-1b-instruct.nim.svc.cluster.local:8000') }}"
           volumeMounts:
             - name: locustfile
               mountPath: /locust
