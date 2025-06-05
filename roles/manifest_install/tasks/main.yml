@@ -47,7 +47,7 @@
   when: item.manifest_file is defined and item.manifest_file != None
   register: temp_rendered_manifest
   vars:
-    manifest_variables: "{{ item.variables | default({}) }}"
+    manifest_vars: "{{ item.variables | default({}) }}"
 
 - name: Apply manifest from file
   kubernetes.core.k8s:

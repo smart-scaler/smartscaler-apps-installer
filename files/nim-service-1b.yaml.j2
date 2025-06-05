@@ -68,7 +68,7 @@ spec:
   storage:
     nimCache:
       name: {{ manifest_vars.nim_service_storage_cache_name | default('meta-llama3-1b-instruct') }}
-      profile: {{ manifest_vars.nim_service_storage_cache_profile | default('8b87146e39b0305ae1d73bc053564d1b4b4c565f81aa5abe3e84385544ca9b60') }}
+      profile: {{ manifest_vars.nim_service_storage_cache_profile | default('') }}
   replicas: {{ manifest_vars.nim_service_replicas | default(1) }}
 {% if manifest_vars.nim_service_resources is defined %}
   resources:
