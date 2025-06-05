@@ -21,4 +21,4 @@ spec:
         serverAddress: {{ manifest_vars.keda_scaled_object_prometheus_address | default('http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090') }}
         metricName: {{ manifest_vars.keda_scaled_object_metric_name | default('smartscaler_hpa_num_pods') }}
         threshold: '{{ manifest_vars.keda_scaled_object_threshold | default("1") }}'
-        query: {{ manifest_vars.keda_scaled_object_query | default('smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-8b-instruct-8b"}') }} 
+        query: {{ manifest_vars.keda_scaled_object_query | default('smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-8b-instruct"}') }} 
