@@ -120,6 +120,12 @@ sudo ./setup_kubernetes.sh
 ### Step 5 Change ownership of the kubeconfig file
 ```bash
 sudo chown $(whoami):$(whoami) files/kubeconfig
+
+# Set the KUBECONFIG environment variable
+export KUBECONFIG=files/kubeconfig
+
+# Verify cluster access and node status
+kubectl get nodes
 ```
 
 ### Step 6: Verify Installation
