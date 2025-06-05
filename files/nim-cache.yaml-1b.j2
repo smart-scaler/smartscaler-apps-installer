@@ -29,7 +29,7 @@ spec:
 {% endif %}
   source:
     ngc:
-      modelPuller: "{{ manifest_vars.nim_cache_model_puller | default('nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8.4') }}"
+      modelPuller: "{{ manifest_vars.nim_cache_model_puller | default('nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8.5') }}"
       pullSecret: "{{ manifest_vars.nim_cache_pull_secret | default('ngc-secret') }}"
       authSecret: "{{ manifest_vars.nim_cache_auth_secret | default('ngc-api-secret') }}"
       model:

@@ -54,7 +54,7 @@
                         "meta-llama3-1b-instruct": {
                             "service_labels": {
                                 "ss_namespace": "nim",
-                                "ss_deployment_name": "meta-llama3-1b-instruct-1b",
+                                "ss_deployment_name": "meta-llama3-1b-instruct",
                                 "ss_cluster_name": "nim-llama"
                             },
                             "metrics_config": {

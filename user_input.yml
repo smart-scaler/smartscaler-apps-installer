@@ -507,7 +507,7 @@ manifests:
     validate: true
     strict_validation: true
     variables:
-      nim_cache_name: "meta-llama3-1b-instruct-1b"
+      nim_cache_name: "meta-llama3-1b-instruct"
       nim_cache_namespace: "nim"
       nim_cache_runtime_class: "nvidia"
       nim_cache_tolerations:
@@ -542,7 +542,7 @@ manifests:
     validate: true
     strict_validation: true
     variables:
-      nim_service_name: "meta-llama3-1b-instruct-1b"
+      nim_service_name: "meta-llama3-1b-instruct"
       nim_service_namespace: "nim"
       nim_service_runtime_class: "nvidia"
       nim_service_env:
@@ -569,7 +569,7 @@ manifests:
         service_monitor:
           additional_labels:
             release: "prometheus"
-      nim_service_storage_cache_name: "meta-llama3-1b-instruct-1b"
+      nim_service_storage_cache_name: "meta-llama3-1b-instruct"
       nim_service_storage_cache_profile: "" #TODO: change to 1b profile
       nim_service_replicas: 1
       nim_service_resources:
@@ -594,7 +594,7 @@ manifests:
     variables:
       keda_scaled_object_name: "llm-demo-keda-1b"
       keda_scaled_object_namespace: "nim"
-      keda_scaled_object_target_name: "meta-llama3-1b-instruct-1b"
+      keda_scaled_object_target_name: "meta-llama3-1b-instruct"
       keda_scaled_object_polling_interval: 30
       keda_scaled_object_min_replicas: 1
       keda_scaled_object_max_replicas: 8
@@ -602,7 +602,7 @@ manifests:
       keda_scaled_object_metric_name: "smartscaler_hpa_num_pods"
       keda_scaled_object_threshold: "1"
       keda_scaled_object_query: >-
-        smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-1b-instruct-1b"}
+        smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-1b-instruct"}
 
   smart_scaler_inference_1b:
     name: smart-scaler-inference-setup_1b
@@ -667,7 +667,7 @@ manifests:
       locust_namespace: "nim-load-test"
       locust_replicas: 1
       locust_image: "locustio/locust:2.15.1"
-      locust_target_host: "http://meta-llama3-1b-instruct-1b.nim.svc.cluster.local:8000"
+      locust_target_host: "http://meta-llama3-1b-instruct.nim.svc.cluster.local:8000"
       locust_cpu_request: "1"
       locust_memory_request: "1Gi"
       locust_cpu_limit: "2"
@@ -689,7 +689,7 @@ manifests:
     validate: true
     strict_validation: true
     variables:
-      nim_cache_name: "meta-llama3-8b-instruct-8b"
+      nim_cache_name: "meta-llama3-8b-instruct"
       nim_cache_namespace: "nim"
       nim_cache_runtime_class: "nvidia"
       nim_cache_tolerations:
@@ -724,7 +724,7 @@ manifests:
     validate: true
     strict_validation: true
     variables:
-      nim_service_name: "meta-llama3-8b-instruct-8b"
+      nim_service_name: "meta-llama3-8b-instruct"
       nim_service_namespace: "nim"
       nim_service_runtime_class: "nvidia"
       nim_service_env:
@@ -751,7 +751,7 @@ manifests:
         service_monitor:
           additional_labels:
             release: "prometheus"
-      nim_service_storage_cache_name: "meta-llama3-8b-instruct-8b"
+      nim_service_storage_cache_name: "meta-llama3-8b-instruct"
       nim_service_storage_cache_profile: "4f904d571fe60ff24695b5ee2aa42da58cb460787a968f1e8a09f5a7e862728d"
       nim_service_replicas: 1
       nim_service_resources:
@@ -776,7 +776,7 @@ manifests:
     variables:
       keda_scaled_object_name: "llm-demo-keda-8b"
       keda_scaled_object_namespace: "nim"
-      keda_scaled_object_target_name: "meta-llama3-8b-instruct-8b"
+      keda_scaled_object_target_name: "meta-llama3-8b-instruct"
       keda_scaled_object_polling_interval: 30
       keda_scaled_object_min_replicas: 1
       keda_scaled_object_max_replicas: 8
@@ -784,7 +784,7 @@ manifests:
       keda_scaled_object_metric_name: "smartscaler_hpa_num_pods"
       keda_scaled_object_threshold: "1"
       keda_scaled_object_query: 
-        smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-8b-instruct-8b"}
+        smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-8b-instruct"}
 
   smart_scaler_inference_8b:
     name: smart-scaler-inference-setup_8b
@@ -849,7 +849,7 @@ manifests:
       locust_namespace: "nim-load-test"
       locust_replicas: 1
       locust_image: "locustio/locust:2.15.1"
-      locust_target_host: "http://meta-llama3-8b-instruct-8b.nim.svc.cluster.local:8000"
+      locust_target_host: "http://meta-llama3-8b-instruct.nim.svc.cluster.local:8000"
       locust_cpu_request: "1"
       locust_memory_request: "1Gi"
       locust_cpu_limit: "2"
@@ -872,7 +872,7 @@ manifests:
     validate: true
     strict_validation: true
     variables:
-      nim_cache_name: "meta-llama3-70b-instruct-70b"
+      nim_cache_name: "meta-llama3-70b-instruct"
       nim_cache_namespace: "nim"
       nim_cache_runtime_class: "nvidia"
       nim_cache_tolerations:
@@ -907,7 +907,7 @@ manifests:
     validate: true
     strict_validation: true
     variables:
-      nim_service_name: "meta-llama3-70b-instruct-70b"
+      nim_service_name: "meta-llama3-70b-instruct"
       nim_service_namespace: "nim"
       nim_service_runtime_class: "nvidia"
       nim_service_env:
@@ -934,7 +934,7 @@ manifests:
         service_monitor:
           additional_labels:
             release: "prometheus"
-      nim_service_storage_cache_name: "meta-llama3-70b-instruct-70b"
+      nim_service_storage_cache_name: "meta-llama3-70b-instruct"
       nim_service_storage_cache_profile: "8b87146e39b0305ae1d73bc053564d1b4b4c565f81aa5abe3e84385544ca9b60"
       nim_service_replicas: 1
       nim_service_resources:
@@ -959,7 +959,7 @@ manifests:
     variables:
       keda_scaled_object_name: "llm-demo-keda-70b"
       keda_scaled_object_namespace: "nim"
-      keda_scaled_object_target_name: "meta-llama3-70b-instruct-70b"
+      keda_scaled_object_target_name: "meta-llama3-70b-instruct"
       keda_scaled_object_polling_interval: 30
       keda_scaled_object_min_replicas: 1
       keda_scaled_object_max_replicas: 8
@@ -967,7 +967,7 @@ manifests:
       keda_scaled_object_metric_name: "smartscaler_hpa_num_pods"
       keda_scaled_object_threshold: "1"
       keda_scaled_object_query: 
-        smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-70b-instruct-70b"}
+        smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-70b-instruct"}
 
   smart_scaler_inference_70b:
     name: smart-scaler-inference-setup_70b
@@ -1032,7 +1032,7 @@ manifests:
       locust_namespace: "nim-load-test"
       locust_replicas: 1
       locust_image: "locustio/locust:2.15.1"
-      locust_target_host: "http://meta-llama3-70b-instruct-70b.nim.svc.cluster.local:8000"
+      locust_target_host: "http://meta-llama3-70b-instruct.nim.svc.cluster.local:8000"
       locust_cpu_request: "1"
       locust_memory_request: "1Gi"
       locust_cpu_limit: "2"

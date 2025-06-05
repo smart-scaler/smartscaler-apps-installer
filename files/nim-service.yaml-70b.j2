@@ -36,7 +36,7 @@ spec:
 {% endif %}
   image:
     repository: {{ manifest_vars.nim_service_image_repository | default('nvcr.io/nim/meta/llama-3.1-70b-instruct') }}
-    tag: {{ manifest_vars.nim_service_image_tag | default('1.8.4') }}
+    tag: {{ manifest_vars.nim_service_image_tag | default('1.8.5') }}
     pullPolicy: {{ manifest_vars.nim_service_image_pull_policy | default('IfNotPresent') }}
 {% if manifest_vars.nim_service_image_pull_secrets is defined %}
     pullSecrets:
