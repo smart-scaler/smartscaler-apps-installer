@@ -2,7 +2,7 @@ from locust import HttpUser, TaskSet, task, constant_throughput, LoadTestShape
 import logging as log
 import random
 
-model = "meta/llama-3.1-70b-instruct"
+model = "meta/llama-3.1-8b-instruct"
 
 prompt_payloads = [
     {
@@ -178,7 +178,7 @@ class User(HttpUser):
     wait_time = constant_throughput(1)
     connection_timeout = 300.0
     network_timeout = 300.0
-    host = "http://meta-llama3-70b-instruct.nim.svc.cluster.local:8000"
+    # host = "http://meta-llama3-8b-instruct.nim.svc.cluster.local:8000"
 
 from locust import LoadTestShape
 from math import exp

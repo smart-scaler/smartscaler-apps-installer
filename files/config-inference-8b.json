@@ -3,7 +3,7 @@
         "logging_config": {
             "wandb-enable": true,
             "wandb-trainer": false,
-            "project-name": "vllm-scaling-demo_mesh",
+            "project-name": "vllm-scaling-demo-mesh",
             "description": "Default run message"
         },
         "customer_labels": {
@@ -51,10 +51,10 @@
             "namespaces": {
                 "nim": {
                     "services": {
-                        "meta-llama3-1b-instruct": {
+                        "meta-llama3-8b-instruct": {
                             "service_labels": {
                                 "ss_namespace": "nim",
-                                "ss_deployment_name": "meta-llama3-1b-instruct_1b",
+                                "ss_deployment_name": "meta-llama3-8b-instruct-8b",
                                 "ss_cluster_name": "nim-llama"
                             },
                             "metrics_config": {
@@ -70,7 +70,7 @@
                                                 "obs": true,
                                                 "reward": true,
                                                 "latency": false,
-                                                "query": "sum(num_requests_running{model_name='meta/llama-3.2-1b-instruct', namespace='nim'}) + sum(num_requests_waiting{model_name='meta/llama-3.2-1b-instruct', namespace='nim'})"
+                                                "query": "sum(num_requests_running{model_name='meta/llama-3.1-8b-instruct', namespace='nim'}) + sum(num_requests_waiting{model_name='meta/llama-3.1-8b-instruct', namespace='nim'})"
                                             },
                                             "rps": {
                                                 "ranges": {
@@ -89,7 +89,7 @@
                                                 "sim": {},
                                                 "obs": true,
                                                 "reward": true,
-                                                "query": "sum(num_requests_running{model_name='meta/llama-3.2-1b-instruct', namespace='nim'}) + sum(num_requests_waiting{model_name='meta/llama-3.2-1b-instruct', namespace='nim'})"
+                                                "query": "sum(num_requests_running{model_name='meta/llama-3.1-8b-instruct', namespace='nim'}) + sum(num_requests_waiting{model_name='meta/llama-3.1-8b-instruct', namespace='nim'})"
                                             },
                                             "cost": {
                                                 "ranges": {
@@ -104,10 +104,10 @@
                                                 "sim": {},
                                                 "obs": true,
                                                 "reward": true,
-                                                "query": "count(num_requests_running{model_name='meta/llama-3.2-1b-instruct', namespace='nim'})"
+                                                "query": "count(num_requests_running{model_name='meta/llama-3.1-8b-instruct', namespace='nim'})"
                                             },
                                             "cpu_recommendation": {
-                                                "query_utilization": "sum(smartscaler_vllm_gpu_cache_usage_perc{model_name='meta/llama-3.2-1b-instruct', namespace='nim'})/ count(smartscaler_vllm_gpu_cache_usage_perc{model_name='meta/llama-3.2-1b-instruct', namespace='nim'})",
+                                                "query_utilization": "sum(smartscaler_vllm_gpu_cache_usage_perc{model_name='meta/llama-3.1-8b-instruct', namespace='nim'})/ count(smartscaler_vllm_gpu_cache_usage_perc{model_name='meta/llama-3.1-8b-instruct', namespace='nim'})",
                                                 "target_utilization": 60,
                                                 "obs": false,
                                                 "reward": false

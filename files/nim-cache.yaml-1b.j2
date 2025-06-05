@@ -1,7 +1,7 @@
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
-  name: {{ manifest_vars.nim_cache_name | default('meta-llama3-8b-instruct') }}
+  name: {{ manifest_vars.nim_cache_name | default('meta-llama3-1b-instruct') }}
   namespace: {{ manifest_vars.nim_cache_namespace | default('nim') }}
 {% if manifest_vars.nim_cache_labels is defined %}
   labels:
@@ -29,7 +29,7 @@ spec:
 {% endif %}
   source:
     ngc:
-      modelPuller: "{{ manifest_vars.nim_cache_model_puller | default('nvcr.io/nim/meta/llama-3.1-8b-instruct:1.8.4') }}"
+      modelPuller: "{{ manifest_vars.nim_cache_model_puller | default('nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8.4') }}"
       pullSecret: "{{ manifest_vars.nim_cache_pull_secret | default('ngc-secret') }}"
       authSecret: "{{ manifest_vars.nim_cache_auth_secret | default('ngc-api-secret') }}"
       model:

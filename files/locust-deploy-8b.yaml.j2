@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ manifest_vars.locust_name | default('locust-load') }}
+  name: {{ manifest_vars.locust_name | default('locust-load-8b') }}
   namespace: {{ manifest_vars.locust_namespace | default('nim-load-test') }}
   labels:
-    app: {{ manifest_vars.locust_name | default('locust-load') }}
+    app: {{ manifest_vars.locust_name | default('locust-load-8b') }}
 spec:
   replicas: {{ manifest_vars.locust_replicas | default(1) }}
   selector:
     matchLabels:
-      app: {{ manifest_vars.locust_name | default('locust-load') }}
+      app: {{ manifest_vars.locust_name | default('locust-load-8b') }}
   template:
     metadata:
       labels:
-        app: {{ manifest_vars.locust_name | default('locust-load') }}
+        app: {{ manifest_vars.locust_name | default('locust-load-8b') }}
     spec:
       containers:
         - name: locust
@@ -38,4 +38,4 @@ spec:
       volumes:
         - name: locustfile
           configMap:
-            name: {{ manifest_vars.locust_configmap_name | default('locustfile') }} 
+            name: {{ manifest_vars.locust_configmap_name | default('locustfile-8b') }} 

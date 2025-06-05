@@ -1,13 +1,13 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ manifest_vars.smart_scaler_name | default('smart-scaler-llm-inf') }}
+  name: {{ manifest_vars.smart_scaler_name | default('smart-scaler-llm-inf-1b') }}
   namespace: {{ manifest_vars.smart_scaler_namespace | default('smart-scaler') }}
   labels:
-    service: {{ manifest_vars.smart_scaler_labels.service | default('inference-tenant-app') }}
-    cluster-name: {{ manifest_vars.smart_scaler_labels.cluster_name | default('nim-llama') }}
-    tenant-id: {{ manifest_vars.smart_scaler_labels.tenant_id | default('tenant-b200-local') }}
-    app-name: {{ manifest_vars.smart_scaler_labels.app_name | default('nim-llama') }}
+    service: {{ manifest_vars.smart_scaler_labels.service | default('inference-tenant-app-1b') }}
+    cluster-name: {{ manifest_vars.smart_scaler_labels.cluster_name | default('nim-llama-1b') }}
+    tenant-id: {{ manifest_vars.smart_scaler_labels.tenant_id | default('tenant-b200-local-1b') }}
+    app-name: {{ manifest_vars.smart_scaler_labels.app_name | default('nim-llama-1b') }}
     app-version: "{{ manifest_vars.smart_scaler_labels.app_version | default('1.0') }}"
 spec:
   replicas: {{ manifest_vars.smart_scaler_replicas | default(1) }}

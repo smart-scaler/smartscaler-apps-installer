@@ -3,7 +3,7 @@
         "logging_config": {
             "wandb-enable": true,
             "wandb-trainer": false,
-            "project-name": "vllm-scaling-demo_mesh",
+            "project-name": "vllm-scaling-demo-mesh",
             "description": "Default run message"
         },
         "customer_labels": {
@@ -51,10 +51,10 @@
             "namespaces": {
                 "nim": {
                     "services": {
-                        "meta-llama3-8b-instruct": {
+                        "meta-llama3-70b-instruct": {
                             "service_labels": {
                                 "ss_namespace": "nim",
-                                "ss_deployment_name": "meta-llama3-8b-instruct",
+                                "ss_deployment_name": "meta-llama3-70b-instruct-70b",
                                 "ss_cluster_name": "nim-llama"
                             },
                             "metrics_config": {
@@ -70,7 +70,7 @@
                                                 "obs": true,
                                                 "reward": true,
                                                 "latency": false,
-                                                "query": "sum(num_requests_running{model_name='meta/llama-3.1-8b-instruct', namespace='nim'}) + sum(num_requests_waiting{model_name='meta/llama-3.1-8b-instruct', namespace='nim'})"
+                                                "query": "sum(num_requests_running{model_name='meta/lama-3.1-70b-instruct', namespace='nim'}) + sum(num_requests_waiting{model_name='meta/lama-3.1-70b-instruct', namespace='nim'})"
                                             },
                                             "rps": {
                                                 "ranges": {
@@ -82,14 +82,14 @@
                                                     "upper_bound_scaling": 2,
                                                     "lower_bound_scaling": 0.7
                                                 },
-                                                "rps_capacity_per_pod": 200,
+                                                "rps_capacity_per_pod": 80,
                                                 "rps_csv_path": "/home/avesha/rl/rlautoscaler/notebooks/csv_data/rps.csv",
                                                 "pod_cap_csv_path": "/home/avesha/rl/rlautoscaler/notebooks/csv_data/default_podcapacities.csv",
                                                 "pod_cap_model": "default",
                                                 "sim": {},
                                                 "obs": true,
                                                 "reward": true,
-                                                "query": "sum(num_requests_running{model_name='meta/llama-3.1-8b-instruct', namespace='nim'}) + sum(num_requests_waiting{model_name='meta/llama-3.1-8b-instruct', namespace='nim'})"
+                                                "query": "sum(num_requests_running{model_name='meta/lama-3.1-70b-instruct', namespace='nim'}) + sum(num_requests_waiting{model_name='meta/lama-3.1-70b-instruct', namespace='nim'})"
                                             },
                                             "cost": {
                                                 "ranges": {
@@ -104,10 +104,10 @@
                                                 "sim": {},
                                                 "obs": true,
                                                 "reward": true,
-                                                "query": "count(num_requests_running{model_name='meta/llama-3.1-8b-instruct', namespace='nim'})"
+                                                "query": "count(num_requests_running{model_name='meta/lama-3.1-70b-instruct', namespace='nim'})"
                                             },
                                             "cpu_recommendation": {
-                                                "query_utilization": "sum(smartscaler_vllm_gpu_cache_usage_perc{model_name='meta/llama-3.1-8b-instruct', namespace='nim'})/ count(smartscaler_vllm_gpu_cache_usage_perc{model_name='meta/llama-3.1-8b-instruct', namespace='nim'})",
+                                                "query_utilization": "sum(smartscaler_vllm_gpu_cache_usage_perc{model_name='meta/lama-3.1-70b-instruct', namespace='nim'})/ count(smartscaler_vllm_gpu_cache_usage_perc{model_name='meta/lama-3.1-70b-instruct', namespace='nim'})",
                                                 "target_utilization": 60,
                                                 "obs": false,
                                                 "reward": false

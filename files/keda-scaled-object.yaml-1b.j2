@@ -1,7 +1,7 @@
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
-  name: {{ manifest_vars.keda_scaled_object_name | default('llm-demo-keda') }}
+  name: {{ manifest_vars.keda_scaled_object_name | default('llm-demo-keda-1b') }}
   namespace: {{ manifest_vars.keda_scaled_object_namespace | default('nim') }}
 {% if manifest_vars.keda_scaled_object_labels is defined %}
   labels:
@@ -11,7 +11,7 @@ metadata:
 {% endif %}
 spec:
   scaleTargetRef:
-    name: {{ manifest_vars.keda_scaled_object_target_name | default('meta-llama3-8b-instruct') }}
+    name: {{ manifest_vars.keda_scaled_object_target_name | default('meta-llama3-1b-instruct') }}
   pollingInterval: {{ manifest_vars.keda_scaled_object_polling_interval | default(30) }}
   minReplicaCount: {{ manifest_vars.keda_scaled_object_min_replicas | default(1) }}
   maxReplicaCount: {{ manifest_vars.keda_scaled_object_max_replicas | default(8) }}
@@ -21,4 +21,4 @@ spec:
         serverAddress: {{ manifest_vars.keda_scaled_object_prometheus_address | default('http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090') }}
         metricName: {{ manifest_vars.keda_scaled_object_metric_name | default('smartscaler_hpa_num_pods') }}
         threshold: '{{ manifest_vars.keda_scaled_object_threshold | default("1") }}'
-        query: {{ manifest_vars.keda_scaled_object_query | default('smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-8b-instruct_8b"}') }} 
+        query: {{ manifest_vars.keda_scaled_object_query | default('smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-1b-instruct-1b"}') }} 
