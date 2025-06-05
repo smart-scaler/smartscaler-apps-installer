@@ -1164,7 +1164,7 @@ command_exec:
             apply -f -
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            create configmap -n smart-scaler mesh-config-1b --from-file=files/config-inference-1b.json
+            create configmap -n smart-scaler mesh-config-1b --from-file="config.json"="files/config-inference-1b.json"
 
   - name: "create_inference_pod_configmap_8b"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
@@ -1187,7 +1187,7 @@ command_exec:
             apply -f -
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            create configmap -n smart-scaler mesh-config-8b --from-file=files/config-inference-8b.json
+            create configmap -n smart-scaler mesh-config-8b --from-file="config.json"="files/config-inference-8b.json"
 
   - name: "create_inference_pod_configmap_70b"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
@@ -1210,7 +1210,7 @@ command_exec:
             apply -f -
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            create configmap -n smart-scaler mesh-config-70b --from-file=files/config-inference-70b.json
+            create configmap -n smart-scaler mesh-config-70b --from-file="config.json"="files/config-inference-70b.json"
 
   - name: "create_locust_configmap_1b"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
@@ -1233,7 +1233,7 @@ command_exec:
           fi
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            -n nim-load-test create configmap locustfile-1b --from-file=locustfile.py=files/locust-1b.py
+            -n nim-load-test create configmap locustfile-1b --from-file="locustfile.py"="files/locust-1b.py"
 
   - name: "create_locust_configmap_8b"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
@@ -1256,7 +1256,7 @@ command_exec:
           fi
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            -n nim-load-test create configmap locustfile-8b --from-file=locustfile.py=files/locust-8b.py
+            -n nim-load-test create configmap locustfile-8b --from-file="locustfile.py"="files/locust-8b.py"
 
   - name: "create_locust_configmap_70b"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
@@ -1279,4 +1279,4 @@ command_exec:
           fi
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            -n nim-load-test create configmap locustfile-70b --from-file=locustfile.py=files/locust-70b.py
+            -n nim-load-test create configmap locustfile-70b --from-file="locustfile.py"="files/locust-70b.py"
