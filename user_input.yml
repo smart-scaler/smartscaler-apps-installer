@@ -59,9 +59,14 @@ kubernetes_deployment:
   firewall:
     enabled: true                            # Whether to configure firewall rules
     allow_additional_ports:
-      - "80"
-      - "443"
-                                           # Added 80,443 for nginx-ingress
+      - "80"      # HTTP
+      - "443"     # HTTPS
+      - "6443"    # Kubernetes API server
+      - "2379"    # etcd client API
+      - "2380"    # etcd server API
+      - "10250"   # Kubelet API
+      - "10251"   # kube-scheduler
+      - "10252"   # kube-controller-manager
 
   # NVIDIA Container Runtime Configuration
   # Required for GPU support in the cluster
@@ -123,9 +128,9 @@ avesha_docker_password: "{{ lookup('env', 'AVESHA_DOCKER_PASSWORD') }}" # Requir
 # Required Execution Order
 execution_order:
   # Core Infrastructure
-  - metallb_chart                 # Install MetalLB Helm chart first
-  - metallb_l2_config            # Configure MetalLB L2 mode
-  - metallb_ip_pool              # Configure IP address pool
+  # - metallb_chart                 # Install MetalLB Helm chart first
+  # - metallb_l2_config            # Configure MetalLB L2 mode
+  # - metallb_ip_pool              # Configure IP address pool
   - nginx_ingress_config         # Apply Nginx Ingress configuration
   - nginx_ingress_chart          # Install Nginx Ingress Controller
 
@@ -139,23 +144,23 @@ execution_order:
   - verify_ngc_secrets
   - create_avesha_secret
 
-  # NIM 1B Components
-  - nim_cache_manifest_1b
-  - nim_service_manifest_1b
-  - keda_scaled_object_manifest_1b
-  - create_inference_pod_configmap_1b
-  - smart_scaler_inference_1b
-  - create_locust_configmap_1b
-  - locust_manifest_1b
+  # # NIM 1B Components
+  # - nim_cache_manifest_1b
+  # - nim_service_manifest_1b
+  # - keda_scaled_object_manifest_1b
+  # - create_inference_pod_configmap_1b
+  # - smart_scaler_inference_1b
+  # - create_locust_configmap_1b
+  # - locust_manifest_1b
 
-  # NIM 8B Components
-  - nim_cache_manifest_8b
-  - nim_service_manifest_8b
-  - keda_scaled_object_manifest_8b
-  - create_inference_pod_configmap_8b
-  - smart_scaler_inference_8b
-  - create_locust_configmap_8b
-  - locust_manifest_8b
+  # # NIM 8B Components
+  # - nim_cache_manifest_8b
+  # - nim_service_manifest_8b
+  # - keda_scaled_object_manifest_8b
+  # - create_inference_pod_configmap_8b
+  # - smart_scaler_inference_8b
+  # - create_locust_configmap_8b
+  # - locust_manifest_8b
 
   # NIM 70B Components
   - nim_cache_manifest_70b
@@ -175,7 +180,7 @@ execution_order:
 
 # MetalLB Configuration
 metallb:
-  enabled: true                          # Enable MetalLB
+  enabled: false                      # Enable MetalLB
   namespace: "metallb"                   # Namespace for MetalLB deployment
   address_range: 172.18.1.1-172.18.1.16  # Reference global IP
   protocol: "layer2"                     # Use Layer 2 mode
@@ -249,7 +254,7 @@ helm_charts:
         replicaCount: 1
         service:
           enabled: true
-          type: "LoadBalancer"
+          type: "NodePort"
         metrics:
           enabled: true
           serviceMonitor:
@@ -282,16 +287,16 @@ helm_charts:
           periodSeconds: 10
           timeoutSeconds: 5
       defaultBackend:
-        enabled: true
+        enabled: false
         service:
           type: ClusterIP
         resources:
           requests:
-            cpu: "10m"
-            memory: "20Mi"
+            cpu: "1000m"
+            memory: "2048"
           limits:
-            cpu: "20m"
-            memory: "40Mi"
+            cpu: "2000m"
+            memory: "4096Mi"
 
   gpu_operator_chart:
     release_name: "gpu-operator"
@@ -334,6 +339,8 @@ helm_charts:
       kubeEtcd:
         enabled: false
       prometheus:
+        service:
+          type: NodePort
         prometheusSpec:
           retention: "15d"
           storageSpec:
@@ -343,7 +350,7 @@ helm_charts:
                 accessModes: ["ReadWriteOnce"]
                 resources:
                   requests:
-                    storage: 1Gi
+                    storage: 10Gi
           additionalScrapeConfigs:
             - job_name: "gpu-metrics"
               scrape_interval: "1s"
@@ -376,6 +383,8 @@ helm_charts:
         persistence:
           enabled: true
           size: "1Gi"
+        service:
+          type: NodePort
       defaultRules:
         rules:
           etcd: false
@@ -390,8 +399,7 @@ helm_charts:
     wait: true
     chart_repo_url: "https://kedacore.github.io/charts"
     chart_version: "2.12.1"
-    dependencies: 
-      - prometheus_stack  # KEDA might need Prometheus for metrics
+    dependencies: []
 
   # OPTIONAL: NIM Operator Chart
   nim_operator_chart:
@@ -402,8 +410,7 @@ helm_charts:
     wait: true
     chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
     chart_version: "v1.0.1"
-    dependencies:
-      - gpu_operator_chart  # NIM operator needs GPU operator
+    dependencies: []
 
 ###############################################################################
 # KUBERNETES MANIFESTS CONFIGURATION
@@ -424,6 +431,10 @@ manifests:
       status: "True"
     validate: true
     strict_validation: true
+    variables:
+      metallb_pool_name: "first-pool"
+      metallb_namespace: "metallb"
+      metallb_address_range: "172.18.1.1-172.18.1.16"  # Using the control plane IP
 
   # MetalLB L2 Advertisement Configuration
   metallb_l2_config:
@@ -441,6 +452,10 @@ manifests:
     strict_validation: true
     dependencies: 
       - metallb_chart  # Ensure MetalLB chart is fully installed first
+    variables:
+      metallb_l2_name: "l2"
+      metallb_namespace: "metallb"
+      metallb_pool_name: "first-pool"
 
   # Nginx Ingress Additional Configuration
   nginx_ingress_config:
@@ -457,6 +472,18 @@ manifests:
     validate: true
     strict_validation: true
     dependencies: []
+    variables:
+      nginx_config_name: "nginx-ingress-controller-custom-config"
+      nginx_namespace: "ingress-nginx"
+      nginx_proxy_buffer_size: "128k"
+      nginx_proxy_body_size: "50m"
+      nginx_client_header_buffer_size: "64k"
+      nginx_large_client_header_buffers: "4 128k"
+      nginx_client_body_buffer_size: "128k"
+      nginx_enable_brotli: "true"
+      nginx_use_gzip: "true"
+      nginx_gzip_level: "6"
+      nginx_gzip_types: "application/atom+xml application/javascript application/x-javascript application/json application/rss+xml application/vnd.ms-fontobject application/x-font-ttf application/x-web-app-manifest+json application/xhtml+xml application/xml font/opentype image/svg+xml image/x-icon text/css text/javascript text/plain text/x-component"
 
   # OPTIONAL: Pushgateway Manifest
   pushgateway_manifest:
@@ -480,9 +507,9 @@ manifests:
       pushgateway_monitor_release: "prometheus"
       pushgateway_monitor_path: "/metrics"
       pushgateway_monitor_interval: "5s"
-      pushgateway_resources_requests_cpu: "100m"
-      pushgateway_resources_requests_memory: "64Mi"
-      pushgateway_resources_limits_cpu: "200m"
+      pushgateway_resources_requests_cpu: "1000m"
+      pushgateway_resources_requests_memory: "2048Mi"
+      pushgateway_resources_limits_cpu: "20000m"
       pushgateway_resources_limits_memory: "128Mi"
     wait: true
     wait_timeout: 300
