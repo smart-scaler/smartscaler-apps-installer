@@ -77,3 +77,28 @@ vault.pass
 local.*
 *.local
 *.local.*
+
+# Logs
+logs/
+*.log
+
+# Kubernetes credentials and sensitive data
+inventory/kubespray/credentials/
+inventory/kubespray/inventory.ini
+inventory/kubespray/host_vars/
+
+# User-specific configuration
+user_input.yml
+
+# Ansible collections
+collections/ansible_collections/kubernetes.core-*.info/
+
+# IDE and system files
+.idea/
+.vscode/
+*.swp
+*~
+
+# Python virtual environment
+venv/
+.env/
