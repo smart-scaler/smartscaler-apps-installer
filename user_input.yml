@@ -194,8 +194,11 @@ helm_charts:
     release_namespace: "{{ metallb.namespace }}"
     create_namespace: true
     wait: true
-    timeout: 600  # Increased timeout
-    dependencies: []  # No dependencies for first chart
+    timeout: 600
+    force: true  # Force upgrade regardless of diff
+    atomic: true  # Roll back on failure
+    skip_diff: true  # Skip Helm diff check
+    dependencies: []
     chart_repo_url: "https://metallb.github.io/metallb"
     chart_version: "0.15.0"
     release_values:
@@ -224,8 +227,11 @@ helm_charts:
     create_namespace: true
     wait: true
     timeout: 600
+    force: true  # Force upgrade regardless of diff
+    atomic: true  # Roll back on failure
+    skip_diff: true  # Skip Helm diff check
     dependencies:
-      - metallb_chart     # Only depend on MetalLB chart
+      - metallb_chart
     chart_repo_url: "https://kubernetes.github.io/ingress-nginx"
     chart_repo_name: "ingress-nginx"
     chart_version: "4.7.1"
@@ -284,6 +290,9 @@ helm_charts:
     release_namespace: "gpu-operator"
     create_namespace: true
     wait: true
+    force: true  # Force upgrade regardless of diff
+    atomic: true  # Roll back on failure
+    skip_diff: true  # Skip Helm diff check
     chart_version: "v25.3.0"
     release_values:
       mig:
@@ -313,6 +322,9 @@ helm_charts:
     release_namespace: "monitoring"
     create_namespace: true
     wait: true
+    force: true  # Force upgrade regardless of diff
+    atomic: true  # Roll back on failure
+    skip_diff: true  # Skip Helm diff check
     chart_repo_url: "https://prometheus-community.github.io/helm-charts"
     chart_version: "55.5.0"
     release_values:
@@ -377,6 +389,9 @@ helm_charts:
     release_namespace: "keda"
     create_namespace: true
     wait: true
+    force: true  # Force upgrade regardless of diff
+    atomic: true  # Roll back on failure
+    skip_diff: true  # Skip Helm diff check
     chart_repo_url: "https://kedacore.github.io/charts"
     chart_version: "2.12.1"
     dependencies: []
@@ -388,6 +403,9 @@ helm_charts:
     release_namespace: "nim"
     create_namespace: true
     wait: true
+    force: true  # Force upgrade regardless of diff
+    atomic: true  # Roll back on failure
+    skip_diff: true  # Skip Helm diff check
     chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
     chart_version: "v1.0.1"
     dependencies: []
@@ -487,17 +505,13 @@ manifests:
       pushgateway_monitor_release: "prometheus"
       pushgateway_monitor_path: "/metrics"
       pushgateway_monitor_interval: "5s"
-      pushgateway_resources_requests_cpu: "1000m"
-      pushgateway_resources_requests_memory: "2048Mi"
-      pushgateway_resources_limits_cpu: "20000m"
-      pushgateway_resources_limits_memory: "128Mi"
-    wait: true
-    wait_timeout: 300
-    wait_condition:
-      type: "Available"
-      status: "True"
-    validate: false
-    strict_validation: false
+      pushgateway_resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
 
  # NIM 1B Components
   nim_cache_manifest_1b:
@@ -1061,12 +1075,12 @@ manifests:
     strict_validation: false
     variables:
       mcp_server_name: "smart-scaler-mcp-server"
-      mcp_server_namespace: "smart-scaler-controller"
+      mcp_server_namespace: "smart-scaler"
       mcp_server_image: "docker.io/aveshasystems/smart-scaler-mcp-server:v1.0.0"
       mcp_server_image_pull_secret: "avesha-systems"
       mcp_server_prometheus_url: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/"
       mcp_server_tenant_id: "tenant-b200-local"
-      mcp_server_port: 8000
+      mcp_server_port: "8000"
       mcp_server_resources:
         requests:
           cpu: "100m"

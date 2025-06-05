@@ -1,4 +1,40 @@
 ---
+- name: Check if helm diff plugin is already installed
+  shell: helm plugin list | grep -q "^diff"
+  register: helm_diff_check
+  changed_when: false
+  failed_when: false
+  ignore_errors: true
+  tags:
+    - helm
+    - prerequisites
+
+- name: Install helm diff plugin for better idempotency checks
+  shell: helm plugin install https://github.com/databus23/helm-diff
+  ignore_errors: true
+  changed_when: false
+  register: helm_diff_install
+  when: helm_diff_check.rc != 0
+  tags:
+    - helm
+    - prerequisites
+
+- name: Debug helm diff plugin status
+  debug:
+    msg: >-
+      {% if helm_diff_check.rc == 0 %}
+      Helm diff plugin is already installed
+      {% elif helm_diff_install is defined and helm_diff_install.rc == 0 %}
+      Helm diff plugin installed successfully
+      {% elif helm_diff_install is defined %}
+      Helm diff plugin installation failed: {{ helm_diff_install.stderr | default('Unknown error') }}
+      {% else %}
+      Helm diff plugin check completed
+      {% endif %}
+  tags:
+    - helm
+    - prerequisites
+
 - name: Load and display user_input.yml content
   debug:
     var: user_input
