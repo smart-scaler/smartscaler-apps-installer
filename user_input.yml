@@ -128,11 +128,11 @@ avesha_docker_password: "{{ lookup('env', 'AVESHA_DOCKER_PASSWORD') }}" # Requir
 # Required Execution Order
 execution_order:
   # Core Infrastructure
-  # - metallb_chart                 # Install MetalLB Helm chart first
-  # - metallb_l2_config            # Configure MetalLB L2 mode
-  # - metallb_ip_pool              # Configure IP address pool
-  - nginx_ingress_config         # Apply Nginx Ingress configuration
-  - nginx_ingress_chart          # Install Nginx Ingress Controller
+  # - metallb_chart                 
+  # - metallb_l2_config            
+  # - metallb_ip_pool              
+  - nginx_ingress_config         
+  - nginx_ingress_chart          
 
   # Existing Applications
   - gpu_operator_chart
@@ -144,24 +144,6 @@ execution_order:
   - verify_ngc_secrets
   - create_avesha_secret
 
-  # # NIM 1B Components
-  # - nim_cache_manifest_1b
-  # - nim_service_manifest_1b
-  # - keda_scaled_object_manifest_1b
-  # - create_inference_pod_configmap_1b
-  # - smart_scaler_inference_1b
-  # - create_locust_configmap_1b
-  # - locust_manifest_1b
-
-  # # NIM 8B Components
-  # - nim_cache_manifest_8b
-  # - nim_service_manifest_8b
-  # - keda_scaled_object_manifest_8b
-  # - create_inference_pod_configmap_8b
-  # - smart_scaler_inference_8b
-  # - create_locust_configmap_8b
-  # - locust_manifest_8b
-
   # NIM 70B Components
   - nim_cache_manifest_70b
   - nim_service_manifest_70b
@@ -170,9 +152,7 @@ execution_order:
   - smart_scaler_inference_70b
   - create_locust_configmap_70b
   - locust_manifest_70b
-
-
-
+  - smart_scaler_mcp_server_manifest  # Added MCP server at the end
 
 ###############################################################################
 # OPTIONAL CONFIGURATION
@@ -429,8 +409,8 @@ manifests:
     wait_condition:
       type: "Available"
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       metallb_pool_name: "first-pool"
       metallb_namespace: "metallb"
@@ -448,8 +428,8 @@ manifests:
     wait_condition:
       type: "Available"
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     dependencies: 
       - metallb_chart  # Ensure MetalLB chart is fully installed first
     variables:
@@ -469,8 +449,8 @@ manifests:
     wait_condition:
       type: "Available"
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     dependencies: []
     variables:
       nginx_config_name: "nginx-ingress-controller-custom-config"
@@ -516,8 +496,8 @@ manifests:
     wait_condition:
       type: "Available"
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
 
  # NIM 1B Components
   nim_cache_manifest_1b:
@@ -531,8 +511,8 @@ manifests:
     wait_condition:
       type: "Available"
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       nim_cache_name: "meta-llama3-1b-instruct"
       nim_cache_namespace: "nim"
@@ -566,8 +546,8 @@ manifests:
     wait_condition:
       type: "Available"
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       nim_service_name: "meta-llama3-1b-instruct"
       nim_service_namespace: "nim"
@@ -616,8 +596,8 @@ manifests:
     wait_condition:
       type: Available
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       keda_scaled_object_name: "llm-demo-keda-1b"
       keda_scaled_object_namespace: "nim"
@@ -642,8 +622,8 @@ manifests:
     wait_condition:
       type: Available
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       smart_scaler_name: "smart-scaler-llm-inf-1b"
       smart_scaler_namespace: "smart-scaler"
@@ -687,8 +667,8 @@ manifests:
     wait_condition:
       type: Available
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       locust_name: "locust-load-1b"
       locust_namespace: "nim-load-test"
@@ -713,8 +693,8 @@ manifests:
     wait_condition:
       type: "Available"
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       nim_cache_name: "meta-llama3-8b-instruct"
       nim_cache_namespace: "nim"
@@ -748,8 +728,8 @@ manifests:
     wait_condition:
       type: "Available"
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       nim_service_name: "meta-llama3-8b-instruct"
       nim_service_namespace: "nim"
@@ -798,8 +778,8 @@ manifests:
     wait_condition:
       type: Available
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       keda_scaled_object_name: "llm-demo-keda-8b"
       keda_scaled_object_namespace: "nim"
@@ -824,8 +804,8 @@ manifests:
     wait_condition:
       type: Available
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       smart_scaler_name: "smart-scaler-llm-inf-8b"
       smart_scaler_namespace: "smart-scaler"
@@ -869,8 +849,8 @@ manifests:
     wait_condition:
       type: Available
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       locust_name: "locust-load-8b"
       locust_namespace: "nim-load-test"
@@ -896,8 +876,8 @@ manifests:
     wait_condition:
       type: "Available"
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       nim_cache_name: "meta-llama3-70b-instruct"
       nim_cache_namespace: "nim"
@@ -931,8 +911,8 @@ manifests:
     wait_condition:
       type: "Available"
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       nim_service_name: "meta-llama3-70b-instruct"
       nim_service_namespace: "nim"
@@ -981,8 +961,8 @@ manifests:
     wait_condition:
       type: Available
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       keda_scaled_object_name: "llm-demo-keda-70b"
       keda_scaled_object_namespace: "nim"
@@ -1007,8 +987,8 @@ manifests:
     wait_condition:
       type: Available
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       smart_scaler_name: "smart-scaler-llm-inf-70b"
       smart_scaler_namespace: "smart-scaler"
@@ -1052,8 +1032,8 @@ manifests:
     wait_condition:
       type: Available
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       locust_name: "locust-load-70b"
       locust_namespace: "nim-load-test"
@@ -1065,6 +1045,35 @@ manifests:
       locust_cpu_limit: "2"
       locust_memory_limit: "2Gi"
       locust_configmap_name: "locustfile-70b"
+
+  smart_scaler_mcp_server_manifest:
+    name: "smart-scaler-mcp-server-setup"
+    manifest_file: "files/smart-scaler-mcp-server.yaml.j2"
+    namespace: "smart-scaler"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: Available
+      status: "True"
+    validate: false
+    strict_validation: false
+    variables:
+      mcp_server_name: "smart-scaler-mcp-server"
+      mcp_server_namespace: "smart-scaler-controller"
+      mcp_server_image: "docker.io/aveshasystems/smart-scaler-mcp-server:v1.0.0"
+      mcp_server_image_pull_secret: "avesha-systems"
+      mcp_server_prometheus_url: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/"
+      mcp_server_tenant_id: "tenant-b200-local"
+      mcp_server_port: 8000
+      mcp_server_resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
 
 ###############################################################################
 # COMMAND EXECUTION CONFIGURATION
