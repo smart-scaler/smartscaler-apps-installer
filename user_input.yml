@@ -644,7 +644,7 @@ manifests:
       smart_scaler_image_pull_policy: "IfNotPresent"
       smart_scaler_command: ["/bin/sh", "-c"]
       smart_scaler_args:
-        - "wandb disabled && python policy/inference_script.py -c /data/config-inference_1b.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
+        - "wandb disabled && python policy/inference_script.py -c /data/config-inference-1b.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
       smart_scaler_config_mount_path: "/data"
       smart_scaler_ports: [9900, 8265, 4321, 6379]
       smart_scaler_image_pull_secret: "avesha-systems"
@@ -826,7 +826,7 @@ manifests:
       smart_scaler_image_pull_policy: "IfNotPresent"
       smart_scaler_command: ["/bin/sh", "-c"]
       smart_scaler_args:
-        - "wandb disabled && python policy/inference_script.py -c /data/config-inference_8b.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
+        - "wandb disabled && python policy/inference_script.py -c /data/config-inference-8b.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
       smart_scaler_config_mount_path: "/data"
       smart_scaler_ports: [9900, 8265, 4321, 6379]
       smart_scaler_image_pull_secret: "avesha-systems"
@@ -1009,7 +1009,7 @@ manifests:
       smart_scaler_image_pull_policy: "IfNotPresent"
       smart_scaler_command: ["/bin/sh", "-c"]
       smart_scaler_args:
-        - "wandb disabled && python policy/inference_script.py -c /data/config-inference_70b.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
+        - "wandb disabled && python policy/inference_script.py -c /data/config-inference-70b.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
       smart_scaler_config_mount_path: "/data"
       smart_scaler_ports: [9900, 8265, 4321, 6379]
       smart_scaler_image_pull_secret: "avesha-systems"
@@ -1164,7 +1164,7 @@ command_exec:
             apply -f -
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            create configmap -n smart-scaler mesh-config-1b --from-file=files/config-inference_1b.json
+            create configmap -n smart-scaler mesh-config-1b --from-file=files/config-inference-1b.json
 
   - name: "create_inference_pod_configmap_8b"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
@@ -1187,7 +1187,7 @@ command_exec:
             apply -f -
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            create configmap -n smart-scaler mesh-config-8b --from-file=files/config-inference_8b.json
+            create configmap -n smart-scaler mesh-config-8b --from-file=files/config-inference-8b.json
 
   - name: "create_inference_pod_configmap_70b"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
@@ -1210,7 +1210,7 @@ command_exec:
             apply -f -
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            create configmap -n smart-scaler mesh-config-70b --from-file=files/config-inference_70b.json
+            create configmap -n smart-scaler mesh-config-70b --from-file=files/config-inference-70b.json
 
   - name: "create_locust_configmap_1b"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
@@ -1233,7 +1233,7 @@ command_exec:
           fi
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            -n nim-load-test create configmap locustfile-1b --from-file=locustfile.py=files/locust_1b.py
+            -n nim-load-test create configmap locustfile-1b --from-file=locustfile.py=files/locust-1b.py
 
   - name: "create_locust_configmap_8b"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
@@ -1256,7 +1256,7 @@ command_exec:
           fi
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            -n nim-load-test create configmap locustfile-8b --from-file=locustfile.py=files/locust_8b.py
+            -n nim-load-test create configmap locustfile-8b --from-file=locustfile.py=files/locust-8b.py
 
   - name: "create_locust_configmap_70b"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
@@ -1279,4 +1279,4 @@ command_exec:
           fi
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            -n nim-load-test create configmap locustfile-70b --from-file=locustfile.py=files/locust_70b.py
+            -n nim-load-test create configmap locustfile-70b --from-file=locustfile.py=files/locust-70b.py
