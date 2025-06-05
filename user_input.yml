@@ -152,7 +152,25 @@ execution_order:
   - smart_scaler_inference_70b
   - create_locust_configmap_70b
   - locust_manifest_70b
-  - smart_scaler_mcp_server_manifest  # Added MCP server at the end
+  - smart_scaler_mcp_server_manifest
+
+  #   # NIM 1B Components
+  # - nim_cache_manifest_1b
+  # - nim_service_manifest_1b
+  # - keda_scaled_object_manifest_1b
+  # - create_inference_pod_configmap_1b
+  # - smart_scaler_inference_1b
+  # - create_locust_configmap_1b
+  # - locust_manifest_1b
+
+  # # NIM 8B Components
+  # - nim_cache_manifest_8b
+  # - nim_service_manifest_8b
+  # - keda_scaled_object_manifest_8b
+  # - create_inference_pod_configmap_8b
+  # - smart_scaler_inference_8b
+  # - create_locust_configmap_8b
+  # - locust_manifest_8b
 
 ###############################################################################
 # OPTIONAL CONFIGURATION
