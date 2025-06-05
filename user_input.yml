@@ -644,7 +644,7 @@ manifests:
       smart_scaler_image_pull_policy: "IfNotPresent"
       smart_scaler_command: ["/bin/sh", "-c"]
       smart_scaler_args:
-        - "wandb disabled && python policy/inference_script.py -c /data/config-inference-1b.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
+        - "wandb disabled && python policy/inference_script.py -c /data/config.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
       smart_scaler_config_mount_path: "/data"
       smart_scaler_ports: [9900, 8265, 4321, 6379]
       smart_scaler_image_pull_secret: "avesha-systems"
@@ -826,7 +826,7 @@ manifests:
       smart_scaler_image_pull_policy: "IfNotPresent"
       smart_scaler_command: ["/bin/sh", "-c"]
       smart_scaler_args:
-        - "wandb disabled && python policy/inference_script.py -c /data/config-inference-8b.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
+        - "wandb disabled && python policy/inference_script.py -c /data/config.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
       smart_scaler_config_mount_path: "/data"
       smart_scaler_ports: [9900, 8265, 4321, 6379]
       smart_scaler_image_pull_secret: "avesha-systems"
@@ -1009,7 +1009,7 @@ manifests:
       smart_scaler_image_pull_policy: "IfNotPresent"
       smart_scaler_command: ["/bin/sh", "-c"]
       smart_scaler_args:
-        - "wandb disabled && python policy/inference_script.py -c /data/config-inference-70b.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
+        - "wandb disabled && python policy/inference_script.py -c /data/config.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
       smart_scaler_config_mount_path: "/data"
       smart_scaler_ports: [9900, 8265, 4321, 6379]
       smart_scaler_image_pull_secret: "avesha-systems"
