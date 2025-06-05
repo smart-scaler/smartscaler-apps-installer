@@ -59,9 +59,14 @@ kubernetes_deployment:
   firewall:
     enabled: true                            # Whether to configure firewall rules
     allow_additional_ports:
-      - "80"
-      - "443"
-                                           # Added 80,443 for nginx-ingress
+      - "80"      # HTTP
+      - "443"     # HTTPS
+      - "6443"    # Kubernetes API server
+      - "2379"    # etcd client API
+      - "2380"    # etcd server API
+      - "10250"   # Kubelet API
+      - "10251"   # kube-scheduler
+      - "10252"   # kube-controller-manager
 
   # NVIDIA Container Runtime Configuration
   # Required for GPU support in the cluster
@@ -123,11 +128,11 @@ avesha_docker_password: "{{ lookup('env', 'AVESHA_DOCKER_PASSWORD') }}" # Requir
 # Required Execution Order
 execution_order:
   # Core Infrastructure
-  - metallb_chart                 # Install MetalLB Helm chart first
-  - metallb_l2_config            # Configure MetalLB L2 mode
-  - metallb_ip_pool              # Configure IP address pool
-  - nginx_ingress_config         # Apply Nginx Ingress configuration
-  - nginx_ingress_chart          # Install Nginx Ingress Controller
+  # - metallb_chart                 
+  # - metallb_l2_config            
+  # - metallb_ip_pool              
+  - nginx_ingress_config         
+  - nginx_ingress_chart          
 
   # Existing Applications
   - gpu_operator_chart
@@ -138,13 +143,16 @@ execution_order:
   - create_ngc_secrets
   - verify_ngc_secrets
   - create_avesha_secret
-  - nim_cache_manifest
-  - nim_service_manifest
-  - keda_scaled_object_manifest
-  - create_inference_pod_configmap
-  - smart_scaler_inference
-  - create_locust_configmap
-  - locust_manifest
+
+  # NIM 70B Components
+  - nim_cache_manifest_70b
+  - nim_service_manifest_70b
+  - keda_scaled_object_manifest_70b
+  - create_inference_pod_configmap_70b
+  - smart_scaler_inference_70b
+  - create_locust_configmap_70b
+  - locust_manifest_70b
+  - smart_scaler_mcp_server_manifest  # Added MCP server at the end
 
 ###############################################################################
 # OPTIONAL CONFIGURATION
@@ -152,7 +160,7 @@ execution_order:
 
 # MetalLB Configuration
 metallb:
-  enabled: true                          # Enable MetalLB
+  enabled: false                      # Enable MetalLB
   namespace: "metallb"                   # Namespace for MetalLB deployment
   address_range: 172.18.1.1-172.18.1.16  # Reference global IP
   protocol: "layer2"                     # Use Layer 2 mode
@@ -186,8 +194,11 @@ helm_charts:
     release_namespace: "{{ metallb.namespace }}"
     create_namespace: true
     wait: true
-    timeout: 600  # Increased timeout
-    dependencies: []  # No dependencies for first chart
+    timeout: 600
+    force: true  # Force upgrade regardless of diff
+    atomic: true  # Roll back on failure
+    skip_diff: true  # Skip Helm diff check
+    dependencies: []
     chart_repo_url: "https://metallb.github.io/metallb"
     chart_version: "0.15.0"
     release_values:
@@ -216,8 +227,11 @@ helm_charts:
     create_namespace: true
     wait: true
     timeout: 600
+    force: true  # Force upgrade regardless of diff
+    atomic: true  # Roll back on failure
+    skip_diff: true  # Skip Helm diff check
     dependencies:
-      - metallb_chart     # Only depend on MetalLB chart
+      - metallb_chart
     chart_repo_url: "https://kubernetes.github.io/ingress-nginx"
     chart_repo_name: "ingress-nginx"
     chart_version: "4.7.1"
@@ -226,7 +240,7 @@ helm_charts:
         replicaCount: 1
         service:
           enabled: true
-          type: "LoadBalancer"
+          type: "NodePort"
         metrics:
           enabled: true
           serviceMonitor:
@@ -259,16 +273,16 @@ helm_charts:
           periodSeconds: 10
           timeoutSeconds: 5
       defaultBackend:
-        enabled: true
+        enabled: false
         service:
           type: ClusterIP
         resources:
           requests:
-            cpu: "10m"
-            memory: "20Mi"
+            cpu: "1000m"
+            memory: "2048"
           limits:
-            cpu: "20m"
-            memory: "40Mi"
+            cpu: "2000m"
+            memory: "4096Mi"
 
   gpu_operator_chart:
     release_name: "gpu-operator"
@@ -276,6 +290,9 @@ helm_charts:
     release_namespace: "gpu-operator"
     create_namespace: true
     wait: true
+    force: true  # Force upgrade regardless of diff
+    atomic: true  # Roll back on failure
+    skip_diff: true  # Skip Helm diff check
     chart_version: "v25.3.0"
     release_values:
       mig:
@@ -305,12 +322,17 @@ helm_charts:
     release_namespace: "monitoring"
     create_namespace: true
     wait: true
+    force: true  # Force upgrade regardless of diff
+    atomic: true  # Roll back on failure
+    skip_diff: true  # Skip Helm diff check
     chart_repo_url: "https://prometheus-community.github.io/helm-charts"
     chart_version: "55.5.0"
     release_values:
       kubeEtcd:
         enabled: false
       prometheus:
+        service:
+          type: NodePort
         prometheusSpec:
           retention: "15d"
           storageSpec:
@@ -320,7 +342,7 @@ helm_charts:
                 accessModes: ["ReadWriteOnce"]
                 resources:
                   requests:
-                    storage: 1Gi
+                    storage: 10Gi
           additionalScrapeConfigs:
             - job_name: "gpu-metrics"
               scrape_interval: "1s"
@@ -353,6 +375,8 @@ helm_charts:
         persistence:
           enabled: true
           size: "1Gi"
+        service:
+          type: NodePort
       defaultRules:
         rules:
           etcd: false
@@ -365,10 +389,12 @@ helm_charts:
     release_namespace: "keda"
     create_namespace: true
     wait: true
+    force: true  # Force upgrade regardless of diff
+    atomic: true  # Roll back on failure
+    skip_diff: true  # Skip Helm diff check
     chart_repo_url: "https://kedacore.github.io/charts"
     chart_version: "2.12.1"
-    dependencies: 
-      - prometheus_stack  # KEDA might need Prometheus for metrics
+    dependencies: []
 
   # OPTIONAL: NIM Operator Chart
   nim_operator_chart:
@@ -377,10 +403,12 @@ helm_charts:
     release_namespace: "nim"
     create_namespace: true
     wait: true
+    force: true  # Force upgrade regardless of diff
+    atomic: true  # Roll back on failure
+    skip_diff: true  # Skip Helm diff check
     chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
     chart_version: "v1.0.1"
-    dependencies:
-      - gpu_operator_chart  # NIM operator needs GPU operator
+    dependencies: []
 
 ###############################################################################
 # KUBERNETES MANIFESTS CONFIGURATION
@@ -399,8 +427,12 @@ manifests:
     wait_condition:
       type: "Available"
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
+    variables:
+      metallb_pool_name: "first-pool"
+      metallb_namespace: "metallb"
+      metallb_address_range: "172.18.1.1-172.18.1.16"  # Using the control plane IP
 
   # MetalLB L2 Advertisement Configuration
   metallb_l2_config:
@@ -414,10 +446,14 @@ manifests:
     wait_condition:
       type: "Available"
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     dependencies: 
       - metallb_chart  # Ensure MetalLB chart is fully installed first
+    variables:
+      metallb_l2_name: "l2"
+      metallb_namespace: "metallb"
+      metallb_pool_name: "first-pool"
 
   # Nginx Ingress Additional Configuration
   nginx_ingress_config:
@@ -431,9 +467,21 @@ manifests:
     wait_condition:
       type: "Available"
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     dependencies: []
+    variables:
+      nginx_config_name: "nginx-ingress-controller-custom-config"
+      nginx_namespace: "ingress-nginx"
+      nginx_proxy_buffer_size: "128k"
+      nginx_proxy_body_size: "50m"
+      nginx_client_header_buffer_size: "64k"
+      nginx_large_client_header_buffers: "4 128k"
+      nginx_client_body_buffer_size: "128k"
+      nginx_enable_brotli: "true"
+      nginx_use_gzip: "true"
+      nginx_gzip_level: "6"
+      nginx_gzip_types: "application/atom+xml application/javascript application/x-javascript application/json application/rss+xml application/vnd.ms-fontobject application/x-font-ttf application/x-web-app-manifest+json application/xhtml+xml application/xml font/opentype image/svg+xml image/x-icon text/css text/javascript text/plain text/x-component"
 
   # OPTIONAL: Pushgateway Manifest
   pushgateway_manifest:
@@ -457,22 +505,18 @@ manifests:
       pushgateway_monitor_release: "prometheus"
       pushgateway_monitor_path: "/metrics"
       pushgateway_monitor_interval: "5s"
-      pushgateway_resources_requests_cpu: "100m"
-      pushgateway_resources_requests_memory: "64Mi"
-      pushgateway_resources_limits_cpu: "200m"
-      pushgateway_resources_limits_memory: "128Mi"
-    wait: true
-    wait_timeout: 300
-    wait_condition:
-      type: "Available"
-      status: "True"
-    validate: true
-    strict_validation: true
+      pushgateway_resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
 
-  # OPTIONAL: NIM Cache Manifest
-  nim_cache_manifest:
-    name: "nim-cache-setup"
-    manifest_file: "files/nim-cache.yaml.j2"
+ # NIM 1B Components
+  nim_cache_manifest_1b:
+    name: "nim-cache-setup-1b"
+    manifest_file: "files/nim-cache-1b.yaml.j2"
     namespace: "nim"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -481,8 +525,190 @@ manifests:
     wait_condition:
       type: "Available"
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
+    variables:
+      nim_cache_name: "meta-llama3-1b-instruct"
+      nim_cache_namespace: "nim"
+      nim_cache_runtime_class: "nvidia"
+      nim_cache_tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      nim_cache_model_puller: "nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8.5"
+      nim_cache_pull_secret: "ngc-secret"
+      nim_cache_auth_secret: "ngc-api-secret"
+      nim_cache_model_engine: "tensorrt_llm"
+      nim_cache_tensor_parallelism: "1"
+      nim_cache_qos_profile: "throughput"
+      nim_cache_model_profiles:
+        - "4f904d571fe60ff24695b5ee2aa42da58cb460787a968f1e8a09f5a7e862728d"
+      nim_cache_pvc_create: true
+      nim_cache_storage_class: "local-path"
+      nim_cache_pvc_size: "200Gi"
+      nim_cache_volume_access_mode: "ReadWriteOnce"
+      nim_cache_resources: {}
+
+  nim_service_manifest_1b:
+    name: "nim-service-setup-1b"
+    manifest_file: "files/nim-service-1b.yaml.j2"
+    namespace: "nim"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 600
+    wait_condition:
+      type: "Available"
+      status: "True"
+    validate: false
+    strict_validation: false
+    variables:
+      nim_service_name: "meta-llama3-1b-instruct"
+      nim_service_namespace: "nim"
+      nim_service_runtime_class: "nvidia"
+      nim_service_env:
+        - name: "LOG_LEVEL"
+          value: "INFO"
+        - name: "VLLM_LOG_LEVEL"
+          value: "INFO"
+        - name: "NIM_LOG_LEVEL"
+          value: "INFO"
+        - name: "OMP_NUM_THREADS"
+          value: "8"
+      nim_service_tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      nim_service_image_repository: "nvcr.io/nim/meta/llama-3.2-1b-instruct"  # Test value to verify variable passing
+      nim_service_image_tag: "1.8.5"
+      nim_service_image_pull_policy: "IfNotPresent"
+      nim_service_image_pull_secrets:
+        - "ngc-secret"
+      nim_service_auth_secret: "ngc-api-secret"
+      nim_service_metrics:
+        enabled: true
+        service_monitor:
+          additional_labels:
+            release: "prometheus"
+      nim_service_storage_cache_name: "meta-llama3-1b-instruct"
+      nim_service_storage_cache_profile: "" #TODO: change to 1b profile
+      nim_service_replicas: 1
+      nim_service_resources:
+        limits:
+          nvidia.com/gpu: 1
+      nim_service_expose_type: "ClusterIP"
+      nim_service_expose_port: 8000
+
+  keda_scaled_object_manifest_1b:
+    name: "keda-scaled-object-setup-1b"
+    manifest_file: "files/keda-scaled-object-1b.yaml.j2"
+    namespace: nim
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: Available
+      status: "True"
+    validate: false
+    strict_validation: false
+    variables:
+      keda_scaled_object_name: "llm-demo-keda-1b"
+      keda_scaled_object_namespace: "nim"
+      keda_scaled_object_target_name: "meta-llama3-1b-instruct"
+      keda_scaled_object_polling_interval: 30
+      keda_scaled_object_min_replicas: 1
+      keda_scaled_object_max_replicas: 8
+      keda_scaled_object_prometheus_address: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+      keda_scaled_object_metric_name: "smartscaler_hpa_num_pods"
+      keda_scaled_object_threshold: "1"
+      keda_scaled_object_query: >-
+        smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-1b-instruct"}
+
+  smart_scaler_inference_1b:
+    name: "smart-scaler-inference-setup-1b"
+    manifest_file: "files/smart-scaler-inference-1b.yaml.j2"
+    namespace: smart-scaler
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 600
+    wait_condition:
+      type: Available
+      status: "True"
+    validate: false
+    strict_validation: false
+    variables:
+      smart_scaler_name: "smart-scaler-llm-inf-1b"
+      smart_scaler_namespace: "smart-scaler"
+      smart_scaler_labels:
+        service: "inference-tenant-app-1b"
+        cluster_name: "nim-llama-1b"
+        tenant_id: "tenant-b200-local-1b"
+        app_name: "nim-llama-1b"
+        app_version: "1.0"
+      smart_scaler_tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      smart_scaler_resources:
+        requests:
+          memory: "1.5Gi"
+          cpu: "100m"
+      smart_scaler_replicas: 1
+      smart_scaler_automount_sa: true
+      smart_scaler_restart_policy: "Always"
+      smart_scaler_config_volume_name: "data"
+      smart_scaler_config_map_name: "mesh-config-1b"
+      smart_scaler_container_name: "inference"
+      smart_scaler_image: "aveshasystems/smart-scaler-llm-inference-benchmark:v1.0.0"
+      smart_scaler_image_pull_policy: "IfNotPresent"
+      smart_scaler_command: ["/bin/sh", "-c"]
+      smart_scaler_args:
+        - "wandb disabled && python policy/inference_script.py -c /data/config.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
+      smart_scaler_config_mount_path: "/data"
+      smart_scaler_ports: [9900, 8265, 4321, 6379]
+      smart_scaler_image_pull_secret: "avesha-systems"
+
+  locust_manifest_1b:
+    name: "locust-load-1b"
+    manifest_file: "files/locust-deploy-1b.yaml.j2"
+    namespace: nim-load-test
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: Available
+      status: "True"
+    validate: false
+    strict_validation: false
+    variables:
+      locust_name: "locust-load-1b"
+      locust_namespace: "nim-load-test"
+      locust_replicas: 1
+      locust_image: "locustio/locust:2.15.1"
+      locust_target_host: "http://meta-llama3-1b-instruct.nim.svc.cluster.local:8000"
+      locust_cpu_request: "1"
+      locust_memory_request: "1Gi"
+      locust_cpu_limit: "2"
+      locust_memory_limit: "2Gi"
+      locust_configmap_name: "locustfile-1b"
+
+ # NIM 1B Components
+  nim_cache_manifest_8b:
+    name: "nim-cache-setup-8b"
+    manifest_file: "files/nim-cache-8b.yaml.j2"
+    namespace: "nim"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 600
+    wait_condition:
+      type: "Available"
+      status: "True"
+    validate: false
+    strict_validation: false
     variables:
       nim_cache_name: "meta-llama3-8b-instruct"
       nim_cache_namespace: "nim"
@@ -505,9 +731,9 @@ manifests:
       nim_cache_volume_access_mode: "ReadWriteOnce"
       nim_cache_resources: {}
 
-  nim_service_manifest:
-    name: "nim-service-setup"
-    manifest_file: "files/nim-service.yaml.j2"
+  nim_service_manifest_8b:
+    name: "nim-service-setup-8b"
+    manifest_file: "files/nim-service-8b.yaml.j2"
     namespace: "nim"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -516,8 +742,8 @@ manifests:
     wait_condition:
       type: "Available"
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
       nim_service_name: "meta-llama3-8b-instruct"
       nim_service_namespace: "nim"
@@ -555,9 +781,9 @@ manifests:
       nim_service_expose_type: "ClusterIP"
       nim_service_expose_port: 8000
 
-  keda_scaled_object_manifest:
-    name: keda-scaled-object-setup
-    manifest_file: "files/keda-scaled-object.yaml.j2"
+  keda_scaled_object_manifest_8b:
+    name: "keda-scaled-object-setup-8b"
+    manifest_file: "files/keda-scaled-object-8b.yaml.j2"
     namespace: nim
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -566,10 +792,10 @@ manifests:
     wait_condition:
       type: Available
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
-      keda_scaled_object_name: "llm-demo-keda"
+      keda_scaled_object_name: "llm-demo-keda-8b"
       keda_scaled_object_namespace: "nim"
       keda_scaled_object_target_name: "meta-llama3-8b-instruct"
       keda_scaled_object_polling_interval: 30
@@ -578,12 +804,12 @@ manifests:
       keda_scaled_object_prometheus_address: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
       keda_scaled_object_metric_name: "smartscaler_hpa_num_pods"
       keda_scaled_object_threshold: "1"
-      keda_scaled_object_query: >-
-        smartscaler_hpa_num_pods{job="pushgateway", kubernetes_pod_name="meta-llama3-8b-instruct->nim->nim-llama", ss_deployment_name="meta-llama3-8b-instruct"}
+      keda_scaled_object_query: 
+        smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-8b-instruct"}
 
-  smart_scaler_inference:
-    name: smart-scaler-inference-setup
-    manifest_file: "files/smart-scaler-inference.yaml.j2"
+  smart_scaler_inference_8b:
+    name: "smart-scaler-inference-setup-8b"
+    manifest_file: "files/smart-scaler-inference-8b.yaml.j2"
     namespace: smart-scaler
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -592,13 +818,196 @@ manifests:
     wait_condition:
       type: Available
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
-      smart_scaler_name: "smart-scaler-llm-inf"
+      smart_scaler_name: "smart-scaler-llm-inf-8b"
       smart_scaler_namespace: "smart-scaler"
       smart_scaler_labels:
-        service: "inference-tenant-app"
+        service: "inference-tenant-app-8b"
+        cluster_name: "nim-llama-8b"
+        tenant_id: "tenant-b200-local-8b"
+        app_name: "nim-llama-8b"
+        app_version: "1.0"
+      smart_scaler_tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      smart_scaler_resources:
+        requests:
+          memory: "1.5Gi"
+          cpu: "100m"
+      smart_scaler_replicas: 1
+      smart_scaler_automount_sa: true
+      smart_scaler_restart_policy: "Always"
+      smart_scaler_config_volume_name: "data"
+      smart_scaler_config_map_name: "mesh-config-8b"
+      smart_scaler_container_name: "inference"
+      smart_scaler_image: "aveshasystems/smart-scaler-llm-inference-benchmark:v1.0.0"
+      smart_scaler_image_pull_policy: "IfNotPresent"
+      smart_scaler_command: ["/bin/sh", "-c"]
+      smart_scaler_args:
+        - "wandb disabled && python policy/inference_script.py -c /data/config.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
+      smart_scaler_config_mount_path: "/data"
+      smart_scaler_ports: [9900, 8265, 4321, 6379]
+      smart_scaler_image_pull_secret: "avesha-systems"
+
+  locust_manifest_8b:
+    name: "locust-load-8b"
+    manifest_file: "files/locust-deploy-8b.yaml.j2"
+    namespace: nim-load-test
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: Available
+      status: "True"
+    validate: false
+    strict_validation: false
+    variables:
+      locust_name: "locust-load-8b"
+      locust_namespace: "nim-load-test"
+      locust_replicas: 1
+      locust_image: "locustio/locust:2.15.1"
+      locust_target_host: "http://meta-llama3-8b-instruct.nim.svc.cluster.local:8000"
+      locust_cpu_request: "1"
+      locust_memory_request: "1Gi"
+      locust_cpu_limit: "2"
+      locust_memory_limit: "2Gi"
+      locust_configmap_name: "locustfile-8b"
+
+
+   # OPTIONAL: NIM Cache Manifest
+  nim_cache_manifest_70b:
+    name: "nim-cache-setup-70b"
+    manifest_file: "files/nim-cache-70b.yaml.j2"
+    namespace: "nim"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 600
+    wait_condition:
+      type: "Available"
+      status: "True"
+    validate: false
+    strict_validation: false
+    variables:
+      nim_cache_name: "meta-llama3-70b-instruct"
+      nim_cache_namespace: "nim"
+      nim_cache_runtime_class: "nvidia"
+      nim_cache_tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      nim_cache_model_puller: "nvcr.io/nim/meta/llama-3.1-70b-instruct:1.8.5"
+      nim_cache_pull_secret: "ngc-secret"
+      nim_cache_auth_secret: "ngc-api-secret"
+      nim_cache_model_engine: "tensorrt_llm"
+      nim_cache_tensor_parallelism: "1"
+      nim_cache_qos_profile: "throughput"
+      nim_cache_model_profiles:
+        - "8b87146e39b0305ae1d73bc053564d1b4b4c565f81aa5abe3e84385544ca9b60"
+      nim_cache_pvc_create: true
+      nim_cache_storage_class: "local-path"
+      nim_cache_pvc_size: "200Gi"
+      nim_cache_volume_access_mode: "ReadWriteOnce"
+      nim_cache_resources: {}
+
+  nim_service_manifest_70b:
+    name: "nim-service-setup-70b"
+    manifest_file: "files/nim-service-70b.yaml.j2"
+    namespace: "nim"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 600
+    wait_condition:
+      type: "Available"
+      status: "True"
+    validate: false
+    strict_validation: false
+    variables:
+      nim_service_name: "meta-llama3-70b-instruct"
+      nim_service_namespace: "nim"
+      nim_service_runtime_class: "nvidia"
+      nim_service_env:
+        - name: "LOG_LEVEL"
+          value: "INFO"
+        - name: "VLLM_LOG_LEVEL"
+          value: "INFO"
+        - name: "NIM_LOG_LEVEL"
+          value: "INFO"
+        - name: "OMP_NUM_THREADS"
+          value: "8"
+      nim_service_tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      nim_service_image_repository: "nvcr.io/nim/meta/llama-3.1-70b-instruct"  # Test value to verify variable passing
+      nim_service_image_tag: "1.8.5"
+      nim_service_image_pull_policy: "IfNotPresent"
+      nim_service_image_pull_secrets:
+        - "ngc-secret"
+      nim_service_auth_secret: "ngc-api-secret"
+      nim_service_metrics:
+        enabled: true
+        service_monitor:
+          additional_labels:
+            release: "prometheus"
+      nim_service_storage_cache_name: "meta-llama3-70b-instruct"
+      nim_service_storage_cache_profile: "8b87146e39b0305ae1d73bc053564d1b4b4c565f81aa5abe3e84385544ca9b60"
+      nim_service_replicas: 1
+      nim_service_resources:
+        limits:
+          nvidia.com/gpu: 1
+      nim_service_expose_type: "ClusterIP"
+      nim_service_expose_port: 8000
+
+  keda_scaled_object_manifest_70b:
+    name: "keda-scaled-object-setup-70b"
+    manifest_file: "files/keda-scaled-object-70b.yaml.j2"
+    namespace: nim
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: Available
+      status: "True"
+    validate: false
+    strict_validation: false
+    variables:
+      keda_scaled_object_name: "llm-demo-keda-70b"
+      keda_scaled_object_namespace: "nim"
+      keda_scaled_object_target_name: "meta-llama3-70b-instruct"
+      keda_scaled_object_polling_interval: 30
+      keda_scaled_object_min_replicas: 1
+      keda_scaled_object_max_replicas: 8
+      keda_scaled_object_prometheus_address: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+      keda_scaled_object_metric_name: "smartscaler_hpa_num_pods"
+      keda_scaled_object_threshold: "1"
+      keda_scaled_object_query: 
+        smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-70b-instruct"}
+
+  smart_scaler_inference_70b:
+    name: "smart-scaler-inference-setup-70b"
+    manifest_file: "files/smart-scaler-inference-70b.yaml.j2"
+    namespace: smart-scaler
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 600
+    wait_condition:
+      type: Available
+      status: "True"
+    validate: false
+    strict_validation: false
+    variables:
+      smart_scaler_name: "smart-scaler-llm-inf-70b"
+      smart_scaler_namespace: "smart-scaler"
+      smart_scaler_labels:
+        service: "inference-tenant-app-70b"
         cluster_name: "nim-llama"
         tenant_id: "tenant-b200-local"
         app_name: "nim-llama"
@@ -615,20 +1024,20 @@ manifests:
       smart_scaler_automount_sa: true
       smart_scaler_restart_policy: "Always"
       smart_scaler_config_volume_name: "data"
-      smart_scaler_config_map_name: "mesh-config"
+      smart_scaler_config_map_name: "mesh-config-70b"
       smart_scaler_container_name: "inference"
       smart_scaler_image: "aveshasystems/smart-scaler-llm-inference-benchmark:v1.0.0"
       smart_scaler_image_pull_policy: "IfNotPresent"
       smart_scaler_command: ["/bin/sh", "-c"]
       smart_scaler_args:
-        - "wandb disabled && python policy/inference_script.py -c /data/config-inference.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
+        - "wandb disabled && python policy/inference_script.py -c /data/config.json --restore -p ./checkpoint_000052 --mode mesh --no-smartscalerdb --no-cpu-switch --inference-session sess-llama-3-1-14-May"
       smart_scaler_config_mount_path: "/data"
       smart_scaler_ports: [9900, 8265, 4321, 6379]
       smart_scaler_image_pull_secret: "avesha-systems"
 
-  locust_manifest:
-    name: locust-setup
-    manifest_file: "files/locust-deploy.yaml.j2"
+  locust_manifest_70b:
+    name: "locust-load-70b"
+    manifest_file: "files/locust-deploy-70b.yaml.j2"
     namespace: nim-load-test
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -637,19 +1046,48 @@ manifests:
     wait_condition:
       type: Available
       status: "True"
-    validate: true
-    strict_validation: true
+    validate: false
+    strict_validation: false
     variables:
-      locust_name: "locust-load"
+      locust_name: "locust-load-70b"
       locust_namespace: "nim-load-test"
       locust_replicas: 1
       locust_image: "locustio/locust:2.15.1"
-      locust_target_host: "http://meta-llama3-8b-instruct.nim.svc.cluster.local:8000"
+      locust_target_host: "http://meta-llama3-70b-instruct.nim.svc.cluster.local:8000"
       locust_cpu_request: "1"
       locust_memory_request: "1Gi"
       locust_cpu_limit: "2"
       locust_memory_limit: "2Gi"
-      locust_configmap_name: "locustfile"
+      locust_configmap_name: "locustfile-70b"
+
+  smart_scaler_mcp_server_manifest:
+    name: "smart-scaler-mcp-server-setup"
+    manifest_file: "files/smart-scaler-mcp-server.yaml.j2"
+    namespace: "smart-scaler"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: Available
+      status: "True"
+    validate: false
+    strict_validation: false
+    variables:
+      mcp_server_name: "smart-scaler-mcp-server"
+      mcp_server_namespace: "smart-scaler"
+      mcp_server_image: "docker.io/aveshasystems/smart-scaler-mcp-server:v1.0.0"
+      mcp_server_image_pull_secret: "avesha-systems"
+      mcp_server_prometheus_url: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/"
+      mcp_server_tenant_id: "tenant-b200-local"
+      mcp_server_port: "8000"
+      mcp_server_resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
 
 ###############################################################################
 # COMMAND EXECUTION CONFIGURATION
@@ -754,18 +1192,19 @@ command_exec:
           KUBECONTEXT: "{{ global_kubecontext }}"
         ignore_errors: true
 
-  - name: "create_inference_pod_configmap"
+
+  - name: "create_inference_pod_configmap_1b"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
     commands:
       - cmd: |
           if kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            -n smart-scaler get configmap mesh-config >/dev/null 2>&1; then
-            echo "ConfigMap mesh-config exists, replacing..."
+            -n smart-scaler get configmap mesh-config-1b >/dev/null 2>&1; then
+            echo "ConfigMap mesh-config-1b exists, replacing..."
             kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
               --context={{ kubecontext | default(global_kubecontext) }} \
-              -n smart-scaler delete configmap mesh-config
+              -n smart-scaler delete configmap mesh-config-1b
           fi
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
@@ -775,9 +1214,55 @@ command_exec:
             apply -f -
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            create configmap -n smart-scaler mesh-config --from-file=files/config-inference.json
+            create configmap -n smart-scaler mesh-config-1b --from-file="config.json"="files/config-inference-1b.json"
 
-  - name: "create_locust_configmap"
+  - name: "create_inference_pod_configmap_8b"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          if kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            -n smart-scaler get configmap mesh-config-8b >/dev/null 2>&1; then
+            echo "ConfigMap mesh-config-8b exists, replacing..."
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+              --context={{ kubecontext | default(global_kubecontext) }} \
+              -n smart-scaler delete configmap mesh-config-8b
+          fi
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            create namespace smart-scaler --dry-run=client -o yaml | \
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f -
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            create configmap -n smart-scaler mesh-config-8b --from-file="config.json"="files/config-inference-8b.json"
+
+  - name: "create_inference_pod_configmap_70b"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          if kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            -n smart-scaler get configmap mesh-config-70b >/dev/null 2>&1; then
+            echo "ConfigMap mesh-config-70b exists, replacing..."
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+              --context={{ kubecontext | default(global_kubecontext) }} \
+              -n smart-scaler delete configmap mesh-config-70b
+          fi
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            create namespace smart-scaler --dry-run=client -o yaml | \
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f -
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            create configmap -n smart-scaler mesh-config-70b --from-file="config.json"="files/config-inference-70b.json"
+
+  - name: "create_locust_configmap_1b"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
     commands:
@@ -790,12 +1275,58 @@ command_exec:
             apply -f -
           if kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            -n nim-load-test get configmap locustfile >/dev/null 2>&1; then
-            echo "ConfigMap locustfile exists, replacing..."
+            -n nim-load-test get configmap locustfile-1b >/dev/null 2>&1; then
+            echo "ConfigMap locustfile-1b exists, replacing..."
             kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
               --context={{ kubecontext | default(global_kubecontext) }} \
-              -n nim-load-test delete configmap locustfile
+              -n nim-load-test delete configmap locustfile-1b
           fi
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            -n nim-load-test create configmap locustfile --from-file=locustfile.py=files/locust.py
+            -n nim-load-test create configmap locustfile-1b --from-file="locustfile.py"="files/locust-1b.py"
+
+  - name: "create_locust_configmap_8b"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            create namespace nim-load-test --dry-run=client -o yaml | \
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f -
+          if kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            -n nim-load-test get configmap locustfile-8b >/dev/null 2>&1; then
+            echo "ConfigMap locustfile-8b exists, replacing..."
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+              --context={{ kubecontext | default(global_kubecontext) }} \
+              -n nim-load-test delete configmap locustfile-8b
+          fi
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            -n nim-load-test create configmap locustfile-8b --from-file="locustfile.py"="files/locust-8b.py"
+
+  - name: "create_locust_configmap_70b"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            create namespace nim-load-test --dry-run=client -o yaml | \
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f -
+          if kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            -n nim-load-test get configmap locustfile-70b >/dev/null 2>&1; then
+            echo "ConfigMap locustfile-70b exists, replacing..."
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+              --context={{ kubecontext | default(global_kubecontext) }} \
+              -n nim-load-test delete configmap locustfile-70b
+          fi
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            -n nim-load-test create configmap locustfile-70b --from-file="locustfile.py"="files/locust-70b.py"

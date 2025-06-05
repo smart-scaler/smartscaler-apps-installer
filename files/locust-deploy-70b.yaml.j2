@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ manifest_vars.locust_name | default('locust-load-70b') }}
+  namespace: {{ manifest_vars.locust_namespace | default('nim-load-test') }}
+  labels:
+    app: {{ manifest_vars.locust_name | default('locust-load-70b') }}
+spec:
+  replicas: {{ manifest_vars.locust_replicas | default(1) }}
+  selector:
+    matchLabels:
+      app: {{ manifest_vars.locust_name | default('locust-load-70b') }}
+  template:
+    metadata:
+      labels:
+        app: {{ manifest_vars.locust_name | default('locust-load-70b') }}
+    spec:
+      containers:
+        - name: locust
+          image: {{ manifest_vars.locust_image | default('locustio/locust:2.15.1') }}
+          command: ["locust"]
+          args:
+            - "-f"
+            - "/locust/locustfile.py"
+            - "--headless"
+            - "--host"
+            - "{{ manifest_vars.locust_target_host | default('http://meta-llama3-70b-instruct.nim.svc.cluster.local:8000') }}"
+          volumeMounts:
+            - name: locustfile
+              mountPath: /locust
+          resources:
+            requests:
+              cpu: {{ manifest_vars.locust_cpu_request | default('1') }}
+              memory: {{ manifest_vars.locust_memory_request | default('1Gi') }}
+            limits:
+              cpu: {{ manifest_vars.locust_cpu_limit | default('2') }}
+              memory: {{ manifest_vars.locust_memory_limit | default('2Gi') }}
+      volumes:
+        - name: locustfile
+          configMap:
+            name: {{ manifest_vars.locust_configmap_name | default('locustfile-70b') }} 

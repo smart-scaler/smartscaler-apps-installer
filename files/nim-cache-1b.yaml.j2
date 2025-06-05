@@ -1,0 +1,65 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: {{ manifest_vars.nim_cache_name | default('meta-llama3-1b-instruct') }}
+  namespace: {{ manifest_vars.nim_cache_namespace | default('nim') }}
+{% if manifest_vars.nim_cache_labels is defined %}
+  labels:
+{% for key, value in manifest_vars.nim_cache_labels.items() %}
+    {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+spec:
+  runtimeClassName: {{ manifest_vars.nim_cache_runtime_class | default('nvidia') }}
+{% if manifest_vars.nim_cache_tolerations is defined %}
+  tolerations:
+{% for toleration in manifest_vars.nim_cache_tolerations %}
+    - key: "{{ toleration.key | default('nvidia.com/gpu') }}"
+      operator: "{{ toleration.operator | default('Exists') }}"
+      effect: "{{ toleration.effect | default('NoSchedule') }}"
+{% if toleration.value is defined %}
+      value: "{{ toleration.value }}"
+{% endif %}
+{% endfor %}
+{% else %}
+  tolerations:
+    - key: "nvidia.com/gpu"
+      operator: "Exists"
+      effect: "NoSchedule"
+{% endif %}
+  source:
+    ngc:
+      modelPuller: "{{ manifest_vars.nim_cache_model_puller | default('nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8.5') }}"
+      pullSecret: "{{ manifest_vars.nim_cache_pull_secret | default('ngc-secret') }}"
+      authSecret: "{{ manifest_vars.nim_cache_auth_secret | default('ngc-api-secret') }}"
+      model:
+        engine: "{{ manifest_vars.nim_cache_model_engine | default('vllm') }}"
+        tensorParallelism: "{{ manifest_vars.nim_cache_tensor_parallelism | default('1') }}"
+        qosProfile: "{{ manifest_vars.nim_cache_qos_profile | default('throughput') }}"
+        profiles:
+{% for profile in manifest_vars.nim_cache_model_profiles | default(['8b87146e39b0305ae1d73bc053564d1b4b4c565f81aa5abe3e84385544ca9b60']) %}
+          - {{ profile }}
+{% endfor %}
+  storage:
+    pvc:
+      create: {{ manifest_vars.nim_cache_pvc_create | default(true) }}
+      storageClass: "{{ manifest_vars.nim_cache_storage_class | default('local-path') }}"
+      size: "{{ manifest_vars.nim_cache_pvc_size | default('200Gi') }}"
+      volumeAccessMode: "{{ manifest_vars.nim_cache_volume_access_mode | default('ReadWriteOnce') }}"
+{% if manifest_vars.nim_cache_resources is defined %}
+  resources:
+{% if manifest_vars.nim_cache_resources.requests is defined %}
+    requests:
+{% for resource, value in manifest_vars.nim_cache_resources.requests.items() %}
+      {{ resource }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+{% if manifest_vars.nim_cache_resources.limits is defined %}
+    limits:
+{% for resource, value in manifest_vars.nim_cache_resources.limits.items() %}
+      {{ resource }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+{% else %}
+  resources: {}
+{% endif %} 

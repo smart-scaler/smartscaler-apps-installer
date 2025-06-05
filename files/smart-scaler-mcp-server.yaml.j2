@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ manifest_variables.mcp_server_name }}
+  namespace: {{ manifest_variables.mcp_server_namespace }}
+  labels:
+    app: {{ manifest_variables.mcp_server_name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ manifest_variables.mcp_server_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ manifest_variables.mcp_server_name }}
+    spec:
+      imagePullSecrets:
+      - name: {{ manifest_variables.mcp_server_image_pull_secret }}
+      containers:
+        - name: {{ manifest_variables.mcp_server_name }}
+          image: {{ manifest_variables.mcp_server_image }}
+          command:
+            - python
+            - '-m'
+            - prometheus_mcp_server.main
+          args:
+            - '--transport'
+            - http
+            - '--port'
+            - '{{ manifest_variables.mcp_server_port }}'
+          env:
+            - name: PROMETHEUS_URL
+              value: {{ manifest_variables.mcp_server_prometheus_url }}
+            - name: PROMETHEUS_USERNAME
+              value: ""
+            - name: PROMETHEUS_PASSWORD
+              value: ""
+            - name: TENANT_ID
+              value: {{ manifest_variables.mcp_server_tenant_id }}
+          resources:
+            limits:
+              cpu: {{ manifest_variables.mcp_server_resources.limits.cpu }}
+              memory: {{ manifest_variables.mcp_server_resources.limits.memory }}
+            requests:
+              cpu: {{ manifest_variables.mcp_server_resources.requests.cpu }}
+              memory: {{ manifest_variables.mcp_server_resources.requests.memory }}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: Always
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext: {}
+      schedulerName: default-scheduler
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ manifest_variables.mcp_server_name }}
+  namespace: {{ manifest_variables.mcp_server_namespace }}
+  labels:
+    app: {{ manifest_variables.mcp_server_name }}
+spec:
+  ports:
+    - protocol: TCP
+      port: {{ manifest_variables.mcp_server_port }}
+      targetPort: {{ manifest_variables.mcp_server_port }}
+  selector:
+    app: {{ manifest_variables.mcp_server_name }}
+  type: NodePort
+  sessionAffinity: None
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  internalTrafficPolicy: Cluster

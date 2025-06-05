@@ -35,19 +35,19 @@
   when: item.manifest_content is defined and item.manifest_content != None
   register: temp_manifest
 
-- name: Set template variables
-  set_fact:
-    template_vars: "{{ item.variables | default({}) | combine({'namespace': item.variables.namespace}) }}"
-  when: item.variables is defined and item.variables.namespace is defined
+- name: Debug variables before template
+  debug:
+    var: item.variables
+  when: item.manifest_file is defined
 
 - name: Create temporary manifest file from template
   template:
     src: "{{ item.manifest_file }}"
     dest: "/tmp/{{ item.name }}-rendered-manifest.yaml"
-  vars:
-    manifest_vars: "{{ item.variables | default({}) }}"
   when: item.manifest_file is defined and item.manifest_file != None
   register: temp_rendered_manifest
+  vars:
+    manifest_variables: "{{ item.variables | default({}) }}"
 
 - name: Apply manifest from file
   kubernetes.core.k8s:
@@ -68,12 +68,14 @@
 
 - name: Remove temporary manifest files
   file:
-    path: "{{ item }}"
+    path: "{{ temp_file }}"
     state: absent
-  with_items:
+  loop:
     - "{{ temp_manifest.dest | default('') }}"
     - "{{ temp_rendered_manifest.dest | default('') }}"
-  when: item != ''
+  loop_control:
+    loop_var: temp_file
+  when: temp_file != ''
 
 - name: Debug manifest result
   debug:
