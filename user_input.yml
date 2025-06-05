@@ -494,8 +494,8 @@ manifests:
 
  # NIM 1B Components
   nim_cache_manifest_1b:
-    name: "nim-cache-setup_1b"
-    manifest_file: "files/nim-cache.yaml_1b.j2"
+    name: "nim-cache-setup-1b"
+    manifest_file: "files/nim-cache-1b.yaml.j2"
     namespace: "nim"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -529,8 +529,8 @@ manifests:
       nim_cache_resources: {}
 
   nim_service_manifest_1b:
-    name: "nim-service-setup_1b"
-    manifest_file: "files/nim-service.yaml_1b.j2"
+    name: "nim-service-setup-1b"
+    manifest_file: "files/nim-service-1b.yaml.j2"
     namespace: "nim"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -579,8 +579,8 @@ manifests:
       nim_service_expose_port: 8000
 
   keda_scaled_object_manifest_1b:
-    name: keda-scaled-object-setup_1b
-    manifest_file: "files/keda-scaled-object.yaml_1b.j2"
+    name: "keda-scaled-object-setup-1b"
+    manifest_file: "files/keda-scaled-object-1b.yaml.j2"
     namespace: nim
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -605,8 +605,8 @@ manifests:
         smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-1b-instruct"}
 
   smart_scaler_inference_1b:
-    name: smart-scaler-inference-setup_1b
-    manifest_file: "files/smart-scaler-inference.yaml_1b.j2"
+    name: "smart-scaler-inference-setup-1b"
+    manifest_file: "files/smart-scaler-inference-1b.yaml.j2"
     namespace: smart-scaler
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -650,8 +650,8 @@ manifests:
       smart_scaler_image_pull_secret: "avesha-systems"
 
   locust_manifest_1b:
-    name: locust-load-1b
-    manifest_file: "files/locust-deploy_1b.yaml.j2"
+    name: "locust-load-1b"
+    manifest_file: "files/locust-deploy-1b.yaml.j2"
     namespace: nim-load-test
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -676,8 +676,8 @@ manifests:
 
  # NIM 1B Components
   nim_cache_manifest_8b:
-    name: "nim-cache-setup_8b"
-    manifest_file: "files/nim-cache.yaml_8b.j2"
+    name: "nim-cache-setup-8b"
+    manifest_file: "files/nim-cache-8b.yaml.j2"
     namespace: "nim"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -711,8 +711,8 @@ manifests:
       nim_cache_resources: {}
 
   nim_service_manifest_8b:
-    name: "nim-service-setup_8b"
-    manifest_file: "files/nim-service.yaml_8b.j2"
+    name: "nim-service-setup-8b"
+    manifest_file: "files/nim-service-8b.yaml.j2"
     namespace: "nim"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -761,8 +761,8 @@ manifests:
       nim_service_expose_port: 8000
 
   keda_scaled_object_manifest_8b:
-    name: keda-scaled-object-setup_8b
-    manifest_file: "files/keda-scaled-object.yaml_8b.j2"
+    name: "keda-scaled-object-setup-8b"
+    manifest_file: "files/keda-scaled-object-8b.yaml.j2"
     namespace: nim
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -787,8 +787,8 @@ manifests:
         smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-8b-instruct"}
 
   smart_scaler_inference_8b:
-    name: smart-scaler-inference-setup_8b
-    manifest_file: "files/smart-scaler-inference.yaml_8b.j2"
+    name: "smart-scaler-inference-setup-8b"
+    manifest_file: "files/smart-scaler-inference-8b.yaml.j2"
     namespace: smart-scaler
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -832,8 +832,8 @@ manifests:
       smart_scaler_image_pull_secret: "avesha-systems"
 
   locust_manifest_8b:
-    name: locust-load-8b
-    manifest_file: "files/locust-deploy_8b.yaml.j2"
+    name: "locust-load-8b"
+    manifest_file: "files/locust-deploy-8b.yaml.j2"
     namespace: nim-load-test
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -859,8 +859,8 @@ manifests:
 
    # OPTIONAL: NIM Cache Manifest
   nim_cache_manifest_70b:
-    name: "nim-cache-setup_70b"
-    manifest_file: "files/nim-cache.yaml_70b.j2"
+    name: "nim-cache-setup-70b"
+    manifest_file: "files/nim-cache-70b.yaml.j2"
     namespace: "nim"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -894,8 +894,8 @@ manifests:
       nim_cache_resources: {}
 
   nim_service_manifest_70b:
-    name: "nim-service-setup_70b"
-    manifest_file: "files/nim-service.yaml_70b.j2"
+    name: "nim-service-setup-70b"
+    manifest_file: "files/nim-service-70b.yaml.j2"
     namespace: "nim"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -944,8 +944,8 @@ manifests:
       nim_service_expose_port: 8000
 
   keda_scaled_object_manifest_70b:
-    name: keda-scaled-object-setup_70b
-    manifest_file: "files/keda-scaled-object.yaml_70b.j2"
+    name: "keda-scaled-object-setup-70b"
+    manifest_file: "files/keda-scaled-object-70b.yaml.j2"
     namespace: nim
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -970,8 +970,8 @@ manifests:
         smartscaler_hpa_num_pods{job="pushgateway", ss_deployment_name="meta-llama3-70b-instruct"}
 
   smart_scaler_inference_70b:
-    name: smart-scaler-inference-setup_70b
-    manifest_file: "files/smart-scaler-inference.yaml_70b.j2"
+    name: "smart-scaler-inference-setup-70b"
+    manifest_file: "files/smart-scaler-inference-70b.yaml.j2"
     namespace: smart-scaler
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
@@ -1015,8 +1015,8 @@ manifests:
       smart_scaler_image_pull_secret: "avesha-systems"
 
   locust_manifest_70b:
-    name: locust-load-70b
-    manifest_file: "files/locust-deploy_70b.yaml.j2"
+    name: "locust-load-70b"
+    manifest_file: "files/locust-deploy-70b.yaml.j2"
     namespace: nim-load-test
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
