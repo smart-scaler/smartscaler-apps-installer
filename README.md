@@ -93,13 +93,13 @@ kubernetes_deployment:
     secure: true                         # Set to true to use HTTPS when connecting to the API server
 
   ssh_key_path: "/absolute/path/to/.ssh/k8s_rsa"  # Full path to the SSH private key used to access the nodes
-  default_ansible_user: "ubuntu"         # Default SSH username for Ansible to connect to nodes
+  default_ansible_user: "REPLACE_SSH_USER"         # Default SSH username for Ansible to connect to nodes
   ansible_sudo_pass: ""                  # Optional: Sudo password; leave empty to be prompted at runtime
   
   control_plane_nodes:
     - name: "master-1"                   # Identifier name for the control plane node
       ansible_host: "YOUR_MASTER_PUBLIC_IP"   # Public IP address of the control plane node for SSH
-      ansible_user: "ubuntu"             # SSH username for this node (overrides default if set)
+      ansible_user: "REPLACE_SSH_USER"             # SSH username for this node (overrides default if set)
       ansible_become: true               # Enable privilege escalation (sudo) on this node
       ansible_become_method: "sudo"      # Method used for privilege escalation
       private_ip: "YOUR_MASTER_PRIVATE_IP"    # Private/internal IP used for cluster communication, use same public ip if not available
