@@ -1,0 +1,536 @@
+{
+    "common_config": {
+        "logging_config": {
+            "wandb-enable": true,
+            "wandb-trainer": false,
+            "project-name": "vllm-scaling-demo_mesh",
+            "description": "Default run message"
+        },
+        "customer_labels": {
+            "ss_app_name": "nim-llama",
+            "ss_tenant_name": "tenant-b200-local",
+            "ss_app_version": "1.0",
+            "ss_cluster_name": "nim-llama"
+        },
+        "policy_client_config": {
+            "inference_mode": "remote",
+            "update_interval": 120,
+            "no_train": false,
+            "stop_reward": 1000,
+            "ep_len": 240,
+            "step_window_delay": 30
+        },
+        "policy_server": {
+            "server_info": {
+                "server_address": "localhost",
+                "server_port": 9900
+            },
+            "trainer_config": {
+                "algorithm": "PPO",
+                "env": "MultiAgentAutoScalingEnv",
+                "rollout_fragment_length": 480,
+                "train_batch_size": 960,
+                "sgd_minibatch_size": 256,
+                "log_level": "INFO",
+                "num_workers": 0,
+                "output_dir": "./policy-data",
+                "output_compress_columns": [],
+                "checkpoint": {
+                    "filename_prefix": "last_checkpoint",
+                    "no_restore": true,
+                    "checkpoint_freq": 1
+                }
+            }
+        },
+        "adapter_type": "mesh",
+        "model_type": "non-fcnet",
+        "no_event_service_list": []
+    },
+    "clusters": {
+        "nim-llama": {
+            "namespaces": {
+                "nim": {
+                    "services": {
+                        "meta-llama3-70b-instruct_70b": {
+                            "service_labels": {
+                                "ss_namespace": "nim",
+                                "ss_deployment_name": "meta-llama3-70b-instruct_70b",
+                                "ss_cluster_name": "nim-llama"
+                            },
+                            "metrics_config": {
+                                "metrics_list": [
+                                    {
+                                        "metrics": {
+                                            "failed_reqs_percentage": {
+                                                "ranges": {
+                                                    "min": 0,
+                                                    "max": 1
+                                                },
+                                                "sim": {},
+                                                "obs": true,
+                                                "reward": true,
+                                                "latency": false,
+                                                "query": "sum(num_requests_running{model_name='meta/lama-3.1-70b-instruct', namespace='nim'}) + sum(num_requests_waiting{model_name='meta/lama-3.1-70b-instruct', namespace='nim'})"
+                                            },
+                                            "rps": {
+                                                "ranges": {
+                                                    "min": null,
+                                                    "max": null
+                                                },
+                                                "safety_check_config": {
+                                                    "high_metric_threshold": 0.95,
+                                                    "upper_bound_scaling": 2,
+                                                    "lower_bound_scaling": 0.7
+                                                },
+                                                "rps_capacity_per_pod": 80,
+                                                "rps_csv_path": "/home/avesha/rl/rlautoscaler/notebooks/csv_data/rps.csv",
+                                                "pod_cap_csv_path": "/home/avesha/rl/rlautoscaler/notebooks/csv_data/default_podcapacities.csv",
+                                                "pod_cap_model": "default",
+                                                "sim": {},
+                                                "obs": true,
+                                                "reward": true,
+                                                "query": "sum(num_requests_running{model_name='meta/lama-3.1-70b-instruct', namespace='nim'}) + sum(num_requests_waiting{model_name='meta/lama-3.1-70b-instruct', namespace='nim'})"
+                                            },
+                                            "cost": {
+                                                "ranges": {
+                                                    "min": null,
+                                                    "max": null
+                                                },
+                                                "clip": 50,
+                                                "scaling_check_config": {
+                                                    "scale_up_threshold": 2,
+                                                    "scale_down_threshold": 0.7
+                                                },
+                                                "sim": {},
+                                                "obs": true,
+                                                "reward": true,
+                                                "query": "count(num_requests_running{model_name='meta/lama-3.1-70b-instruct', namespace='nim'})"
+                                            },
+                                            "cpu_recommendation": {
+                                                "query_utilization": "sum(smartscaler_vllm_gpu_cache_usage_perc{model_name='meta/lama-3.1-70b-instruct', namespace='nim'})/ count(smartscaler_vllm_gpu_cache_usage_perc{model_name='meta/lama-3.1-70b-instruct', namespace='nim'})",
+                                                "target_utilization": 60,
+                                                "obs": false,
+                                                "reward": false
+                                            }
+                                        },
+                                        "query_params": {
+                                            "slope": true,
+                                            "range": 10,
+                                            "sliding_window_len": 11,
+                                            "steps": 30
+                                        },
+                                        "database": {
+                                            "name": "prometheus",
+                                            "url": "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090",
+                                  
+                                            "saas": true
+                                        },
+                                        "buffer_pods": 0
+                                    }
+                                ]
+                            },
+                            "overall_qos_objective": {
+                                "failed_reqs_percentage": {
+                                    "high": 0.01,
+                                    "low": 0
+                                },
+                                "latency": {
+                                    "high": 2500,
+                                    "low": 0
+                                }
+                            },
+                            "algorithmConfig": {
+                                "env_config": {
+                                    "env_name": "AutoScalingEnv",
+                                    "action_config": {
+                                        "action_type": "override_scaling_factor",
+                                        "scaling_factor": {
+                                            "num_levels": 4,
+                                            "start": 0,
+                                            "end": 2,
+                                            "interval_type": "left_skewed",
+                                            "skewness": 0.75
+                                        },
+                                        "direct": {
+                                            "pods_scaling": 6
+                                        },
+                                        "override_scaling_factor": [
+                                            0.05,
+                                            0.1,
+                                            0.15,
+                                            0.2,
+                                            0.25,
+                                            0.3,
+                                            0.35,
+                                            0.4,
+                                            0.45,
+                                            0.5,
+                                            0.55,
+                                            0.6,
+                                            0.65,
+                                            0.7,
+                                            0.75,
+                                            0.8,
+                                            0.85,
+                                            0.9,
+                                            0.95,
+                                            1,
+                                            1.2,
+                                            1.4,
+                                            1.6,
+                                            1.8,
+                                            2,
+                                            2.25,
+                                            2.5,
+                                            2.75,
+                                            3,
+                                            3.25,
+                                            3.5,
+                                            3.75,
+                                            4,
+                                            4.25,
+                                            4.5,
+                                            4.75,
+                                            5,
+                                            6,
+                                            7,
+                                            8,
+                                            9,
+                                            10
+                                        ],
+                                        "asg_action_config": {
+                                            "pods_per_node": 3,
+                                            "std_deviation": 1
+                                        }
+                                    },
+                                    "obs_config": {
+                                        "obs_type": "dict_slope-prediction",
+                                        "num_metrics": 3,
+                                        "obs_conversion_config": {
+                                            "rps": {
+                                                "slope": true,
+                                                "prediction": true,
+                                                "discretize": true,
+                                                "safety_check": true,
+                                                "bins": [
+                                                    -3.14,
+                                                    0.0,
+                                                    3.14
+                                                ]
+                                            },
+                                            "failed_reqs_percentage": {
+                                                "slope": false,
+                                                "prediction": false,
+                                                "discretize": true,
+                                                "safety_check": false,
+                                                "bins": [
+                                                    0.0,
+                                                    0.01
+                                                ]
+                                            },
+                                            "cost": {
+                                                "slope": false,
+                                                "prediction": false,
+                                                "discretize": true,
+                                                "safety_check": false,
+                                                "bins": [
+                                                    0.0,
+                                                    1.0
+                                                ]
+                                            }
+                                        },
+                                        "prediction_length": 5,
+                                        "flag_levels": 2,
+                                        "tensor": {
+                                            "type": "linear",
+                                            "metric_types": 1,
+                                            "metric_time_steps": 4,
+                                            "max_metrics_per_type": 2,
+                                            "rate_params": 2
+                                        }
+                                    },
+                                    "reward_config": {
+                                        "reward_history_thresh": 0.8,
+                                        "reward_function": "piecewise-reward",
+                                        "reward_params": {
+                                            "normalization-cost-alpha": 1,
+                                            "normalization-sla-beta": 50,
+                                            "penalty_factor": -100,
+                                            "lagrange_parm": 2
+                                        }
+                                    }
+                                }
+                            },
+                            "pushgateway": {
+                                "url": "http://pushgateway.monitoring.svc.cluster.local:9091"
+                            },
+                            "reward_alert_config": {
+                                "reward_fail_thresh": 0.4,
+                                "reward_fail_thresh_max": 0.5,
+                                "num_fail_episodes": 5,
+                                "num_total_episodes": 10
+                            },
+                            "rps_alert_config": {
+                                "rps_fail_thresh": 0.7,
+                                "num_fail_episodes": 0,
+                                "num_total_episodes": 1
+                            },
+                            "reward_alert_inference_config": {
+                                "num_fail_steps": 0.2,
+                                "num_total_steps": 60
+                            },
+                            "version": "v1"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "database": {
+        "name": "prometheus",
+        "url": "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+    },
+    "pushgateway": {
+        "url": "http://pushgateway.monitoring.svc.cluster.local:9091"
+    },
+    "buffer_pods": 0,
+    "sla": 1,
+    "generic_service": {
+        "service-1": {
+            "sim_config": {
+                "sim_type": "rps_pattern_sim",
+                "logging_config": {
+                    "wandb-enable": true,
+                    "wandb-trainer": false
+                },
+                "tensor": {
+                    "type": "linear",
+                    "metric_types": 1,
+                    "metric_time_steps": 4,
+                    "max_metrics_per_type": 1,
+                    "rate_params": 2
+                },
+                "derived_metrics_gen_config": {
+                    "rps": {
+                        "filename": "path to general_rps.csv",
+                        "num_data_points": 4
+                    },
+                    "failed_reqs_percentage": {
+                        "pod_cap_csv_path": "path to podcapacities.csv",
+                        "pod_cap_model": "default",
+                        "rps_capacity_per_pod": 13,
+                        "max": 1,
+                        "min": 0
+                    }
+                }
+            },
+            "metrics_config": {
+                "metrics_list": [
+                    {
+                        "metrics": {
+                            "failed_reqs_percentage": {
+                                "ranges": {
+                                    "min": 0,
+                                    "max": 1
+                                },
+                                "sim": {},
+                                "obs": true,
+                                "reward": true
+                            },
+                            "rps": {
+                                "ranges": {
+                                    "min": 0.8,
+                                    "max": 1327
+                                },
+                                "safety_check_config": {
+                                    "high_metric_threshold": 0.6,
+                                    "upper_bound_scaling": 1.3,
+                                    "lower_bound_scaling": 0.7
+                                },
+                                "rps_capacity_per_pod": 13,
+                                "rps_csv_path": "path to general_rps.csv",
+                                "pod_cap_csv_path": "path to podcapacities.csv",
+                                "pod_cap_model": "default",
+                                "sim": {},
+                                "obs": true,
+                                "reward": true
+                            },
+                            "cost": {
+                                "ranges": {
+                                    "min": 1.0,
+                                    "max": 204.0
+                                },
+                                "clip": 500,
+                                "sim": {},
+                                "obs": true,
+                                "reward": true
+                            }
+                        },
+                        "query_params": {
+                            "slope": true,
+                            "range": 10,
+                            "sliding_window_len": 4,
+                            "steps": 30
+                        },
+                        "database": {
+                            "name": "sim",
+                            "url": "test"
+                        }
+                    }
+                ]
+            },
+            "overall_qos_objective": {
+                "failed_reqs_percentage": {
+                    "high": 0.01,
+                    "low": 0
+                }
+            },
+            "algorithmConfig": {
+                "env_config": {
+                    "env_name": "AutoScalingEnv",
+                    "action_config": {
+                        "action_type": "override_scaling_factor",
+                        "scaling_factor": {
+                            "num_levels": 4,
+                            "start": 0,
+                            "end": 2,
+                            "interval_type": "left_skewed",
+                            "skewness": 0.75
+                        },
+                        "direct": {
+                            "pods_scaling": 6
+                        },
+                        "override_scaling_factor": [
+                            0.05,
+                            0.1,
+                            0.15,
+                            0.2,
+                            0.25,
+                            0.3,
+                            0.35,
+                            0.4,
+                            0.45,
+                            0.5,
+                            0.55,
+                            0.6,
+                            0.65,
+                            0.7,
+                            0.75,
+                            0.8,
+                            0.85,
+                            0.9,
+                            0.95,
+                            1,
+                            1.2,
+                            1.4,
+                            1.6,
+                            1.8,
+                            2,
+                            2.25,
+                            2.5,
+                            2.75,
+                            3,
+                            3.25,
+                            3.5,
+                            3.75,
+                            4,
+                            4.25,
+                            4.5,
+                            4.75,
+                            5,
+                            6,
+                            7,
+                            8,
+                            9,
+                            10
+                        ],
+                        "asg_action_config": {
+                            "pods_per_node": 3,
+                            "std_deviation": 1
+                        }
+                    },
+                    "obs_config": {
+                        "obs_type": "dict_slope-prediction",
+                        "num_metrics": 3,
+                        "obs_conversion_config": {
+                            "rps": {
+                                "slope": true,
+                                "prediction": true,
+                                "discretize": true,
+                                "safety_check": true,
+                                "bins": [
+                                    -3.14,
+                                    0.0,
+                                    3.14
+                                ]
+                            },
+                            "failed_reqs_percentage": {
+                                "slope": false,
+                                "prediction": false,
+                                "discretize": true,
+                                "safety_check": false,
+                                "bins": [
+                                    0.0,
+                                    0.01
+                                ]
+                            },
+                            "cost": {
+                                "slope": false,
+                                "prediction": false,
+                                "discretize": true,
+                                "safety_check": false,
+                                "bins": [
+                                    0.0,
+                                    1.0
+                                ]
+                            },
+                            "cpu_recommendation": {
+                                "query_utilization": "Sample query for service cpu utilization fraction (0-1)",
+                                "target_utilization": 30,
+                                "obs": false,
+                                "reward": false
+                            }
+                        },
+                        "prediction_length": 4,
+                        "flag_levels": 2,
+                        "tensor": {
+                            "type": "linear",
+                            "metric_types": 1,
+                            "metric_time_steps": 4,
+                            "max_metrics_per_type": 2,
+                            "rate_params": 2
+                        }
+                    },
+                    "reward_config": {
+                        "reward_history_thresh": 0.8,
+                        "reward_function": "piecewise-reward",
+                        "reward_params": {
+                            "normalization-cost-alpha": 1,
+                            "normalization-sla-beta": 50,
+                            "penalty_factor": -100,
+                            "lagrange_parm": 2
+                        }
+                    }
+                }
+            },
+            "pushgateway": {
+                "url": "test"
+            },
+            "reward_alert_config": {
+                "reward_fail_thresh": 0.1,
+                "reward_fail_thresh_max": 0.2,
+                "num_fail_episodes": 10,
+                "num_total_episodes": 250
+            },
+            "rps_alert_config": {
+                "rps_fail_thresh": 0.7,
+                "num_fail_episodes": 0,
+                "num_total_episodes": 1
+            },
+            "reward_alert_inference_config": {
+                "num_fail_steps": 0.2,
+                "num_total_steps": 60
+            }
+        }
+    }
+}
