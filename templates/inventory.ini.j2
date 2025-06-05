@@ -30,22 +30,34 @@ kube_node
 
 [calico_rr]
 
-[k8s_cluster:vars]
+[all:vars]
 # Network plugin (calico, flannel, weave or cilium)
-kube_network_plugin=calico
+kube_network_plugin={{ kubernetes_deployment.network_plugin | default('calico') }}
 
 # Container runtime (containerd, crio)
-container_manager=containerd
+container_manager={{ kubernetes_deployment.container_runtime | default('containerd') }}
 
 # DNS mode (coredns, nodelocaldns)
-dns_mode=coredns
+dns_mode={{ kubernetes_deployment.dns_mode | default('coredns') }}
 
-# Add both public and private IPs to SSL keys for all nodes
-supplementary_addresses_in_ssl_keys=[
-  {% for node in control_plane_nodes %}
-  "{{ node.ansible_host }}", "{{ node.private_ip | default(node.ansible_host) }}"{% if not loop.last or worker_nodes %}, {% endif %}
-  {% endfor %}
-  {% for node in worker_nodes %}
-  "{{ node.ansible_host }}", "{{ node.private_ip | default(node.ansible_host) }}"{% if not loop.last %}, {% endif %}
-  {% endfor %}
-] 
+# API Server Configuration
+kube_apiserver_ip={{ kubernetes_deployment.api_server.host }}
+kube_apiserver_port={{ kubernetes_deployment.api_server.port }}
+kube_apiserver_bind_address=0.0.0.0
+kube_apiserver_advertise_address={{ kubernetes_deployment.api_server.host }}
+loadbalancer_apiserver_localhost=false
+apiserver_loadbalancer_domain_name={{ kubernetes_deployment.api_server.host }}
+
+# Supplementary addresses for SSL keys (comma-separated string)
+supplementary_addresses_in_ssl_keys={{ supplementary_ssl_addresses | join(',') }}
+
+# Additional configurations
+loadbalancer_apiserver_address={{ kubernetes_deployment.api_server.host }}
+loadbalancer_apiserver_port={{ kubernetes_deployment.api_server.port }}
+
+# Security settings
+kube_apiserver_node_port_range=30000-32767
+kube_apiserver_insecure_port=0
+kube_apiserver_secure_port={{ kubernetes_deployment.api_server.port }}
+kube_apiserver_enable_admission_plugins=NodeRestriction
+kube_apiserver_enable_bootstrap_token_auth=true 

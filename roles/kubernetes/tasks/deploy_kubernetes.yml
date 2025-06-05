@@ -4,6 +4,17 @@
     msg: "Kubernetes deployment is disabled in user_input.yml"
   when: not kubernetes_deployment.enabled | default(false)
 
+- name: Ensure logs directory exists
+  file:
+    path: "{{ playbook_dir }}/logs"
+    state: directory
+    mode: '0755'
+    owner: "{{ lookup('env', 'USER') }}"
+    group: "{{ lookup('env', 'USER') }}"
+  delegate_to: localhost
+  become: false
+  when: kubernetes_deployment.enabled | default(false)
+
 - name: Display current working directory
   command: pwd
   register: current_dir
@@ -135,26 +146,34 @@
 - name: Verify IP configuration before deployment
   debug:
     msg: |
-      === IP Configuration Verification ===
+      ╔══════════════════════════════════════════════════════════════════╗
+      ║                   IP Configuration Verification                   ║
+      ╚══════════════════════════════════════════════════════════════════╝
+      
       Control Plane Nodes:
       {% for node in kubernetes_deployment.control_plane_nodes %}
-      - {{ node.name }}: 
-        - ansible_host (public): {{ node.ansible_host }}
-        - private_ip (etcd only): {{ node.private_ip }}
-        - host_vars file: {{ inventory_dir }}/kubespray/host_vars/{{ node.name }}.yml
+      ├─ {{ node.name }}
+      │  ├─ Public IP (ansible_host): {{ node.ansible_host }}
+      │  ├─ Private IP: {{ node.private_ip }}
+      │  └─ Host vars: {{ inventory_dir }}/kubespray/host_vars/{{ node.name }}.yml
       {% endfor %}
       {% if kubernetes_deployment.worker_nodes is defined and kubernetes_deployment.worker_nodes|length > 0 %}
+      
       Worker Nodes:
       {% for node in kubernetes_deployment.worker_nodes %}
-      - {{ node.name }}:
-        - ansible_host (public): {{ node.ansible_host }}
-        - private_ip (etcd only): {{ node.private_ip }}
-        - host_vars file: {{ inventory_dir }}/kubespray/host_vars/{{ node.name }}.yml
+      ├─ {{ node.name }}
+      │  ├─ Public IP (ansible_host): {{ node.ansible_host }}
+      │  ├─ Private IP: {{ node.private_ip }}
+      │  └─ Host vars: {{ inventory_dir }}/kubespray/host_vars/{{ node.name }}.yml
       {% endfor %}
       {% endif %}
       
-      IMPORTANT: Only etcd-specific variables are overridden to fix binding issues.
-      API Server will remain accessible on public IP: {{ kubernetes_deployment.api_server.host }}:{{ kubernetes_deployment.api_server.port }}
+      ┌──────────────────────────────────────────────────────────────────┐
+      │ NOTE: Only etcd-specific variables are overridden in host_vars   │
+      │ to fix binding issues. API Server will remain accessible on:     │
+      │                                                                  │
+      │ → {{ kubernetes_deployment.api_server.host }}:{{ kubernetes_deployment.api_server.port }}
+      └──────────────────────────────────────────────────────────────────┘
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Set node IP variables
@@ -347,6 +366,7 @@
         - "{{ lookup('env', 'PWD') }}/files/kubeconfig"
         - "{{ lookup('env', 'PWD') }}/inventory"
         - "{{ lookup('env', 'PWD') }}/inventory/kubespray"
+        - "{{ lookup('env', 'PWD') }}/logs"
       delegate_to: localhost
       become: false
       ignore_errors: true
@@ -360,6 +380,7 @@
         - "{{ lookup('env', 'PWD') }}/files/kubeconfig"
         - "{{ lookup('env', 'PWD') }}/inventory"
         - "{{ lookup('env', 'PWD') }}/inventory/kubespray"
+        - "{{ lookup('env', 'PWD') }}/logs"
       delegate_to: localhost
       ignore_errors: true
       when: fix_perms_result is failed
@@ -371,6 +392,7 @@
         - "{{ lookup('env', 'PWD') }}/files"
         - "{{ lookup('env', 'PWD') }}/inventory"
         - "{{ lookup('env', 'PWD') }}/inventory/kubespray"
+        - "{{ lookup('env', 'PWD') }}/logs"
       delegate_to: localhost
       ignore_errors: true
   when: kubeconfig_fetch is success

@@ -11,6 +11,17 @@
     kubespray_dir: "{{ playbook_dir }}/kubespray"
 
   pre_tasks:
+    - name: Display Playbook Environment
+      debug:
+        msg: |
+          === PLAYBOOK ENVIRONMENT ===
+          Playbook Directory: {{ playbook_dir }}
+          Inventory Directory: {{ inventory_dir }}
+          Kubespray Directory: {{ kubespray_dir }}
+          Ansible Version: {{ ansible_version.full }}
+          Python Version: {{ ansible_python_version }}
+          Host OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+
     - name: Load and verify user_input.yml
       block:
         - name: Load user_input.yml content
@@ -23,6 +34,28 @@
             kubernetes_deployment: "{{ user_input.kubernetes_deployment }}"
           when: user_input.kubernetes_deployment is defined
 
+        - name: Generate supplementary SSL addresses
+          set_fact:
+            supplementary_ssl_addresses: >-
+              {{
+                ([kubernetes_deployment.api_server.host] +
+                 kubernetes_deployment.control_plane_nodes | map(attribute='ansible_host') | list +
+                 kubernetes_deployment.control_plane_nodes | map(attribute='private_ip') | list +
+                 (kubernetes_deployment.worker_nodes | default([]) | map(attribute='ansible_host') | list) +
+                 (kubernetes_deployment.worker_nodes | default([]) | map(attribute='private_ip') | list))
+                | select('defined')
+                | unique
+                | list
+              }}
+          when: kubernetes_deployment.enabled | default(false)
+
+        - name: Display supplementary SSL addresses
+          debug:
+            msg: |
+              === SSL ADDRESSES ===
+              Supplementary SSL Addresses: {{ supplementary_ssl_addresses | default([]) }}
+          when: kubernetes_deployment.enabled | default(false)
+
         - name: Verify kubernetes_deployment section exists
           fail:
             msg: "kubernetes_deployment section not found in user_input.yml"
@@ -31,15 +64,51 @@
         - name: Display loaded configuration
           debug:
             msg: |
-              Loaded configuration:
-              - Kubernetes enabled: {{ kubernetes_deployment.enabled }}
-              - API Server: {{ kubernetes_deployment.api_server.host }}
-              - SSH Key: {{ kubernetes_deployment.ssh_key_path }}
+              === KUBERNETES CONFIGURATION ===
+              1. Basic Settings:
+                - Kubernetes Enabled: {{ kubernetes_deployment.enabled }}
+                - Network Plugin: {{ kubernetes_deployment.network_plugin | default('calico') }}
+                - Container Runtime: {{ kubernetes_deployment.container_runtime | default('containerd') }}
+                - DNS Mode: {{ kubernetes_deployment.dns_mode | default('coredns') }}
+
+              2. API Server Configuration:
+                - Host: {{ kubernetes_deployment.api_server.host }}
+                - Port: {{ kubernetes_deployment.api_server.port }}
+                - Secure: {{ kubernetes_deployment.api_server.secure }}
+
+              3. SSL Configuration:
+                - Supplementary Addresses: {{ supplementary_ssl_addresses | default([]) }}
 
     - name: Check if Kubernetes deployment is enabled
       debug:
-        msg: "Kubernetes deployment is disabled in user_input.yml. Skipping all tasks."
+        msg: "WARNING: Kubernetes deployment is disabled in user_input.yml. Skipping all tasks."
       when: not kubernetes_deployment.enabled | default(false)
+
+    - name: Verify critical configurations
+      assert:
+        that:
+          - kubernetes_deployment.api_server.host != "PUBLIC_IP"
+          - kubernetes_deployment.api_server.host != ""
+          - kubernetes_deployment.api_server.port is defined
+          - kubernetes_deployment.ssh_key_path is defined
+          - kubernetes_deployment.control_plane_nodes | length > 0
+        fail_msg: "Critical configuration validation failed. Please check your user_input.yml"
+        success_msg: "Critical configuration validation passed"
+      when: kubernetes_deployment.enabled | default(false)
+
+    - name: Display deployment plan
+      debug:
+        msg: |
+          === DEPLOYMENT PLAN ===
+          1. Create and verify inventory directory
+          2. Deploy Kubernetes using Kubespray
+          3. Configure API server with:
+             - IP: {{ kubernetes_deployment.api_server.host }}
+             - Port: {{ kubernetes_deployment.api_server.port }}
+          4. Set up load balancer configuration
+          5. Apply network configuration
+          6. Configure NVIDIA runtime (if enabled)
+      when: kubernetes_deployment.enabled | default(false)
 
     - name: Ensure inventory directory exists
       file:
@@ -58,4 +127,24 @@
         loadbalancer_apiserver:
           address: "{{ kubernetes_deployment.api_server.host }}"
           port: "{{ kubernetes_deployment.api_server.port }}"
-      when: kubernetes_deployment.enabled | default(false) 
+        supplementary_addresses_in_ssl_keys: "{{ supplementary_ssl_addresses | default([]) }}"
+      when: kubernetes_deployment.enabled | default(false)
+
+  post_tasks:
+    - name: Display deployment completion status
+      debug:
+        msg: |
+          === DEPLOYMENT COMPLETED ===
+          Kubernetes cluster deployment has completed.
+          
+          Next Steps:
+          1. Verify cluster status:
+             kubectl get nodes
+             kubectl cluster-info
+          
+          2. Check pod status:
+             kubectl get pods --all-namespaces
+          
+          3. Verify API server:
+             curl -k https://{{ kubernetes_deployment.api_server.host }}:{{ kubernetes_deployment.api_server.port }}/version
+      when: kubernetes_deployment.enabled | default(false)
