@@ -18,18 +18,21 @@ Ansible-based installer for Smart Scaler components and Kubernetes cluster deplo
 ### System Requirements
 
 #### Control Plane Nodes (Master)
+
 - **CPU**: 8 cores minimum
-- **RAM**: 16GB minimum  
+- **RAM**: 16GB minimum
 - **Storage**: 500GB minimum
 - **OS**: Ubuntu 22.04+ or compatible Linux distribution
 
 #### Worker Nodes
+
 - **CPU**: 8 cores minimum
 - **RAM**: 16GB minimum
 - **Storage**: 500GB minimum
 - **OS**: Same as control plane nodes
 
 ### Required Software
+
 - Python 3.x and pip
 - Git
 - SSH key generation capability
@@ -37,6 +40,7 @@ Ansible-based installer for Smart Scaler components and Kubernetes cluster deplo
 - kubectl v1.25.0+
 
 ### Network Requirements
+
 - SSH access between installer machine and all cluster nodes
 - Internet connectivity for downloading packages
 - Open ports: 6443 (API server), 2379-2380 (etcd), 10250 (kubelet)
@@ -82,11 +86,10 @@ This section defines the settings required to enable and configure a Kubernetes 
 
 > 🔧 **Note**: Replace placeholders like `YOUR_MASTER_PUBLIC_IP` and `YOUR_MASTER_PRIVATE_IP` with actual values before running the playbook.
 
-
 ```yaml
 kubernetes_deployment:
   enabled: true                           # Enable or disable Kubernetes deployment via Ansible
-  
+
   api_server:
     host: "YOUR_MASTER_PUBLIC_IP"        # Public IP address of the Kubernetes API server (control plane)
     port: 6443                           # Default port for Kubernetes API server
@@ -95,7 +98,7 @@ kubernetes_deployment:
   ssh_key_path: "/absolute/path/to/.ssh/k8s_rsa"  # Full path to the SSH private key used to access the nodes
   default_ansible_user: "REPLACE_SSH_USER"         # Default SSH username for Ansible to connect to nodes
   ansible_sudo_pass: ""                  # Optional: Sudo password; leave empty to be prompted at runtime
-  
+
   control_plane_nodes:
     - name: "master-1"                   # Identifier name for the control plane node
       ansible_host: "YOUR_MASTER_PUBLIC_IP"   # Public IP address of the control plane node for SSH
@@ -104,7 +107,7 @@ kubernetes_deployment:
       ansible_become_method: "sudo"      # Method used for privilege escalation
       private_ip: "YOUR_MASTER_PRIVATE_IP"    # Private/internal IP used for cluster communication, use same public ip if not available
 
-  
+
 ```
 
 ### Step 4: Deploy Kubernetes Cluster
@@ -118,6 +121,7 @@ sudo ./setup_kubernetes.sh
 ```
 
 ### Step 5 Change ownership of the kubeconfig file
+
 ```bash
 sudo chown $(whoami):$(whoami) files/kubeconfig
 ```
@@ -138,6 +142,7 @@ kubectl get pods --all-namespaces
 ## 3. Prerequisites for Installing SmartScaler Apps
 
 ### Cluster Requirements
+
 - **Kubernetes cluster must be running and accessible**
 - **kubectl configured with proper kubeconfig**
 - **Helm v3.15.0+ installed**
@@ -148,7 +153,7 @@ Set the following environment variables before deployment:
 
 ```bash
 export NGC_API_KEY="your_ngc_api_key"
-export NGC_DOCKER_API_KEY="your_ngc_docker_api_key"  
+export NGC_DOCKER_API_KEY="your_ngc_docker_api_key"
 export AVESHA_DOCKER_USERNAME="your_avesha_username"
 export AVESHA_DOCKER_PASSWORD="your_avesha_password"
 ```
@@ -156,7 +161,6 @@ export AVESHA_DOCKER_PASSWORD="your_avesha_password"
 ### Configure user_input.yml
 
 **Important**: Set `kubernetes_deployment.enabled` to `false` in `user_input.yml` before running apps installation:
-
 
 ```yaml
 kubernetes_deployment:
@@ -172,6 +176,7 @@ use_global_context: true                                 # Required: Use global 
 ### Required Files
 
 Ensure these files exist in the `files/` directory:
+
 - `kubeconfig` - Kubernetes cluster configuration
 - `config-inference.json` - Smart Scaler inference configuration
 - `locust.py` - Load testing script
@@ -218,7 +223,7 @@ kubectl get namespaces
 
 # Expected namespaces:
 # - gpu-operator
-# - keda  
+# - keda
 # - monitoring
 # - nim
 # - nim-load-test
@@ -227,7 +232,7 @@ kubectl get namespaces
 
 # Verify component status
 kubectl get pods -n gpu-operator
-kubectl get pods -n monitoring  
+kubectl get pods -n monitoring
 kubectl get pods -n keda
 kubectl get pods -n nim
 kubectl get pods -n smart-scaler
@@ -300,7 +305,7 @@ kubectl port-forward -n nim svc/meta-llama3-8b-instruct 8000:8000
    - Verify network connectivity between nodes
    - Review firewall settings
 
-3. **Apps Deployment Failed**  
+3. **Apps Deployment Failed**
    - Ensure `kubernetes_deployment.enabled` is set to `false`
    - Verify all environment variables are set
    - Check cluster accessibility with `kubectl get nodes`
