@@ -37,7 +37,7 @@ spec:
         tensorParallelism: "{{ manifest_vars.nim_cache_tensor_parallelism | default('1') }}"
         qosProfile: "{{ manifest_vars.nim_cache_qos_profile | default('throughput') }}"
         profiles:
-{% for profile in manifest_vars.nim_cache_model_profiles | default(['8b87146e39b0305ae1d73bc053564d1b4b4c565f81aa5abe3e84385544ca9b60']) %}
+{% for profile in manifest_vars.nim_cache_model_profiles | default(['4f904d571fe60ff24695b5ee2aa42da58cb460787a968f1e8a09f5a7e862728d']) %}
           - {{ profile }}
 {% endfor %}
   storage:
