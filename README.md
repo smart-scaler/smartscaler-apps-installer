@@ -57,8 +57,8 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Install Python dependencies with sudo (required for system-wide tools)
-chmod +x files/install_requirements.sh
-sudo ./files/install_requirements.sh
+chmod +x files/install-requirements.sh
+sudo ./files/install-requirements.sh
 
 # Install Ansible collections
 sudo LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ansible-galaxy collection install -r requirements.yml --force
