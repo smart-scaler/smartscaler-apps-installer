@@ -131,8 +131,8 @@ execution_order:
   # - metallb_chart                 
   # - metallb_l2_config            
   # - metallb_ip_pool              
-  - nginx_ingress_config         
-  - nginx_ingress_chart          
+  # - nginx_ingress_config         
+  # - nginx_ingress_chart          
 
   # Existing Applications
   - gpu_operator_chart
@@ -185,7 +185,7 @@ metallb:
 
 # Nginx Ingress Configuration
 nginx_ingress:
-  enabled: true
+  enabled: false
   namespace: "ingress-nginx"
   replica_count: 1
   service_type: "LoadBalancer"
@@ -248,8 +248,7 @@ helm_charts:
     force: true
     atomic: false
     skip_diff: true
-    dependencies:
-      - metallb_chart
+    dependencies: []
     chart_repo_url: "https://kubernetes.github.io/ingress-nginx"
     chart_repo_name: "ingress-nginx"
     chart_version: "4.7.1"
@@ -341,7 +340,7 @@ helm_charts:
     create_namespace: true
     wait: false
     timeout: "300s"
-    force: true
+    force: false
     atomic: false
     skip_diff: true
     chart_repo_url: "https://prometheus-community.github.io/helm-charts"
