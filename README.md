@@ -357,6 +357,7 @@ Assuming your node IP is `192.168.100.10`:
 
 > ⚠️ **Note:**
 >
+> * User and Password for Grafana UI is: admin/prom-operator
 > * NodePort values (like `32321` for Grafana and `30090` for Prometheus) **may change** as per your environment. Always verify with `kubectl get svc -n monitoring`.
 > * Ensure firewall rules or cloud security groups allow traffic to these NodePorts.
 
