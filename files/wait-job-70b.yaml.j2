@@ -40,7 +40,7 @@ metadata:
 spec:
   backoffLimit: 0
   activeDeadlineSeconds: {{ manifest_vars.wait_job_timeout }}
-  ttlSecondsAfterFinished: 100
+  ttlSecondsAfterFinished: 1200
   template:
     spec:
       serviceAccountName: {{ manifest_vars.wait_job_service_account }}
