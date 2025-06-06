@@ -33,9 +33,14 @@ kind: Job
 metadata:
   name: {{ manifest_vars.wait_job_name }}
   namespace: {{ manifest_vars.wait_job_namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": hook-succeeded
 spec:
   backoffLimit: 0
   activeDeadlineSeconds: {{ manifest_vars.wait_job_timeout }}
+  ttlSecondsAfterFinished: 100
   template:
     spec:
       serviceAccountName: {{ manifest_vars.wait_job_service_account }}
@@ -46,10 +51,13 @@ spec:
         - /bin/sh
         - -c
         - |
+          set -e
           echo "Waiting for NIMCache {{ manifest_vars.wait_job_target_cache }} to be ready..."
           until kubectl get nimcache {{ manifest_vars.wait_job_target_cache }} -n {{ manifest_vars.wait_job_namespace }} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' | grep -q "True"; do
             echo "NIMCache not ready yet, waiting {{ manifest_vars.wait_job_check_interval }} seconds..."
             sleep {{ manifest_vars.wait_job_check_interval }}
           done
           echo "NIMCache is ready!"
+          # Explicitly exit with success to mark job as complete
+          exit 0
       restartPolicy: Never
