@@ -150,7 +150,7 @@ metallb_namespace: "{{ kubernetes_deployment.addons.metallb_namespace | default(
 metallb_protocol: "{{ kubernetes_deployment.addons.metallb_protocol | default('layer2') }}"
 metallb_port: "{{ kubernetes_deployment.addons.metallb_port | default('7472') }}"
 metallb_memberlist_port: "{{ kubernetes_deployment.addons.metallb_port | default('7946') }}"
-metallb_version: "{{ kubernetes_deployment.addons.metallb_version | default('v0.13.12') }}"
+metallb_version: "{{ kubernetes_deployment.addons.metallb_version | default('0.13.12') }}"
 metallb_auto_assign: "{{ kubernetes_deployment.addons.metallb_auto_assign | default(true) }}"
 metallb_pool_name: "{{ kubernetes_deployment.addons.metallb_pool_name | default('default') }}"
 metallb_limits_cpu: "{{ kubernetes_deployment.addons.metallb_limits_cpu | default('100m') }}"
