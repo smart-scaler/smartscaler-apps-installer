@@ -277,11 +277,11 @@ helm_charts:
             timeoutSeconds: 15
         resources:
           requests:
-            cpu: "100m"
-            memory: "90Mi"
+            cpu: "1000m"
+            memory: "1024Mi"
           limits:
-            cpu: "200m"
-            memory: "512Mi"
+            cpu: "2000m"
+            memory: "2048Mi"
         readinessProbe:
           initialDelaySeconds: 5
           periodSeconds: 5
