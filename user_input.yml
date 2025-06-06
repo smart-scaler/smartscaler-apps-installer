@@ -1097,7 +1097,7 @@ manifests:
     variables:
       locust_name: "locust-load-70b"
       locust_namespace: "nim-load-test"
-      locust_replicas: 1
+      locust_replicas: 0
       locust_image: "locustio/locust:2.15.1"
       locust_target_host: "http://meta-llama3-70b-instruct.nim.svc.cluster.local:8000"
       locust_cpu_request: "1"
