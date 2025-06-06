@@ -622,7 +622,7 @@ Set `spec.metadata` fields with the following data
 Scale the Locust replicas up to 1 to initiate the next test cycle:
 
 ```bash
-kubectl scale deployment locust-load -n nim-load-test --replicas=1
+kubectl scale deployment locust-load-70b -n nim-load-test --replicas=1
 ```
 
 ### Monitor the Test
