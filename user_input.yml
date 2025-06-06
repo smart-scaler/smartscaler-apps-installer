@@ -218,7 +218,7 @@ helm_charts:
     skip_diff: true
     dependencies: []
     chart_repo_url: "https://metallb.github.io/metallb"
-    chart_version: "0.15.0"
+    chart_version: "0.13.10"
     release_values:
       prometheus:
         serviceMonitor:
