@@ -540,7 +540,7 @@ Follow these steps to (re)start a clean test cycle:
 Scale the NIM LLM deployment replicas to 1:
 
 ```bash
-kubectl scale deployment <meta-llama3-8b-instruct> --replicas=1 -n nim
+kubectl scale deployment meta-llama3-70b-instruct --replicas=1 -n nim
 ```
 
 Scale the Locust deployment replicas to 0:
@@ -577,7 +577,7 @@ Ensure the HorizontalPodAutoscaler (HPA)replica is also set to 1:
 Edit ScaledObject resource
 
 ```bash
-kubectl edit scaledobjects llm-demo-keda -n nim
+kubectl edit scaledobjects llm-demo-keda-70b -n nim
 ```
 
 Set `spec.metadata` fields with the following data
