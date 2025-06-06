@@ -112,33 +112,36 @@ kubernetes_deployment:
 
 #### ⚙️ For Single Node: Quick Configuration Update (Command-Line Shortcut)
 
-You can quickly replace the placeholder values in your `user_input.yml` configuration using the following `sed` command:
+You can quickly update your `user_input.yml` by replacing only the **values** in this command based on your environment.
+**Keep the placeholder keywords (`PUBLIC_IP`, `PRIVATE_IP`, etc.) on the left side exactly as-is.**
 
-#### 🧪 Example:
+> ⚠️ **Warning:**
+> Replace **only** the values on the right-hand side (`172.25.232.9`, `root`, etc.) with your actual environment details.
+> **Do not modify** the placeholder keywords (`PUBLIC_IP`, `PRIVATE_IP`, etc.) — they are required for matching.
+
+#### 🧪 Example Command
 
 ```bash
 sed -i \
-  -e 's|PUBLIC_IP|203.0.113.10|g' \
-  -e 's|PRIVATE_IP|192.168.1.10|g' \
-  -e 's|REPLACE_SSH_USER|ubuntu|g' \
-  -e 's|/absolute/path/to/.ssh/k8s_rsa|/home/ubuntu/.ssh/id_rsa|g' \
+  -e 's|PUBLIC_IP|192.168.1.100|g' \
+  -e 's|PRIVATE_IP|192.168.1.100|g' \
+  -e 's|REPLACE_SSH_USER|root|g' \
+  -e 's|/absolute/path/to/.ssh/k8s_rsa|/root/.ssh/k8s_rsa|g' \
   -e '/kubernetes_deployment:/,/^[^ ]/ s/enabled: false/enabled: true/' \
-  path/to/your/user_input.yml
+  user_input.yml
 ```
-🔁 What it updates:
 
-    PUBLIC_IP → Master node’s public IP or if Single IP just give Same IP
+> ✅ This command will:
+>
+> * Replace `PUBLIC_IP` and `PRIVATE_IP` placeholders with your node IP
+> * Set the correct SSH user and key path
+> * Enable Kubernetes deployment by updating `enabled: false` → `enabled: true`
 
-    PRIVATE_IP → Master node’s private/internal IP (can be same as public if not applicable)
+#### 📌 Note:
 
-    REPLACE_SSH_USER → Your SSH username (e.g., ubuntu, ec2-user)
+If you're deploying on a **single node** and running the command from the **same server**, you can use the **same IP address** for both `PUBLIC_IP` and `PRIVATE_IP`.
 
-    SSH key path → Absolute Path to your private SSH key
-
-    enabled: false → Automatically changed to enabled: true
-
-> ✅ Use this before running the installer to ensure the configuration is correctly set for a single-node Kubernetes deployment.
-
+---
 
 ### Step 4: Deploy Kubernetes Cluster
 
