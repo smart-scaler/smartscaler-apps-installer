@@ -323,16 +323,49 @@ smart-scaler-llm-inf-5f4bf754dd-6qbm9   1/1     Running   0          98m
 locust-load-54748fd47d-tndsr   1/1     Running   0          97m
 ```
 
-3. **Check services and endpoints:**
+### Step 4: Accessing Prometheus & Grafana via NodePort
+
+After deploying the application stack, Prometheus and Grafana can be accessed through the exposed NodePort services using your node’s IP address.
+
+### 🧾 Check Service Ports
+
+Run the following command to list the monitoring services:
 
 ```bash
-# Port forward to access services (examples)
-kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
-kubectl port-forward -n nim svc/meta-llama3-8b-instruct 8000:8000
+kubectl get svc -n monitoring
 ```
 
----
+### ✅ Sample Output
 
+```
+NAME                                      TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                         AGE
+alertmanager-operated                     ClusterIP   None            <none>        9093/TCP,9094/TCP,9094/UDP      3m21s
+prometheus-grafana                        NodePort    10.233.59.186   <none>        80:32321/TCP                    3m30s
+prometheus-kube-prometheus-alertmanager   ClusterIP   10.233.23.33    <none>        9093/TCP,8080/TCP               3m30s
+prometheus-kube-prometheus-operator       ClusterIP   10.233.49.28    <none>        443/TCP                         3m30s
+prometheus-kube-prometheus-prometheus     NodePort    10.233.38.213   <none>        9090:30090/TCP,8080:32020/TCP   3m30s
+prometheus-kube-state-metrics             ClusterIP   10.233.40.63    <none>        8080/TCP                        3m30s
+prometheus-operated                       ClusterIP   None            <none>        9090/TCP                        3m21s
+prometheus-prometheus-node-exporter       ClusterIP   10.233.55.211   <none>        9100/TCP                        3m30s
+pushgateway                               ClusterIP   10.233.42.8     <none>        9091/TCP                        104s
+```
+
+### 🌐 Access URLs
+
+Assuming your node IP is `192.168.100.10`:
+
+* **Grafana Dashboard**
+  🔗 [http://192.168.100.10:32321](http://192.168.100.10:32321)
+
+* **Prometheus UI**
+  🔗 [http://192.168.100.10:30090](http://192.168.100.10:30090)
+
+> ⚠️ **Note:**
+>
+> * NodePort values (like `32321` for Grafana and `30090` for Prometheus) **may change** as per your environment. Always verify with `kubectl get svc -n monitoring`.
+> * Ensure firewall rules or cloud security groups allow traffic to these NodePorts.
+
+---
 ## Documentation Links
 
 - **[User Input Configuration Guide](docs/USER_INPUT_CONFIGURATION.md)** - Complete user_input.yml guide
