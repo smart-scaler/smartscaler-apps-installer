@@ -567,7 +567,7 @@ kubectl get hpa -n nim
 
 Ensure the HorizontalPodAutoscaler (HPA)replica is also set to 1:
 
-## Smart Scaler or HPA configuration or verify configuration
+## Smart Scaler/HPA configuration, verify configuration
 
 ### Smart Scaler 
 
