@@ -1,0 +1,46 @@
+---
+# Role for executing kubectl commands with tracking
+- name: Set effective variables with global fallback
+  set_fact:
+    effective_kubeconfig: "{{ item.kubeconfig | default(global_kubeconfig) }}"
+    effective_kubecontext: "{{ item.kubecontext | default(global_kubecontext) }}"
+
+- name: Verify kubeconfig exists
+  stat:
+    path: "{{ effective_kubeconfig }}"
+  register: kubeconfig_stat
+  when: effective_kubeconfig is defined and effective_kubeconfig != ''
+
+- name: Fail if kubeconfig doesn't exist
+  fail:
+    msg: "Kubeconfig file {{ effective_kubeconfig }} does not exist"
+  when: effective_kubeconfig is defined and effective_kubeconfig != '' and not kubeconfig_stat.stat.exists
+
+- name: Execute kubectl commands
+  shell: "{{ cmd_item.command }}"
+  environment: "{{ cmd_item.env | default({}) | combine({'KUBECONFIG': effective_kubeconfig}) }}"
+  loop: "{{ item.commands }}"
+  loop_control:
+    loop_var: cmd_item
+  register: kubectl_result
+  failed_when: 
+    - kubectl_result.rc != 0 
+    - not cmd_item.ignore_errors | default(false)
+  changed_when: kubectl_result.rc == 0
+
+- name: Track successful kubectl commands
+  include_tasks: "{{ playbook_dir }}/tasks/summary_tracker.yml"
+  vars:
+    item_name: "{{ item.name }}"
+    item_type: "kubectl"
+    item_details: "Commands: {{ item.commands | length }}"
+  when: kubectl_result is succeeded
+
+- name: Track failed kubectl commands  
+  include_tasks: "{{ playbook_dir }}/tasks/summary_tracker.yml"
+  vars:
+    item_name: "{{ item.name }}"
+    item_type: "kubectl"
+    item_error: "{{ kubectl_result.msg | default('Kubectl command failed') }}"
+    item_details: "Failed command: {{ kubectl_result.cmd | default('unknown') }}"
+  when: kubectl_result is failed 
