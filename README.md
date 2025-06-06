@@ -619,10 +619,11 @@ Set `spec.metadata` fields with the following data
     serverAddress: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
     threshold: "80"
 ```
-Check to make sure current replicas set to 1
+Check to make sure current replicas set to 1 and model pod is running and ready
 
 ```bash
 kubectl get hpa -n nim
+kubectl get pods -n nim
 ```
 ### Restart Load Generation
 
