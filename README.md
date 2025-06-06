@@ -600,7 +600,7 @@ Check and reset the `spec.maxReplicaCount` to 8
 Edit ScaledObject resource
 
 ```bash
-kubectl edit scaledobjects llm-demo-keda -n nim
+kubectl edit scaledobjects llm-demo-keda-70b -n nim
 ```
 
 Set `spec.metadata` fields with the following data
