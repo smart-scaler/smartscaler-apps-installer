@@ -10,12 +10,12 @@
 ###############################################################################
 kubernetes_deployment:
   # Master switch for Kubernetes deployment
-  enabled: true                           # Enable kubernetes deployment
+  enabled: false                           # Enable kubernetes deployment
   
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
   api_server:
-    host: "89.169.113.186"  # Reference global IP
+    host: "PUBLIC_IP"  # Reference global IP
     port: 6443              # The port for the Kubernetes API server
                            # 6443 is the default secure port for Kubernetes
     secure: true           # Whether to use HTTPS for API server connections
@@ -23,9 +23,9 @@ kubernetes_deployment:
 
   # SSH Access Configuration
   # Required for Kubespray to access and configure nodes
-  ssh_key_path: "/home/richie/.ssh/k8s_rsa"  # Full path to the SSH private key file
+  ssh_key_path: "/absolute/path/to/.ssh/k8s_rsa"  # Full path to the SSH private key file
                                             # Used to authenticate with the cluster nodes
-  default_ansible_user: "avesha"         # Default SSH user for all nodes
+  default_ansible_user: "REPLACE_SSH_USER"         # Default SSH user for all nodes
                                            # Common values: ubuntu (Ubuntu), ec2-user (AWS)
   # Ansible Sudo Password Configuration
   # Optional: Can be set here, via ANSIBLE_SUDO_PASS environment variable,
@@ -36,13 +36,13 @@ kubernetes_deployment:
   # Defines the master nodes that will run the Kubernetes control plane
   control_plane_nodes:
     - name: "master-1"                # Unique identifier for the control plane node
-      ansible_host: "89.169.113.186"  # Reference global IP
-      ansible_user: "avesha"      # SSH username for this specific node
+      ansible_host: "PUBLIC_IP"  # Reference global IP
+      ansible_user: "REPLACE_SSH_USER"      # SSH username for this specific node
                                      # Overrides default_ansible_user if different
       ansible_become: true            # Enable privilege escalation (sudo)
       ansible_become_method: "sudo"     # Method for privilege escalation
       ansible_become_user: "root"       # Target user for privilege escalation
-      private_ip: "10.0.2.7"      # Internal/private IP address
+      private_ip: "PRIVATE_IP"      # Internal/private IP address
                                      # Used for internal cluster communication
   # Kubernetes Network Configuration
   # Defines the network ranges for various Kubernetes components
@@ -105,17 +105,11 @@ validate_prerequisites:
 
 execution_order_enabled: true                # Required: Must be enabled for ordered execution
 
-# Summary and reporting configuration
-summary_enabled: true                       # Enable installation summary reporting
-save_summary_to_file: true                  # Save summary report to file
-detailed_summary: true                      # Include detailed component information in summary
-
-use_global_context: true                     # Required: Use global context
-
 # Required Kubeconfig Settings
-global_control_plane_ip: "89.169.113.186"         # Provide the public IP for metallb/Nginx
-global_kubeconfig: "output/kubeconfig"        # Required: Path to kubeconfig file
+global_control_plane_ip: "PUBLIC_IP"         # Provide the public IP for metallb/Nginx
+global_kubeconfig: "files/kubeconfig"        # Required: Path to kubeconfig file
 global_kubecontext: "kubernetes-admin@cluster.local"  # Required: Kubernetes context
+use_global_context: true                     # Required: Use global context
 
 # Required Helm Settings
 use_local_charts: false                      # Required: Use local Helm charts
