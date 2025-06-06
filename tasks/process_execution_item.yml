@@ -74,4 +74,21 @@
         - not cmd_item.ignore_errors | default(false)
       changed_when: cmd_result.rc == 0
 
+    - name: Track successful command execution
+      include_tasks: "tasks/summary_tracker.yml"
+      vars:
+        item_name: "{{ current_item.name }}"
+        item_type: "command"
+        item_details: "Commands: {{ current_item.commands | length }}"
+      when: cmd_result is succeeded
+
+    - name: Track failed command execution
+      include_tasks: "tasks/summary_tracker.yml"
+      vars:
+        item_name: "{{ current_item.name }}"
+        item_type: "command"
+        item_error: "{{ cmd_result.msg | default('Command execution failed') }}"
+        item_details: "Failed command: {{ cmd_result.cmd | default('unknown') }}"
+      when: cmd_result is failed
+
 # Handle other types (helm, manifests, etc) here if needed 
