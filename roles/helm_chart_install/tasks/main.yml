@@ -24,6 +24,17 @@
     repo_state: present
   when: not effective_use_local_chart and effective_readd_helm_repo
 
+- name: Debug Helm chart configuration
+  debug:
+    msg:
+      - "Chart: {{ item.release_name }}"
+      - "Namespace: {{ item.release_namespace }}"
+      - "Force: {{ item.force | default(false) }}"
+      - "Atomic: {{ item.atomic | default(false) }}"
+      - "Reset Values: {{ item.reset_values | default(true) }}"
+      - "Reuse Values: {{ item.reuse_values | default(false) }}"
+      - "Values: {{ item.release_values | default({}) }}"
+
 - name: Install/Upgrade Helm chart
   kubernetes.core.helm:
     name: "{{ item.release_name }}"
@@ -34,8 +45,35 @@
     kubeconfig: "{{ effective_kubeconfig }}"
     context: "{{ effective_kubecontext }}"
     wait: "{{ item.wait | default(false) }}"
+    timeout: "{{ item.timeout | default('600s') }}"
     values: "{{ item.release_values | default({}) }}"
+    force: "{{ item.force | default(false) }}"
+    atomic: "{{ item.atomic | default(false) }}"
+    reset_values: "{{ item.reset_values | default(true) }}"
+    reuse_values: "{{ item.reuse_values | default(false) }}"
     state: present
+  register: helm_result
+
+- name: Track successful helm installation
+  include_tasks: "{{ playbook_dir }}/tasks/summary_tracker.yml"
+  vars:
+    item_name: "{{ item.release_name }}"
+    item_type: "helm"
+    item_details: "Chart: {{ item.chart_ref }} v{{ item.chart_version | default('latest') }} in {{ item.release_namespace }}"
+  when: 
+    - helm_result is succeeded
+    - summary_enabled | default(true)
+
+- name: Track failed helm installation
+  include_tasks: "{{ playbook_dir }}/tasks/summary_tracker.yml"
+  vars:
+    item_name: "{{ item.release_name }}"
+    item_type: "helm"
+    item_error: "{{ helm_result.msg | default('Helm installation failed') }}"
+    item_details: "Chart: {{ item.chart_ref }} v{{ item.chart_version | default('latest') }} in {{ item.release_namespace }}"
+  when: 
+    - helm_result is failed
+    - summary_enabled | default(true)
 
 - name: Remove temporary Helm repository
   kubernetes.core.helm_repository:

@@ -57,7 +57,7 @@
     context: "{{ effective_kubecontext }}"
     namespace: "{{ effective_namespace }}"
     wait: "{{ item.wait | default(false) }}"
-    wait_timeout: "{{ item.wait_timeout | default(300) }}"
+    wait_timeout: "{{ item.wait_timeout | default(300) | int }}"
     validate:
       fail_on_error: "{{ item.validate | default(true) }}"
       strict: "{{ item.strict_validation | default(true) }}"
@@ -65,6 +65,29 @@
   when: (temp_rendered_manifest is defined and temp_rendered_manifest.dest is defined) or 
         (item.manifest_file is defined and item.manifest_file != None) or 
         (temp_manifest is defined and temp_manifest.dest is defined)
+
+- name: Track successful manifest installation
+  include_tasks: "{{ playbook_dir }}/tasks/summary_tracker.yml"
+  vars:
+    item_name: "{{ item.name }}"
+    item_type: "manifest"
+    item_details: "Namespace: {{ effective_namespace }}, File: {{ item.manifest_file | default(item.manifest_url | default('inline')) }}"
+  when: manifest_result is succeeded
+
+- name: Track failed manifest installation
+  include_tasks: "{{ playbook_dir }}/tasks/summary_tracker.yml"
+  vars:
+    item_name: "{{ item.name }}"
+    item_type: "manifest"
+    item_error: "{{ manifest_result.msg | default('Manifest application failed') }}"
+    item_details: "File: {{ item.manifest_file | default(item.manifest_url | default('inline')) }}"
+  when: manifest_result is failed
+
+- name: Clean up temporary manifest file
+  file:
+    path: "/tmp/{{ item.name }}-rendered-manifest.yaml"
+    state: absent
+  when: temp_rendered_manifest is defined and temp_rendered_manifest.changed
 
 - name: Remove temporary manifest files
   file:
