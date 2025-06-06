@@ -365,6 +365,12 @@ Assuming your node IP is `192.168.100.10`:
 > * NodePort values (like `32321` for Grafana and `30090` for Prometheus) **may change** as per your environment. Always verify with `kubectl get svc -n monitoring`.
 > * Ensure firewall rules or cloud security groups allow traffic to these NodePorts.
 
+* **Import NIM Dashboard**
+  
+   Import the following NIM Dashboard JSON in Grafana
+     https://github.com/smart-scaler/smartscaler-apps-installer/blob/main/files/grafana-dashboards/nim-dashboard.json
+  
+    **Note:** Customize to your environment and model, if needed.
 
 ### Proceed to Test Run
 
