@@ -146,6 +146,7 @@ execution_order:
 
   # NIM 70B Components
   - nim_cache_manifest_70b
+  - wait_for_nim_cache_70b
   - nim_cache_wait_job_70b
   - nim_service_manifest_70b
   - keda_scaled_object_manifest_70b
@@ -1140,6 +1141,43 @@ manifests:
 ###############################################################################
 
 command_exec:
+  - name: "wait_for_nim_cache_70b"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          echo "Waiting for Job wait-for-nimcache-70b to complete..."
+          start_time=$(date +%s)
+          timeout=1200
+          job_complete=false
+          while [ $(($(date +%s) - start_time)) -lt $timeout ]; do
+            if kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+               --context={{ kubecontext | default(global_kubecontext) }} \
+               -n nim get job wait-for-nimcache-70b -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' | grep -q "True"; then
+              job_complete=true
+              break
+            fi
+            echo "Job not complete yet, waiting... ($(($timeout - ($(date +%s) - start_time))) seconds remaining)"
+            # Show job status
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+              --context={{ kubecontext | default(global_kubecontext) }} \
+              -n nim get job wait-for-nimcache-70b -o jsonpath='{.status.conditions[*]}' || true
+            echo
+            sleep 10
+          done
+          if [ "$job_complete" = true ]; then
+            echo "Job completed successfully!"
+          else
+            echo "WARNING: Timeout waiting for Job"
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+              --context={{ kubecontext | default(global_kubecontext) }} \
+              -n nim describe job wait-for-nimcache-70b || true
+          fi
+          # Don't exit with error, let Ansible continue
+        env:
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
+        ignore_errors: true
+        
   - name: "create_ngc_secrets"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
