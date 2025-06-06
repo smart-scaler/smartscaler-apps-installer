@@ -10,12 +10,12 @@
 ###############################################################################
 kubernetes_deployment:
   # Master switch for Kubernetes deployment
-  enabled: false                           # Enable kubernetes deployment
+  enabled: true                           # Enable kubernetes deployment
   
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
   api_server:
-    host: "PUBLIC_IP"  # Reference global IP
+    host: "89.169.113.186"  # Reference global IP
     port: 6443              # The port for the Kubernetes API server
                            # 6443 is the default secure port for Kubernetes
     secure: true           # Whether to use HTTPS for API server connections
@@ -23,9 +23,9 @@ kubernetes_deployment:
 
   # SSH Access Configuration
   # Required for Kubespray to access and configure nodes
-  ssh_key_path: "/absolute/path/to/.ssh/k8s_rsa"  # Full path to the SSH private key file
+  ssh_key_path: "/home/richie/.ssh/k8s_rsa"  # Full path to the SSH private key file
                                             # Used to authenticate with the cluster nodes
-  default_ansible_user: "REPLACE_SSH_USER"         # Default SSH user for all nodes
+  default_ansible_user: "avesha"         # Default SSH user for all nodes
                                            # Common values: ubuntu (Ubuntu), ec2-user (AWS)
   # Ansible Sudo Password Configuration
   # Optional: Can be set here, via ANSIBLE_SUDO_PASS environment variable,
@@ -36,13 +36,13 @@ kubernetes_deployment:
   # Defines the master nodes that will run the Kubernetes control plane
   control_plane_nodes:
     - name: "master-1"                # Unique identifier for the control plane node
-      ansible_host: "PUBLIC_IP"  # Reference global IP
-      ansible_user: "REPLACE_SSH_USER"      # SSH username for this specific node
+      ansible_host: "89.169.113.186"  # Reference global IP
+      ansible_user: "avesha"      # SSH username for this specific node
                                      # Overrides default_ansible_user if different
       ansible_become: true            # Enable privilege escalation (sudo)
       ansible_become_method: "sudo"     # Method for privilege escalation
       ansible_become_user: "root"       # Target user for privilege escalation
-      private_ip: "PRIVATE_IP"      # Internal/private IP address
+      private_ip: "10.0.2.7"      # Internal/private IP address
                                      # Used for internal cluster communication
   # Kubernetes Network Configuration
   # Defines the network ranges for various Kubernetes components
@@ -105,11 +105,17 @@ validate_prerequisites:
 
 execution_order_enabled: true                # Required: Must be enabled for ordered execution
 
-# Required Kubeconfig Settings
-global_control_plane_ip: "PUBLIC_IP"         # Provide the public IP for metallb/Nginx
-global_kubeconfig: "files/kubeconfig"        # Required: Path to kubeconfig file
-global_kubecontext: "kubernetes-admin@cluster.local"  # Required: Kubernetes context
+# Summary and reporting configuration
+summary_enabled: true                       # Enable installation summary reporting
+save_summary_to_file: true                  # Save summary report to file
+detailed_summary: true                      # Include detailed component information in summary
+
 use_global_context: true                     # Required: Use global context
+
+# Required Kubeconfig Settings
+global_control_plane_ip: "89.169.113.186"         # Provide the public IP for metallb/Nginx
+global_kubeconfig: "output/kubeconfig"        # Required: Path to kubeconfig file
+global_kubecontext: "kubernetes-admin@cluster.local"  # Required: Kubernetes context
 
 # Required Helm Settings
 use_local_charts: false                      # Required: Use local Helm charts
@@ -212,10 +218,10 @@ helm_charts:
     release_namespace: "{{ metallb.namespace }}"
     create_namespace: true
     wait: true
-    timeout: 600
-    force: true  # Force upgrade regardless of diff
-    atomic: true  # Roll back on failure
-    skip_diff: true  # Skip Helm diff check
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
     dependencies: []
     chart_repo_url: "https://metallb.github.io/metallb"
     chart_version: "0.15.0"
@@ -231,7 +237,7 @@ helm_charts:
           enabled: false
       webhookConfiguration:
         enabled: true
-        timeoutSeconds: 30
+        timeoutSeconds: 15
       crds:
         enabled: true
       rbac:
@@ -244,10 +250,10 @@ helm_charts:
     release_namespace: "ingress-nginx"
     create_namespace: true
     wait: true
-    timeout: 600
-    force: true  # Force upgrade regardless of diff
-    atomic: true  # Roll back on failure
-    skip_diff: true  # Skip Helm diff check
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
     dependencies:
       - metallb_chart
     chart_repo_url: "https://kubernetes.github.io/ingress-nginx"
@@ -274,7 +280,7 @@ helm_charts:
           enabled: true
           patch:
             enabled: true
-            timeoutSeconds: 30
+            timeoutSeconds: 15
         resources:
           requests:
             cpu: "100m"
@@ -283,17 +289,17 @@ helm_charts:
             cpu: "200m"
             memory: "512Mi"
         readinessProbe:
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 5
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
         livenessProbe:
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 5
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
       defaultBackend:
         enabled: false
         service:
-          type: ClusterIP
+          type: NodePort
         resources:
           requests:
             cpu: "1000m"
@@ -307,11 +313,14 @@ helm_charts:
     chart_ref: "gpu-operator"
     release_namespace: "gpu-operator"
     create_namespace: true
-    wait: true
-    force: true  # Force upgrade regardless of diff
-    atomic: true  # Roll back on failure
-    skip_diff: true  # Skip Helm diff check
+    wait: false
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
     chart_version: "v25.3.0"
+    chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
+    dependencies: []
     release_values:
       mig:
         strategy: "none"
@@ -329,20 +338,18 @@ helm_charts:
         env:
           - name: "CONTAINERD_RUNTIME_CLASS"
             value: "nvidia"
-    chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
-    dependencies: []  # Can start independently
 
-
-# OPTIONAL: Prometheus Stack
+  # Prometheus Stack
   prometheus_stack:
     release_name: "prometheus"
     chart_ref: "kube-prometheus-stack"
     release_namespace: "monitoring"
     create_namespace: true
-    wait: true
-    force: true  # Force upgrade regardless of diff
-    atomic: true  # Roll back on failure
-    skip_diff: true  # Skip Helm diff check
+    wait: false
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
     chart_repo_url: "https://prometheus-community.github.io/helm-charts"
     chart_version: "55.5.0"
     release_values:
@@ -395,35 +402,33 @@ helm_charts:
           size: "1Gi"
         service:
           type: NodePort
-      defaultRules:
-        rules:
-          etcd: false
-    dependencies: []  # Can start independently
 
-  # OPTIONAL: KEDA Chart
+  # KEDA Chart
   keda_chart:
     release_name: "keda"
     chart_ref: "keda"
     release_namespace: "keda"
     create_namespace: true
-    wait: true
-    force: true  # Force upgrade regardless of diff
-    atomic: true  # Roll back on failure
-    skip_diff: true  # Skip Helm diff check
+    wait: false
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
     chart_repo_url: "https://kedacore.github.io/charts"
     chart_version: "2.12.1"
     dependencies: []
 
-  # OPTIONAL: NIM Operator Chart
+  # NIM Operator Chart
   nim_operator_chart:
     release_name: "nim"
     chart_ref: "k8s-nim-operator"
     release_namespace: "nim"
     create_namespace: true
-    wait: true
-    force: true  # Force upgrade regardless of diff
-    atomic: true  # Roll back on failure
-    skip_diff: true  # Skip Helm diff check
+    wait: false
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
     chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
     chart_version: "v1.0.1"
     dependencies: []
@@ -508,6 +513,11 @@ manifests:
     namespace: "monitoring"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: "Available"
+      status: "True"
     variables:
       pushgateway_name: "pushgateway"
       pushgateway_namespace: "monitoring"
