@@ -365,6 +365,12 @@ Assuming your node IP is `192.168.100.10`:
 > * NodePort values (like `32321` for Grafana and `30090` for Prometheus) **may change** as per your environment. Always verify with `kubectl get svc -n monitoring`.
 > * Ensure firewall rules or cloud security groups allow traffic to these NodePorts.
 
+
+### Proceed to Test Run
+
+📖 **[Example Test Run Steps](https://github.com/smart-scaler/smartscaler-apps-installer/blob/sample-test-run-doc/README.md#example-test-run-steps)**
+
+
 ---
 ## Documentation Links
 
@@ -561,9 +567,35 @@ kubectl get hpa -n nim
 
 Ensure the HorizontalPodAutoscaler (HPA)replica is also set to 1:
 
-## Setup RL or HPA configuration or verify configuration
+## Smart Scaler or HPA configuration or verify configuration
 
-### RL Setup
+### Smart Scaler 
+
+**Note:** 
+  - verify and edit scaledobject, if needed (Typically you would need to edit this if you are switching from HPA to Smart Scaler)
+
+Edit ScaledObject resource
+
+```bash
+kubectl edit scaledobjects llm-demo-keda -n nim
+```
+
+Set `spec.metadata` fields with the following data
+
+```yaml
+- metadata:
+    metricName: smartscaler_hpa_num_pods
+    query: smartscaler_hpa_num_pods{ss_app_name="nim-llama",ss_deployment_name="meta-llama3-8b-instruct",job="pushgateway",ss_app_version="1.0", ss_cluster_name="nim-llama", ss_namespace="nim", ss_tenant_name="tenant-b200-local"}
+    serverAddress: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+    threshold: "1"
+```
+
+Check and reset the `spec.maxReplicaCount` to 8
+
+### For HPA setup
+
+**Note:** 
+  - verify and edit scaledobject, if needed (Typically you would need to edit this if you are switching from Smart Scaler to HPA)
 
 Edit ScaledObject resource
 
@@ -576,26 +608,6 @@ Set `spec.metadata` fields with the following data
 **Note:** threshold value will be different for different models and GPUs, based on the PSE values.
 - For B200: llama3.1 70b, threshold:80
 - For B200: llama3.1 8b, threshold:200 
-
-```yaml
-- metadata:
-    metricName: smartscaler_hpa_num_pods
-    query: smartscaler_hpa_num_pods{ss_app_name="nim-llama",ss_deployment_name="meta-llama3-8b-instruct",job="pushgateway",ss_app_version="1.0", ss_cluster_name="nim-llama", ss_namespace="nim", ss_tenant_name="tenant-b200-local"}
-    serverAddress: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
-    threshold: "200"
-```
-
-Check and reset the `spec.maxReplicaCount` to 8
-
-### For HPA setup
-
-Edit ScaledObject resource
-
-```bash
-kubectl edit scaledobjects llm-demo-keda -n nim
-```
-
-Set `spec.metadata` fields with the following data
 
 ```yaml
 - metadata:
