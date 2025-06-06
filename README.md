@@ -464,7 +464,7 @@ sudo ansible-playbook site.yml \
 To completely remove the Kubernetes cluster and clean up all resources, run the following command from the root directory:
 
 ```bash
-ansible-playbook kubespray/reset.yml -i inventory/kubespray/inventory.ini -e metallb_version=0.13.10
+ansible-playbook kubespray/reset.yml -i inventory/kubespray/inventory.ini
 ```
 
 This command will:
