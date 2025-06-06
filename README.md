@@ -160,7 +160,7 @@ sudo ./setup_kubernetes.sh
 ### Step 5 Change ownership of the kubeconfig file
 
 ```bash
-sudo chown $(whoami):$(whoami) files/kubeconfig
+sudo chown $(whoami):$(whoami) output/kubeconfig
 
 # Set the KUBECONFIG environment variable
 export KUBECONFIG=output/kubeconfig
