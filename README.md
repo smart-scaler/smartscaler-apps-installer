@@ -377,7 +377,7 @@ Assuming your node IP is `192.168.100.10`:
 
 ### Proceed to Test Run
 
-📖 **[Example Test Run Steps](https://github.com/smart-scaler/smartscaler-apps-installer/blob/sample-test-run-doc/README.md#example-test-run-steps)**
+📖 **([Example Test Run Steps](#example-test-run-steps))**
 
 
 ---
