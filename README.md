@@ -126,7 +126,7 @@ sudo ./setup_kubernetes.sh
 sudo chown $(whoami):$(whoami) files/kubeconfig
 
 # Set the KUBECONFIG environment variable
-export KUBECONFIG=files/kubeconfig
+export KUBECONFIG=output/kubeconfig
 
 # Verify cluster access and node status
 kubectl get nodes
