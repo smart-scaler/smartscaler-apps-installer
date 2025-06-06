@@ -365,6 +365,12 @@ Assuming your node IP is `192.168.100.10`:
 > * NodePort values (like `32321` for Grafana and `30090` for Prometheus) **may change** as per your environment. Always verify with `kubectl get svc -n monitoring`.
 > * Ensure firewall rules or cloud security groups allow traffic to these NodePorts.
 
+
+### Proceed to Test Run
+
+📖 **[Example Test Run Steps](https://github.com/smart-scaler/smartscaler-apps-installer/blob/sample-test-run-doc/README.md#example-test-run-steps)**
+
+
 ---
 ## Documentation Links
 
@@ -520,3 +526,105 @@ This command will:
 - Reset the nodes to their pre-Kubernetes state
 
 > ⚠️ **Warning**: This action is irreversible. Make sure to backup any important data before proceeding with the cluster destruction.
+
+# Example Test Run Steps
+
+Each test run can include multiple cycles, with each cycle typically lasting around 1 hour. Running multiple cycles helps in evaluating consistency and observing Smart Scaler's behavior over time.
+
+## 🔄 Starting (restarting) a Test Run
+
+Follow these steps to (re)start a clean test cycle:
+
+### Scale Down LLM and Load Generator Pods
+
+Scale the NIM LLM deployment replicas to 1:
+
+```bash
+kubectl scale deployment <meta-llama3-8b-instruct> --replicas=1 -n nim
+```
+
+Scale the Locust deployment replicas to 0:
+
+```bash
+kubectl scale deployment locust-load --replicas=0  -n nim-load-test
+```
+
+### Verify Smart Scaler and HPA Settings
+
+Ensure the HorizontalPodAutoscaler (HPA)replica is also set to 1:
+
+```bash
+kubectl get hpa -n nim
+```
+
+### Wait for Stabilization
+
+Wait for some time (5-20 minutes) to allow both Smart Scaler and HPA to fully scale down and stabilize at 1 replica.
+
+```bash
+kubectl get hpa -n nim
+```
+
+Ensure the HorizontalPodAutoscaler (HPA)replica is also set to 1:
+
+## Smart Scaler or HPA configuration or verify configuration
+
+### Smart Scaler 
+
+**Note:** 
+  - verify and edit scaledobject, if needed (Typically you would need to edit this if you are switching from HPA to Smart Scaler)
+
+Edit ScaledObject resource
+
+```bash
+kubectl edit scaledobjects llm-demo-keda -n nim
+```
+
+Set `spec.metadata` fields with the following data
+
+```yaml
+- metadata:
+    metricName: smartscaler_hpa_num_pods
+    query: smartscaler_hpa_num_pods{ss_app_name="nim-llama",ss_deployment_name="meta-llama3-8b-instruct",job="pushgateway",ss_app_version="1.0", ss_cluster_name="nim-llama", ss_namespace="nim", ss_tenant_name="tenant-b200-local"}
+    serverAddress: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+    threshold: "1"
+```
+
+Check and reset the `spec.maxReplicaCount` to 8
+
+### For HPA setup
+
+**Note:** 
+  - verify and edit scaledobject, if needed (Typically you would need to edit this if you are switching from Smart Scaler to HPA)
+
+Edit ScaledObject resource
+
+```bash
+kubectl edit scaledobjects llm-demo-keda -n nim
+```
+
+Set `spec.metadata` fields with the following data
+
+**Note:** threshold value will be different for different models and GPUs, based on the PSE values.
+- For B200: llama3.1 70b, threshold:80
+- For B200: llama3.1 8b, threshold:200 
+
+```yaml
+- metadata:
+    metricName: smartscaler_hpa_num_pods
+    query: sum(num_requests_running) + sum(num_requests_waiting)
+    serverAddress: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+    threshold: "80"
+```
+
+### Restart Load Generation
+
+Scale the Locust replicas up to 1 to initiate the next test cycle:
+
+```bash
+kubectl scale deployment locust-load -n nim-load-test --replicas=1
+```
+
+### Monitor the Test
+
+Observe metrics and scaling behavior using the NIM Dashboard.
