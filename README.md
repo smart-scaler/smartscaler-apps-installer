@@ -366,3 +366,110 @@ kubectl get events --all-namespaces
 ```
 
 For additional support, please refer to the detailed documentation in the `docs/` folder or create an issue in the repository.
+
+---
+
+## Execution Order Control
+
+The deployment process follows a specific execution order defined in `user_input.yml`. You can control which components to execute by modifying the execution order or using `--extra-vars` with Ansible.
+
+### Available Components
+
+#### Core Infrastructure (Optional)
+- `metallb_chart` - MetalLB load balancer installation
+- `metallb_l2_config` - L2 configuration for MetalLB
+- `metallb_ip_pool` - IP pool configuration for MetalLB
+- `nginx_ingress_config` - NGINX ingress controller configuration
+- `nginx_ingress_chart` - NGINX ingress controller installation
+
+#### Base Components
+- `gpu_operator_chart` - NVIDIA GPU operator installation
+- `prometheus_stack` - Prometheus monitoring stack
+- `pushgateway_manifest` - Prometheus Pushgateway
+- `keda_chart` - KEDA autoscaling
+- `nim_operator_chart` - NIM operator installation
+- `create_ngc_secrets` - NGC credentials setup
+- `verify_ngc_secrets` - NGC credentials verification
+- `create_avesha_secret` - Avesha credentials setup
+
+#### NIM 70B Components
+- `nim_cache_manifest_70b` - NIM cache for 70B model
+- `wait_for_nim_cache_70b` - Wait for cache initialization
+- `nim_cache_wait_job_70b` - Cache wait job
+- `nim_service_manifest_70b` - NIM service for 70B model
+- `keda_scaled_object_manifest_70b` - KEDA scaling configuration
+- `create_inference_pod_configmap_70b` - Inference configuration
+- `smart_scaler_inference_70b` - Smart Scaler setup
+- `create_locust_configmap_70b` - Load test configuration
+- `locust_manifest_70b` - Load testing setup
+- `smart_scaler_mcp_server_manifest` - MCP server configuration
+
+#### NIM 1B Components (Optional)
+- `nim_cache_manifest_1b` - NIM cache for 1B model
+- `nim_service_manifest_1b` - NIM service for 1B model
+- `keda_scaled_object_manifest_1b` - KEDA scaling configuration
+- `create_inference_pod_configmap_1b` - Inference configuration
+- `smart_scaler_inference_1b` - Smart Scaler setup
+- `create_locust_configmap_1b` - Load test configuration
+- `locust_manifest_1b` - Load testing setup
+
+#### NIM 8B Components (Optional)
+- `nim_cache_manifest_8b` - NIM cache for 8B model
+- `nim_service_manifest_8b` - NIM service for 8B model
+- `keda_scaled_object_manifest_8b` - KEDA scaling configuration
+- `create_inference_pod_configmap_8b` - Inference configuration
+- `smart_scaler_inference_8b` - Smart Scaler setup
+- `create_locust_configmap_8b` - Load test configuration
+- `locust_manifest_8b` - Load testing setup
+
+### Controlling Execution
+
+To execute specific components, use the `execution_order` variable with a list of components:
+
+```bash
+# Execute only GPU operator and monitoring stack
+sudo ansible-playbook site.yml \
+  --extra-vars "execution_order=['gpu_operator_chart','prometheus_stack']" \
+  -e "ngc_api_key=$NGC_API_KEY" \
+  -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
+  -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \
+  -e "avesha_docker_password=$AVESHA_DOCKER_PASSWORD" \
+  -vv
+
+# Execute only NGINX ingress setup
+sudo ansible-playbook site.yml \
+  --extra-vars "execution_order=['nginx_ingress_config','nginx_ingress_chart']" \
+  -e "ngc_api_key=$NGC_API_KEY" \
+  -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
+  -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \
+  -e "avesha_docker_password=$AVESHA_DOCKER_PASSWORD" \
+  -vv
+
+# Execute all NIM 70B components
+sudo ansible-playbook site.yml \
+  --extra-vars "execution_order=['nim_cache_manifest_70b','wait_for_nim_cache_70b','nim_cache_wait_job_70b','nim_service_manifest_70b','keda_scaled_object_manifest_70b','create_inference_pod_configmap_70b','smart_scaler_inference_70b','create_locust_configmap_70b','locust_manifest_70b']" \
+  -e "ngc_api_key=$NGC_API_KEY" \
+  -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
+  -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \
+  -e "avesha_docker_password=$AVESHA_DOCKER_PASSWORD" \
+  -vv
+```
+
+> 💡 **Tip**: Components are executed in the order they appear in the list. Make sure to list dependent components in the correct order and include all required credentials.
+
+---
+
+## Destroying the Kubernetes Cluster
+
+To completely remove the Kubernetes cluster and clean up all resources, run the following command from the root directory:
+
+```bash
+ansible-playbook kubespray/reset.yml -i inventory/kubespray/inventory.ini
+```
+
+This command will:
+- Remove all Kubernetes components from the nodes
+- Clean up all cluster-related configurations
+- Reset the nodes to their pre-Kubernetes state
+
+> ⚠️ **Warning**: This action is irreversible. Make sure to backup any important data before proceeding with the cluster destruction.
