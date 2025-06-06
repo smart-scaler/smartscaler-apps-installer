@@ -25,14 +25,14 @@ Ansible-based installer for Smart Scaler components and Kubernetes cluster deplo
 
 - **CPU**: 8 cores minimum
 - **RAM**: 16GB minimum
-- **Storage**: 500GB minimum
+- **Storage**: 500GB minimum (Depends on NIM Profile Requirements for loading Image/Nim Cache PVC Requirements)
 - **OS**: Ubuntu 22.04+ or compatible Linux distribution
 
 #### Worker Nodes (Optional)
 
 - **CPU**: 8 cores minimum
 - **RAM**: 16GB minimum
-- **Storage**: 500GB minimum
+- **Storage**: 500GB minimum (Depends on NIM Profile Requirements for loading Image/Nim Cache PVC Requirements)
 - **OS**: Same as control plane nodes
 
 ### Required Software
@@ -227,15 +227,6 @@ sed -i \
    -e '/kubernetes_deployment:/,/^[^ ]/ s/enabled: true/enabled: false/' \
   path/to/your/user_input.yml
 ```
-
-### Required Files
-
-Ensure these files exist in the `files/` directory:
-
-- `kubeconfig` - Kubernetes cluster configuration
-- `config-inference.json` - Smart Scaler inference configuration
-- `locust.py` - Load testing script
-
 ---
 
 ## 4. Instructions to Deploy SmartScaler Apps
