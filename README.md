@@ -539,17 +539,18 @@ Follow these steps to (re)start a clean test cycle:
 
 ### Scale Down LLM and Load Generator Pods
 
+Scale the Locust deployment replicas to 0:
+
+```bash
+kubectl scale deployment locust-load-70b --replicas=0  -n nim-load-test
+```
+
 Scale the NIM LLM deployment replicas to 1:
 
 ```bash
 kubectl scale deployment meta-llama3-70b-instruct --replicas=1 -n nim
 ```
 
-Scale the Locust deployment replicas to 0:
-
-```bash
-kubectl scale deployment locust-load-70b --replicas=0  -n nim-load-test
-```
 
 ### Verify Smart Scaler and HPA Settings
 
@@ -618,7 +619,11 @@ Set `spec.metadata` fields with the following data
     serverAddress: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
     threshold: "80"
 ```
+Check to make sure current replicas set to 1
 
+```bash
+kubectl get hpa -n nim
+```
 ### Restart Load Generation
 
 Scale the Locust replicas up to 1 to initiate the next test cycle:
