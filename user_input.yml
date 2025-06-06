@@ -212,10 +212,10 @@ helm_charts:
     release_namespace: "{{ metallb.namespace }}"
     create_namespace: true
     wait: true
-    timeout: 600
-    force: true  # Force upgrade regardless of diff
-    atomic: true  # Roll back on failure
-    skip_diff: true  # Skip Helm diff check
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
     dependencies: []
     chart_repo_url: "https://metallb.github.io/metallb"
     chart_version: "0.15.0"
@@ -231,7 +231,7 @@ helm_charts:
           enabled: false
       webhookConfiguration:
         enabled: true
-        timeoutSeconds: 30
+        timeoutSeconds: 15
       crds:
         enabled: true
       rbac:
@@ -244,10 +244,10 @@ helm_charts:
     release_namespace: "ingress-nginx"
     create_namespace: true
     wait: true
-    timeout: 600
-    force: true  # Force upgrade regardless of diff
-    atomic: true  # Roll back on failure
-    skip_diff: true  # Skip Helm diff check
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
     dependencies:
       - metallb_chart
     chart_repo_url: "https://kubernetes.github.io/ingress-nginx"
@@ -274,7 +274,7 @@ helm_charts:
           enabled: true
           patch:
             enabled: true
-            timeoutSeconds: 30
+            timeoutSeconds: 15
         resources:
           requests:
             cpu: "100m"
@@ -283,17 +283,17 @@ helm_charts:
             cpu: "200m"
             memory: "512Mi"
         readinessProbe:
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 5
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
         livenessProbe:
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 5
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
       defaultBackend:
         enabled: false
         service:
-          type: ClusterIP
+          type: NodePort
         resources:
           requests:
             cpu: "1000m"
@@ -307,11 +307,14 @@ helm_charts:
     chart_ref: "gpu-operator"
     release_namespace: "gpu-operator"
     create_namespace: true
-    wait: true
-    force: true  # Force upgrade regardless of diff
-    atomic: true  # Roll back on failure
-    skip_diff: true  # Skip Helm diff check
+    wait: false
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
     chart_version: "v25.3.0"
+    chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
+    dependencies: []
     release_values:
       mig:
         strategy: "none"
@@ -329,20 +332,18 @@ helm_charts:
         env:
           - name: "CONTAINERD_RUNTIME_CLASS"
             value: "nvidia"
-    chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
-    dependencies: []  # Can start independently
 
-
-# OPTIONAL: Prometheus Stack
+  # Prometheus Stack
   prometheus_stack:
     release_name: "prometheus"
     chart_ref: "kube-prometheus-stack"
     release_namespace: "monitoring"
     create_namespace: true
-    wait: true
-    force: true  # Force upgrade regardless of diff
-    atomic: true  # Roll back on failure
-    skip_diff: true  # Skip Helm diff check
+    wait: false
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
     chart_repo_url: "https://prometheus-community.github.io/helm-charts"
     chart_version: "55.5.0"
     release_values:
@@ -392,38 +393,38 @@ helm_charts:
         enabled: true
         persistence:
           enabled: true
-          size: "1Gi"
+          storageClassName: local-path
+          size: 1Gi
+          accessModes: ["ReadWriteOnce"]
         service:
           type: NodePort
-      defaultRules:
-        rules:
-          etcd: false
-    dependencies: []  # Can start independently
 
-  # OPTIONAL: KEDA Chart
+  # KEDA Chart
   keda_chart:
     release_name: "keda"
     chart_ref: "keda"
     release_namespace: "keda"
     create_namespace: true
-    wait: true
-    force: true  # Force upgrade regardless of diff
-    atomic: true  # Roll back on failure
-    skip_diff: true  # Skip Helm diff check
+    wait: false
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
     chart_repo_url: "https://kedacore.github.io/charts"
     chart_version: "2.12.1"
     dependencies: []
 
-  # OPTIONAL: NIM Operator Chart
+  # NIM Operator Chart
   nim_operator_chart:
     release_name: "nim"
     chart_ref: "k8s-nim-operator"
     release_namespace: "nim"
     create_namespace: true
-    wait: true
-    force: true  # Force upgrade regardless of diff
-    atomic: true  # Roll back on failure
-    skip_diff: true  # Skip Helm diff check
+    wait: false
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
     chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
     chart_version: "v1.0.1"
     dependencies: []
@@ -508,6 +509,11 @@ manifests:
     namespace: "monitoring"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: "Available"
+      status: "True"
     variables:
       pushgateway_name: "pushgateway"
       pushgateway_namespace: "monitoring"

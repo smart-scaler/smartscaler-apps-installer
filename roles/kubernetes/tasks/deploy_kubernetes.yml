@@ -4,6 +4,10 @@
     msg: "Kubernetes deployment is disabled in user_input.yml"
   when: not kubernetes_deployment.enabled | default(false)
 
+- name: Initialize summary tracking
+  include_tasks: "{{ playbook_dir }}/tasks/summary_tracker.yml"
+  when: kubernetes_deployment.enabled | default(false)
+
 - name: Display current working directory
   command: pwd
   register: current_dir
@@ -170,6 +174,29 @@
          default(hostvars[groups['kube_control_plane'][0]].ansible_default_ipv4.address) }}
   when: kubernetes_deployment.enabled | default(false)
 
+- name: Track Kubernetes deployment start
+  set_fact:
+    installation_summary:
+      total_items: "{{ (installation_summary.total_items | int) + 1 }}"
+      successful_items: "{{ installation_summary.successful_items + [deployment_info] }}"
+      failed_items: "{{ installation_summary.failed_items }}"
+      skipped_items: "{{ installation_summary.skipped_items }}"
+      kubernetes_components: "{{ installation_summary.kubernetes_components + [deployment_info] }}"
+      helm_charts: "{{ installation_summary.helm_charts }}"
+      manifests: "{{ installation_summary.manifests }}"
+      kubectl_commands: "{{ installation_summary.kubectl_commands }}"
+      command_executions: "{{ installation_summary.command_executions }}"
+  vars:
+    deployment_info:
+      name: "kubespray-cluster-deployment"
+      type: "kubernetes"
+      status: "success"
+      timestamp: "{{ ansible_date_time.iso8601 }}"
+      details: "Starting Kubespray cluster deployment with {{ kubernetes_deployment.control_plane_nodes | length }} control plane nodes"
+  when: 
+    - summary_enabled | default(true)
+    - kubernetes_deployment.enabled | default(false)
+
 - name: Run Kubespray cluster deployment
   command:
     cmd: >
@@ -198,6 +225,55 @@
   poll: "{{ kubespray_poll_interval }}"
   ignore_errors: true
   when: kubernetes_deployment.enabled | default(false)
+
+- name: Track successful Kubernetes deployment
+  set_fact:
+    installation_summary:
+      total_items: "{{ (installation_summary.total_items | int) + 1 }}"
+      successful_items: "{{ installation_summary.successful_items + [deployment_info] }}"
+      failed_items: "{{ installation_summary.failed_items }}"
+      skipped_items: "{{ installation_summary.skipped_items }}"
+      kubernetes_components: "{{ installation_summary.kubernetes_components + [deployment_info] }}"
+      helm_charts: "{{ installation_summary.helm_charts }}"
+      manifests: "{{ installation_summary.manifests }}"
+      kubectl_commands: "{{ installation_summary.kubectl_commands }}"
+      command_executions: "{{ installation_summary.command_executions }}"
+  vars:
+    deployment_info:
+      name: "kubespray-cluster-deployment"
+      type: "kubernetes"
+      status: "success"
+      timestamp: "{{ ansible_date_time.iso8601 }}"
+      details: "Kubespray deployment completed successfully in {{ kubespray_result.delta if kubespray_result.delta is defined else 'unknown time' }}"
+  when: 
+    - summary_enabled | default(true)
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result is succeeded
+
+- name: Track failed Kubernetes deployment
+  set_fact:
+    installation_summary:
+      total_items: "{{ (installation_summary.total_items | int) + 1 }}"
+      successful_items: "{{ installation_summary.successful_items }}"
+      failed_items: "{{ installation_summary.failed_items + [deployment_info] }}"
+      skipped_items: "{{ installation_summary.skipped_items }}"
+      kubernetes_components: "{{ installation_summary.kubernetes_components }}"
+      helm_charts: "{{ installation_summary.helm_charts }}"
+      manifests: "{{ installation_summary.manifests }}"
+      kubectl_commands: "{{ installation_summary.kubectl_commands }}"
+      command_executions: "{{ installation_summary.command_executions }}"
+  vars:
+    deployment_info:
+      name: "kubespray-cluster-deployment"
+      type: "kubernetes"
+      status: "failed"
+      timestamp: "{{ ansible_date_time.iso8601 }}"
+      error: "{{ kubespray_result.msg | default('Kubespray deployment failed') }} - RC: {{ kubespray_result.rc | default('unknown') }}"
+      details: "Failed after {{ kubespray_result.delta if kubespray_result.delta is defined else 'unknown time' }}"
+  when: 
+    - summary_enabled | default(true)
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result is failed
 
 - name: Display warning if async timeout occurred
   debug:
@@ -243,19 +319,19 @@
   become: false
   delegate_to: localhost
 
-- name: Ensure files directory exists
+- name: Ensure output directory exists
   file:
-    path: "{{ lookup('env', 'PWD') }}/files"
+    path: "{{ lookup('env', 'PWD') }}/output"
     state: directory
     mode: '0755'
   become: false
   when: kubernetes_deployment.enabled | default(false)
 
-- name: Fix files directory ownership
+- name: Fix output directory ownership
   block:
     - name: Try fixing directory ownership without sudo
       file:
-        path: "{{ lookup('env', 'PWD') }}/files"
+        path: "{{ lookup('env', 'PWD') }}/output"
         owner: "{{ lookup('env', 'USER') }}"
         group: "{{ lookup('env', 'USER') }}"
         recurse: yes
@@ -266,8 +342,8 @@
 
     - name: Fix directory ownership with sudo if needed
       shell: |
-        sudo chown -R {{ lookup('env', 'USER') }}:{{ lookup('env', 'USER') }} {{ lookup('env', 'PWD') }}/files
-        sudo chmod -R 755 {{ lookup('env', 'PWD') }}/files
+        sudo chown -R {{ lookup('env', 'USER') }}:{{ lookup('env', 'USER') }} {{ lookup('env', 'PWD') }}/output
+        sudo chmod -R 755 {{ lookup('env', 'PWD') }}/output
       delegate_to: localhost
       ignore_errors: true
       when: dir_ownership_result is failed
@@ -315,7 +391,7 @@
 - name: Fetch kubeconfig from temporary location
   fetch:
     src: "/tmp/kubeconfig-temp/admin.conf"
-    dest: "{{ lookup('env', 'PWD') }}/files/kubeconfig"
+    dest: "{{ lookup('env', 'PWD') }}/output/kubeconfig"
     flat: yes
   delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
   vars:
@@ -344,7 +420,7 @@
         owner: "{{ lookup('env', 'USER') }}"
         group: "{{ lookup('env', 'USER') }}"
       with_items:
-        - "{{ lookup('env', 'PWD') }}/files/kubeconfig"
+        - "{{ lookup('env', 'PWD') }}/output/kubeconfig"
         - "{{ lookup('env', 'PWD') }}/inventory"
         - "{{ lookup('env', 'PWD') }}/inventory/kubespray"
       delegate_to: localhost
@@ -357,7 +433,7 @@
         sudo chown -R {{ lookup('env', 'USER') }}:{{ lookup('env', 'USER') }} {{ item }}
         sudo chmod 644 {{ item }}  # Explicit permission setting
       with_items:
-        - "{{ lookup('env', 'PWD') }}/files/kubeconfig"
+        - "{{ lookup('env', 'PWD') }}/output/kubeconfig"
         - "{{ lookup('env', 'PWD') }}/inventory"
         - "{{ lookup('env', 'PWD') }}/inventory/kubespray"
       delegate_to: localhost
@@ -368,7 +444,7 @@
       shell: |
         sudo chmod 755 {{ item }}
       with_items:
-        - "{{ lookup('env', 'PWD') }}/files"
+        - "{{ lookup('env', 'PWD') }}/output"
         - "{{ lookup('env', 'PWD') }}/inventory"
         - "{{ lookup('env', 'PWD') }}/inventory/kubespray"
       delegate_to: localhost
@@ -377,7 +453,7 @@
 
 - name: Verify kubeconfig exists
   stat:
-    path: "{{ lookup('env', 'PWD') }}/files/kubeconfig"
+    path: "{{ lookup('env', 'PWD') }}/output/kubeconfig"
   register: kubeconfig_stat
   delegate_to: localhost
 
@@ -385,9 +461,9 @@
   debug:
     msg: |
       Kubeconfig has been copied to:
-      - Global location: {{ lookup('env', 'PWD') }}/files/kubeconfig
+      - Global location: {{ lookup('env', 'PWD') }}/output/kubeconfig
       
       You can now use kubectl with:
-      export KUBECONFIG={{ lookup('env', 'PWD') }}/files/kubeconfig
+      export KUBECONFIG={{ lookup('env', 'PWD') }}/output/kubeconfig
       kubectl get nodes
   when: kubeconfig_stat.stat.exists 

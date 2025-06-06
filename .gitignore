@@ -23,6 +23,15 @@ inventory/*.ini
 inventory/*.yaml
 inventory/*.yml
 
+# Kubespray specific
+inventory/kubespray/credentials/
+inventory/kubespray/host_vars/
+inventory/kubespray/inventory.ini
+inventory/kubespray/group_vars/k8s_cluster/
+inventory/kubespray/*secrets*
+inventory/kubespray/*.key
+inventory/kubespray/*.pem
+
 # Vault password files
 .vault_pass.txt
 
@@ -47,6 +56,8 @@ kubeconfig
 files/kubeconfig
 .kube/
 .kube/config
+k8s-summary.yml
+test.out
 
 # Ansible Vault files
 .vault_pass
@@ -77,3 +88,10 @@ vault.pass
 local.*
 *.local
 *.local.*
+
+# Output directory - contains generated files and logs
+output/
+output/*
+
+# Kubernetes collections
+collections/ansible_collections/kubernetes.core-*.info/

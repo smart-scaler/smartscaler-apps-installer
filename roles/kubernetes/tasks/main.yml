@@ -14,7 +14,7 @@
 - name: Install Python requirements
   block:
     - name: Run requirements installation script
-      command: "{{ playbook_dir }}/files/install_requirements.sh"
+      command: "{{ playbook_dir }}/files/install-requirements.sh"
       register: install_output
   become: true
   when: 
@@ -114,14 +114,62 @@
   block:
     - name: Configure NVIDIA runtime firewall rules
       include_tasks: firewall_config.yml
+      register: firewall_config_result
       when:
         - kubernetes_deployment.nvidia_runtime.enabled | default(false)
         - deploy_kubernetes | default(true) | bool
 
+    - name: Track successful firewall configuration
+      include_tasks: "{{ playbook_dir }}/tasks/summary_tracker.yml"
+      vars:
+        item_name: "nvidia-firewall-config"
+        item_type: "kubernetes"
+        item_details: "NVIDIA firewall rules configured successfully"
+      when: 
+        - summary_enabled | default(true)
+        - kubernetes_deployment.nvidia_runtime.enabled | default(false)
+        - firewall_config_result is succeeded
+
+    - name: Track failed firewall configuration
+      include_tasks: "{{ playbook_dir }}/tasks/summary_tracker.yml"
+      vars:
+        item_name: "nvidia-firewall-config"
+        item_type: "kubernetes"
+        item_error: "{{ firewall_config_result.msg | default('Firewall configuration failed') }}"
+        item_details: "NVIDIA firewall rules setup failed"
+      when: 
+        - summary_enabled | default(true)
+        - kubernetes_deployment.nvidia_runtime.enabled | default(false)
+        - firewall_config_result is failed
+
     - name: Configure NVIDIA runtime
       include_tasks: nvidia_runtime_config.yml
+      register: nvidia_runtime_result
       when:
         - kubernetes_deployment.nvidia_runtime.enabled | default(false)
         - deploy_kubernetes | default(true) | bool
+
+    - name: Track successful NVIDIA runtime configuration
+      include_tasks: "{{ playbook_dir }}/tasks/summary_tracker.yml"
+      vars:
+        item_name: "nvidia-runtime-config"
+        item_type: "kubernetes"
+        item_details: "NVIDIA runtime configured successfully"
+      when: 
+        - summary_enabled | default(true)
+        - kubernetes_deployment.nvidia_runtime.enabled | default(false)
+        - nvidia_runtime_result is succeeded
+
+    - name: Track failed NVIDIA runtime configuration
+      include_tasks: "{{ playbook_dir }}/tasks/summary_tracker.yml"
+      vars:
+        item_name: "nvidia-runtime-config"
+        item_type: "kubernetes"
+        item_error: "{{ nvidia_runtime_result.msg | default('NVIDIA runtime configuration failed') }}"
+        item_details: "NVIDIA container runtime setup failed"
+      when: 
+        - summary_enabled | default(true)
+        - kubernetes_deployment.nvidia_runtime.enabled | default(false)
+        - nvidia_runtime_result is failed
   become: true
   when: kubernetes_deployment.enabled | default(false) 

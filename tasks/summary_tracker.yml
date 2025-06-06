@@ -1,0 +1,233 @@
+---
+# Summary tracking functionality
+# This file provides tasks to track and report installation status
+
+- name: Initialize summary tracking variables
+  set_fact:
+    installation_summary: "{{ installation_summary | default(default_installation_summary) }}"
+    kubernetes_summary: "{{ kubernetes_summary | default(default_kubernetes_summary) }}"
+  vars:
+    default_installation_summary:
+      total_items: 0
+      successful_items: []
+      failed_items: []
+      skipped_items: []
+      kubernetes_components: []
+      helm_charts: []
+      manifests: []
+      kubectl_commands: []
+      command_executions: []
+    default_kubernetes_summary:
+      cluster_status: "unknown"
+      nodes: []
+      system_pods: []
+      network_ready: false
+      storage_ready: false
+  when: installation_summary is not defined or kubernetes_summary is not defined
+
+- name: Create output directory for reports and logs
+  file:
+    path: "./output"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+
+- name: Track successful installation
+  set_fact:
+    installation_summary: "{{ installation_summary | combine(success_update) }}"
+  vars:
+    item_info:
+      name: "{{ item_name }}"
+      type: "{{ item_type }}"
+      status: "success"
+      timestamp: "{{ ansible_date_time.iso8601 }}"
+      details: "{{ item_details | default('') }}"
+    success_update:
+      total_items: "{{ (installation_summary.total_items | int) + 1 }}"
+      successful_items: "{{ installation_summary.successful_items + [item_info] }}"
+      kubernetes_components: "{{ installation_summary.kubernetes_components + [item_info] if item_type == 'kubernetes' else installation_summary.kubernetes_components }}"
+      helm_charts: "{{ installation_summary.helm_charts + [item_info] if item_type == 'helm' else installation_summary.helm_charts }}"
+      manifests: "{{ installation_summary.manifests + [item_info] if item_type == 'manifest' else installation_summary.manifests }}"
+      kubectl_commands: "{{ installation_summary.kubectl_commands + [item_info] if item_type == 'kubectl' else installation_summary.kubectl_commands }}"
+      command_executions: "{{ installation_summary.command_executions + [item_info] if item_type == 'command' else installation_summary.command_executions }}"
+  when: 
+    - item_name is defined
+    - item_type is defined
+    - item_error is not defined
+
+- name: Track failed installation
+  set_fact:
+    installation_summary: "{{ installation_summary | combine(failed_update) }}"
+  vars:
+    item_info:
+      name: "{{ item_name }}"
+      type: "{{ item_type }}"
+      status: "failed"
+      timestamp: "{{ ansible_date_time.iso8601 }}"
+      error: "{{ item_error | default('Unknown error') }}"
+      details: "{{ item_details | default('') }}"
+    failed_update:
+      total_items: "{{ (installation_summary.total_items | int) + 1 }}"
+      failed_items: "{{ installation_summary.failed_items + [item_info] }}"
+      kubernetes_components: "{{ installation_summary.kubernetes_components + [item_info] if item_type == 'kubernetes' else installation_summary.kubernetes_components }}"
+      helm_charts: "{{ installation_summary.helm_charts + [item_info] if item_type == 'helm' else installation_summary.helm_charts }}"
+      manifests: "{{ installation_summary.manifests + [item_info] if item_type == 'manifest' else installation_summary.manifests }}"
+      kubectl_commands: "{{ installation_summary.kubectl_commands + [item_info] if item_type == 'kubectl' else installation_summary.kubectl_commands }}"
+      command_executions: "{{ installation_summary.command_executions + [item_info] if item_type == 'command' else installation_summary.command_executions }}"
+  when: 
+    - item_name is defined
+    - item_type is defined
+    - item_error is defined
+
+- name: Track skipped installation
+  set_fact:
+    installation_summary: "{{ installation_summary | combine(skipped_update) }}"
+  vars:
+    item_info:
+      name: "{{ item_name }}"
+      type: "{{ item_type }}"
+      status: "skipped"
+      timestamp: "{{ ansible_date_time.iso8601 }}"
+      reason: "{{ item_reason | default('Condition not met') }}"
+      details: "{{ item_details | default('') }}"
+    skipped_update:
+      total_items: "{{ (installation_summary.total_items | int) + 1 }}"
+      skipped_items: "{{ installation_summary.skipped_items + [item_info] }}"
+      kubernetes_components: "{{ installation_summary.kubernetes_components + [item_info] if item_type == 'kubernetes' else installation_summary.kubernetes_components }}"
+      helm_charts: "{{ installation_summary.helm_charts + [item_info] if item_type == 'helm' else installation_summary.helm_charts }}"
+      manifests: "{{ installation_summary.manifests + [item_info] if item_type == 'manifest' else installation_summary.manifests }}"
+      kubectl_commands: "{{ installation_summary.kubectl_commands + [item_info] if item_type == 'kubectl' else installation_summary.kubectl_commands }}"
+      command_executions: "{{ installation_summary.command_executions + [item_info] if item_type == 'command' else installation_summary.command_executions }}"
+  when: 
+    - item_name is defined
+    - item_type is defined
+    - item_reason is defined
+
+- name: Update Kubernetes cluster summary
+  set_fact:
+    kubernetes_summary: "{{ kubernetes_summary | combine(k8s_update_info) }}"
+  vars:
+    k8s_update_info: "{{ k8s_summary_data | default({}) }}"
+  when: k8s_summary_data is defined
+
+- name: Generate installation summary report
+  debug:
+    msg: |
+      
+      ================================================
+      🚀 SMART SCALER INSTALLATION SUMMARY
+      ================================================
+      
+      📊 OVERALL STATUS:
+      • Total Items Processed: {{ installation_summary.total_items }}
+      • ✅ Successful: {{ installation_summary.successful_items | length }}
+      • ❌ Failed: {{ installation_summary.failed_items | length }}
+      • ⏭️  Skipped: {{ installation_summary.skipped_items | length }}
+      
+      📈 BY COMPONENT TYPE:
+      • Kubernetes: {{ installation_summary.kubernetes_components | length }}
+      • Helm Charts: {{ installation_summary.helm_charts | length }}
+      • Manifests: {{ installation_summary.manifests | length }}
+      • Kubectl Commands: {{ installation_summary.kubectl_commands | length }}
+      • Commands: {{ installation_summary.command_executions | length }}
+      
+      {% if installation_summary.successful_items | length > 0 %}
+      ✅ SUCCESSFUL INSTALLATIONS:
+      {% for item in installation_summary.successful_items %}
+      • {{ item.type | upper }}: {{ item.name }}{% if item.details %} ({{ item.details }}){% endif %}
+      {% endfor %}
+      {% endif %}
+      
+      {% if installation_summary.failed_items | length > 0 %}
+      ❌ FAILED INSTALLATIONS:
+      {% for item in installation_summary.failed_items %}
+      • {{ item.type | upper }}: {{ item.name }} - {{ item.error }}
+      {% endfor %}
+      {% endif %}
+      
+      {% if installation_summary.skipped_items | length > 0 %}
+      ⏭️  SKIPPED INSTALLATIONS:
+      {% for item in installation_summary.skipped_items %}
+      • {{ item.type | upper }}: {{ item.name }} - {{ item.reason }}
+      {% endfor %}
+      {% endif %}
+      
+      {% if installation_summary.total_items == 0 %}
+      ℹ️  No application installations processed yet.
+      {% endif %}
+      
+      ================================================
+  when: (installation_summary.total_items | int > 0) or (generate_summary_report | default(false) | bool)
+
+- name: Generate Kubernetes cluster summary report
+  debug:
+    msg: |
+      
+      ================================================
+      ☸️  KUBERNETES CLUSTER SUMMARY
+      ================================================
+      
+      🔧 CLUSTER STATUS: {{ kubernetes_summary.cluster_status | upper }}
+      
+      {% if kubernetes_summary.nodes | length > 0 %}
+      🖥️  CLUSTER NODES:
+      {% for node in kubernetes_summary.nodes %}
+      • {{ node.name }}: {{ node.status }} ({{ node.role }}){% if node.version %} - v{{ node.version }}{% endif %}
+
+      {% endfor %}
+      {% endif %}
+      
+      {% if kubernetes_summary.system_pods | length > 0 %}
+      🛠️  SYSTEM COMPONENTS:
+      {% for pod in kubernetes_summary.system_pods %}
+      • {{ pod.name }}: {{ pod.status }}{% if pod.namespace %} ({{ pod.namespace }}){% endif %}
+
+      {% endfor %}
+      {% endif %}
+      
+      🌐 NETWORK: {{ '✅ Ready' if kubernetes_summary.network_ready else '❌ Not Ready' }}
+      💾 STORAGE: {{ '✅ Ready' if kubernetes_summary.storage_ready else '❌ Not Ready' }}
+      
+      {% if kubernetes_summary.cluster_status == 'unknown' %}
+      ℹ️  Note: Run 'kubectl get nodes' and 'kubectl get pods -n kube-system' to verify cluster status manually.
+      {% endif %}
+      
+      ================================================
+  when: kubernetes_summary is defined and (kubernetes_summary.nodes | length > 0 or kubernetes_summary.system_pods | length > 0 or generate_k8s_summary_report | default(false))
+
+- name: Save summary to file
+  copy:
+    content: |
+      # Smart Scaler Installation Summary
+      Generated: {{ ansible_date_time.iso8601 }}
+      
+      ## Overall Statistics
+      - Total Items: {{ installation_summary.total_items }}
+      - Successful: {{ installation_summary.successful_items | length }}
+      - Failed: {{ installation_summary.failed_items | length }}
+      - Skipped: {{ installation_summary.skipped_items | length }}
+      
+      ## Detailed Results
+      
+      ### Successful Installations
+      {% for item in installation_summary.successful_items %}
+      - {{ item.name }} ({{ item.type }}) - {{ item.timestamp }}
+      {% endfor %}
+      
+      ### Failed Installations
+      {% for item in installation_summary.failed_items %}
+      - {{ item.name }} ({{ item.type }}) - {{ item.error }} - {{ item.timestamp }}
+      {% endfor %}
+      
+      ### Skipped Installations
+      {% for item in installation_summary.skipped_items %}
+      - {{ item.name }} ({{ item.type }}) - {{ item.reason }} - {{ item.timestamp }}
+      {% endfor %}
+      
+      ## Kubernetes Cluster Summary
+      - Cluster Status: {{ kubernetes_summary.cluster_status }}
+      - Network Ready: {{ kubernetes_summary.network_ready }}
+      - Storage Ready: {{ kubernetes_summary.storage_ready }}
+      - Total Nodes: {{ kubernetes_summary.nodes | length }}
+    dest: "./output/installation_summary_{{ ansible_date_time.epoch }}.md"
+  when: should_save_summary | default(false) 

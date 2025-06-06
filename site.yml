@@ -98,6 +98,10 @@
           {%- endif %}
 
   tasks:
+    - name: Initialize summary tracking
+      include_tasks: "tasks/summary_tracker.yml"
+      when: summary_enabled | default(true)
+
     - name: Validate prerequisites
       include_tasks: "tasks/validate_prerequisites.yml"
       when: validate_prerequisites.enabled | default(true)
@@ -111,3 +115,37 @@
           avesha_docker_username: "{{ avesha_docker_username }}"
           avesha_docker_password: "{{ avesha_docker_password }}"
       when: execution_order_enabled | default(true)
+
+  post_tasks:
+    - name: Collect Kubernetes cluster information
+      include_tasks: "tasks/collect_k8s_summary.yml"
+      when: 
+        - summary_enabled | default(true)
+        - global_kubeconfig is defined
+
+    - name: Generate final summary report
+      include_tasks: "tasks/summary_tracker.yml"
+      vars:
+        generate_summary_report: true
+        generate_k8s_summary_report: true
+        should_save_summary: "{{ save_summary_to_file | default(true) }}"
+      when: summary_enabled | default(true)
+
+    - name: Display installation completion message
+      debug:
+        msg: |
+          
+          🎉 Smart Scaler installation process completed!
+          
+          {% if save_summary_to_file | default(true) %}
+          📄 Summary report saved to: output/installation_summary_{{ ansible_date_time.epoch }}.md
+          {% endif %}
+          
+          🔍 Check the summary above for detailed results.
+          
+          💡 Next steps:
+          • Verify all components are running: kubectl get pods --all-namespaces
+          • Check service endpoints: kubectl get services --all-namespaces
+          • Review logs for any issues: kubectl logs <pod-name> -n <namespace>
+          • All output files are saved in the ./output/ directory
+      when: summary_enabled | default(true)
