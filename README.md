@@ -174,7 +174,7 @@ kubernetes_deployment:
 
 # Required Kubeconfig Settings
 global_control_plane_ip: "YOUR_MASTER_PUBLIC_IP"         # Provide the public IP for metallb/Nginx
-global_kubeconfig: "files/kubeconfig"                    # Required: Path to kubeconfig file
+global_kubeconfig: "output/kubeconfig"                    # Required: Path to kubeconfig file
 global_kubecontext: "kubernetes-admin@cluster.local"     # Required: Kubernetes context
 use_global_context: true                                 # Required: Use global context
 ```
