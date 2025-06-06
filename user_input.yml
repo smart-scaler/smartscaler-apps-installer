@@ -146,6 +146,7 @@ execution_order:
 
   # NIM 70B Components
   - nim_cache_manifest_70b
+  - nim_cache_wait_job_70b
   - nim_service_manifest_70b
   - keda_scaled_object_manifest_70b
   - create_inference_pod_configmap_70b
