@@ -937,6 +937,28 @@ manifests:
       nim_cache_volume_access_mode: "ReadWriteOnce"
       nim_cache_resources: {}
 
+
+  nim_cache_wait_job_70b:
+    name: "wait-for-nimcache-70b"
+    manifest_file: "files/wait-job-70b.yaml.j2"
+    namespace: "nim"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 1200
+    wait_condition:
+      type: "Complete"
+      status: "True"
+    validate: false
+    strict_validation: false
+    variables:
+      wait_job_name: "wait-for-nimcache-70b"
+      wait_job_namespace: "nim"
+      wait_job_target_cache: "meta-llama3-70b-instruct"
+      wait_job_timeout: 1200
+      wait_job_check_interval: 10
+      wait_job_service_account: "nim-job-reader"
+
   nim_service_manifest_70b:
     name: "nim-service-setup-70b"
     manifest_file: "files/nim-service-70b.yaml.j2"
