@@ -521,7 +521,7 @@ This command will:
 
 > ⚠️ **Warning**: This action is irreversible. Make sure to backup any important data before proceeding with the cluster destruction.
 
-# Sample Test Run Steps
+# Example Test Run Steps
 
 Each test run can include multiple cycles, with each cycle typically lasting around 1 hour. Running multiple cycles helps in evaluating consistency and observing Smart Scaler's behavior over time.
 
