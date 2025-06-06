@@ -125,6 +125,17 @@ sed -i \
   -e '/kubernetes_deployment:/,/^[^ ]/ s/enabled: false/enabled: true/' \
   path/to/your/user_input.yml
 ```
+🔁 What it updates:
+
+    PUBLIC_IP → Master node’s public IP or if Single IP just give Same IP
+
+    PRIVATE_IP → Master node’s private/internal IP (can be same as public if not applicable)
+
+    REPLACE_SSH_USER → Your SSH username (e.g., ubuntu, ec2-user)
+
+    SSH key path → Absolute Path to your private SSH key
+
+    enabled: false → Automatically changed to enabled: true
 
 > ✅ Use this before running the installer to ensure the configuration is correctly set for a single-node Kubernetes deployment.
 
