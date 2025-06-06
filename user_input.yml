@@ -393,7 +393,9 @@ helm_charts:
         enabled: true
         persistence:
           enabled: true
-          size: "1Gi"
+          storageClassName: local-path
+          size: 1Gi
+          accessModes: ["ReadWriteOnce"]
         service:
           type: NodePort
 
