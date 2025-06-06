@@ -4,14 +4,15 @@ Ansible-based installer for Smart Scaler components and Kubernetes cluster deplo
 
 ## Table of Contents
 
-1. [Prerequisites for Deploying K8s Cluster](#1-prerequisites-for-deploying-k8s-cluster)
-2. [Installation Steps for Deploying K8s Cluster](#2-installation-steps-for-deploying-k8s-cluster)
-3. [Prerequisites for Installing SmartScaler Apps](#3-prerequisites-for-installing-smartscaler-apps)
-4. [Instructions to Deploy SmartScaler Apps](#4-instructions-to-deploy-smartscaler-apps)
-5. [Example Test Run Steps](#example-test-run-steps)
-6. [Execution Order Control](#execution-order-control)
-7. [Destroying the Kubernetes Cluster](#destroying-the-kubernetes-cluster)
-8. [Documentation Links](#documentation-links)
+
+1. [Prerequisites for Deploying K8s Cluster](#1-prerequisites-for-deploying-k8s-cluster) *(~2–3 mins)*  
+2. [Installation Steps for Deploying K8s Cluster](#2-installation-steps-for-deploying-k8s-cluster) *(~15–20 mins)*  
+3. [Prerequisites for Installing SmartScaler Apps](#3-prerequisites-for-installing-smartscaler-apps) *(~2 mins)*  
+4. [Instructions to Deploy SmartScaler Apps](#4-instructions-to-deploy-smartscaler-apps) *(Depending on NIM profiles 70b(~20-25 mins), 8b(~10-15 mins), 1b(~10 mins))*  
+5. [Example Test Run Steps](#example-test-run-steps) *(~15 mins)*  
+6. [Execution Order Control](#execution-order-control) *(optional) (~1 min)*  
+7. [Destroying the Kubernetes Cluster](#destroying-the-kubernetes-cluster) *(~5 mins)*  
+8. [Documentation Links](#documentation-links)  
 9. [Troubleshooting](#troubleshooting)
 
 ---
@@ -27,7 +28,7 @@ Ansible-based installer for Smart Scaler components and Kubernetes cluster deplo
 - **Storage**: 500GB minimum
 - **OS**: Ubuntu 22.04+ or compatible Linux distribution
 
-#### Worker Nodes
+#### Worker Nodes (Optional)
 
 - **CPU**: 8 cores minimum
 - **RAM**: 16GB minimum
