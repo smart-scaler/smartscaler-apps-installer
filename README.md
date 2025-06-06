@@ -10,9 +10,10 @@ Ansible-based installer for Smart Scaler components and Kubernetes cluster deplo
 4. [Instructions to Deploy SmartScaler Apps](#4-instructions-to-deploy-smartscaler-apps)
 5. [Accessing Prometheus & Grafana via NodePort](#step-4-accessing-prometheus--grafana-via-nodeport)
 6. [Example Test Run Steps](https://github.com/smart-scaler/smartscaler-apps-installer/blob/sample-test-run-doc/README.md#example-test-run-steps)
-7. [Destroying the Kubernetes Cluster](#destroying-the-kubernetes-cluster)
-8. [Documentation Links](#documentation-links)
-9. [Troubleshooting](#troubleshooting)
+7. [Execution Order Control](https://github.com/smart-scaler/smartscaler-apps-installer/tree/main?tab=readme-ov-file#execution-order-control)
+8. [Destroying the Kubernetes Cluster](#destroying-the-kubernetes-cluster)
+9. [Documentation Links](#documentation-links)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
