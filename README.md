@@ -84,31 +84,50 @@ Edit `user_input.yml` with your cluster configuration:
 
 This section defines the settings required to enable and configure a Kubernetes cluster deployment using Ansible.
 
-> 🔧 **Note**: Replace placeholders like `YOUR_MASTER_PUBLIC_IP` and `YOUR_MASTER_PRIVATE_IP` with actual values before running the playbook.
+#### 🔧 **Note**: Replace placeholders with actual values before running the playbook.
 
 ```yaml
 kubernetes_deployment:
-  enabled: true                           # Enable or disable Kubernetes deployment via Ansible
+  enabled: true  # Enable Kubernetes deployment via Ansible
 
   api_server:
-    host: "YOUR_MASTER_PUBLIC_IP"        # Public IP address of the Kubernetes API server (control plane)
-    port: 6443                           # Default port for Kubernetes API server
-    secure: true                         # Set to true to use HTTPS when connecting to the API server
+    host: "PUBLIC_IP"        # Public IP of Kubernetes API server
+    port: 6443               # Default secure port
+    secure: true             # Use HTTPS (recommended)
 
-  ssh_key_path: "/absolute/path/to/.ssh/k8s_rsa"  # Full path to the SSH private key used to access the nodes
-  default_ansible_user: "REPLACE_SSH_USER"         # Default SSH username for Ansible to connect to nodes
-  ansible_sudo_pass: ""                  # Optional: Sudo password; leave empty to be prompted at runtime
+  ssh_key_path: "/absolute/path/to/.ssh/k8s_rsa"     # SSH private key path
+  default_ansible_user: "REPLACE_SSH_USER"           # SSH user (e.g., ubuntu, ec2-user)
+  ansible_sudo_pass: ""                              # Optional: sudo password
 
   control_plane_nodes:
-    - name: "master-1"                   # Identifier name for the control plane node
-      ansible_host: "YOUR_MASTER_PUBLIC_IP"   # Public IP address of the control plane node for SSH
-      ansible_user: "REPLACE_SSH_USER"             # SSH username for this node (overrides default if set)
-      ansible_become: true               # Enable privilege escalation (sudo) on this node
-      ansible_become_method: "sudo"      # Method used for privilege escalation
-      private_ip: "YOUR_MASTER_PRIVATE_IP"    # Private/internal IP used for cluster communication, use same public ip if not available
-
+    - name: "master-1"
+      ansible_host: "PUBLIC_IP"       # Public IP for SSH
+      ansible_user: "REPLACE_SSH_USER"
+      ansible_become: true
+      ansible_become_method: "sudo"
+      ansible_become_user: "root"
+      private_ip: "PRIVATE_IP"        # Internal/private IP
 
 ```
+
+#### ⚙️ For Single Node: Quick Configuration Update (Command-Line Shortcut)
+
+You can quickly replace the placeholder values in your `user_input.yml` configuration using the following `sed` command:
+
+#### 🧪 Example:
+
+```bash
+sed -i \
+  -e 's|PUBLIC_IP|203.0.113.10|g' \
+  -e 's|PRIVATE_IP|192.168.1.10|g' \
+  -e 's|REPLACE_SSH_USER|ubuntu|g' \
+  -e 's|/absolute/path/to/.ssh/k8s_rsa|/home/ubuntu/.ssh/id_rsa|g' \
+  -e '/kubernetes_deployment:/,/^[^ ]/ s/enabled: false/enabled: true/' \
+  path/to/your/user_input.yml
+```
+
+> ✅ Use this before running the installer to ensure the configuration is correctly set for a single-node Kubernetes deployment.
+
 
 ### Step 4: Deploy Kubernetes Cluster
 
@@ -172,11 +191,23 @@ export AVESHA_DOCKER_PASSWORD="your_avesha_password"
 kubernetes_deployment:
   enabled: false  # Must be false for apps-only deployment
 
-# Required Kubeconfig Settings
+> ℹ️ **Required Kubeconfig Settings** – Already included above; this section can be skipped.
+
 global_control_plane_ip: "YOUR_MASTER_PUBLIC_IP"         # Provide the public IP for metallb/Nginx
 global_kubeconfig: "output/kubeconfig"                    # Required: Path to kubeconfig file
 global_kubecontext: "kubernetes-admin@cluster.local"     # Required: Kubernetes context
 use_global_context: true                                 # Required: Use global context
+```
+#### Quick Configuration Update (Command-Line Shortcut)
+
+You can quickly replace the placeholder values in your `user_input.yml` configuration using the following `sed` command:
+
+#### 🧪 Example:
+
+```bash
+sed -i \
+   -e '/kubernetes_deployment:/,/^[^ ]/ s/enabled: true/enabled: false/' \
+  path/to/your/user_input.yml
 ```
 
 ### Required Files
