@@ -948,7 +948,7 @@ manifests:
     wait: true
     wait_timeout: 1200
     wait_condition:
-      type: "Complete"
+      type: "Succeeded"
       status: "True"
     validate: false
     strict_validation: false
