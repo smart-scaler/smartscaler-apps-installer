@@ -1,0 +1,134 @@
+---
+# Collect Kubernetes cluster information for summary
+- name: Initialize cluster summary variables
+  set_fact:
+    processed_nodes: []
+    processed_system_pods: []
+
+- name: Get cluster nodes
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    kubeconfig: "{{ global_kubeconfig }}"
+  register: k8s_nodes
+  ignore_errors: true
+  when: global_kubeconfig is defined
+
+- name: Get system pods status
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: kube-system
+    kubeconfig: "{{ global_kubeconfig }}"
+  register: k8s_system_pods
+  ignore_errors: true
+  when: global_kubeconfig is defined
+
+- name: Get cluster info
+  kubernetes.core.k8s_cluster_info:
+    kubeconfig: "{{ global_kubeconfig }}"
+  register: k8s_cluster_info
+  ignore_errors: true
+  when: global_kubeconfig is defined
+
+- name: Check network readiness (CNI)
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: kube-system
+    label_selectors:
+      - "k8s-app=calico-node"
+    kubeconfig: "{{ global_kubeconfig }}"
+  register: network_pods
+  ignore_errors: true
+  when: global_kubeconfig is defined
+
+- name: Check storage readiness
+  kubernetes.core.k8s_info:
+    api_version: storage.k8s.io/v1
+    kind: StorageClass
+    kubeconfig: "{{ global_kubeconfig }}"
+  register: storage_classes
+  ignore_errors: true
+  when: global_kubeconfig is defined
+
+- name: Process cluster nodes information
+  set_fact:
+    processed_nodes: "{{ processed_nodes + [node_info] }}"
+  vars:
+    node_info:
+      name: "{{ item.metadata.name }}"
+      status: "{{ item.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('Unknown') }}"
+      role: "{{ 'control-plane' if 'node-role.kubernetes.io/control-plane' in item.metadata.labels else 'worker' }}"
+      version: "{{ item.status.nodeInfo.kubeletVersion | default('unknown') }}"
+  loop: "{{ k8s_nodes.resources | default([]) }}"
+  when: 
+    - k8s_nodes is defined 
+    - k8s_nodes.resources is defined
+    - k8s_nodes.resources | length > 0
+
+- name: Process system pods information
+  set_fact:
+    processed_system_pods: "{{ processed_system_pods + [pod_info] }}"
+  vars:
+    pod_info:
+      name: "{{ item.metadata.name }}"
+      status: "{{ item.status.phase | default('Unknown') }}"
+      namespace: "{{ item.metadata.namespace }}"
+      ready: "{{ item.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('False') }}"
+  loop: "{{ k8s_system_pods.resources | default([]) }}"
+  when: 
+    - k8s_system_pods is defined 
+    - k8s_system_pods.resources is defined
+    - k8s_system_pods.resources | length > 0
+
+- name: Determine cluster status
+  set_fact:
+    cluster_status: >-
+      {%- if processed_nodes | length > 0 -%}
+        {%- set ready_nodes = processed_nodes | selectattr('status', 'equalto', true) | list -%}
+        {%- if ready_nodes | length == processed_nodes | length -%}
+          healthy
+        {%- elif ready_nodes | length > 0 -%}
+          partially_ready
+        {%- else -%}
+          unhealthy
+        {%- endif -%}
+      {%- else -%}
+        unknown
+      {%- endif -%}
+
+- name: Determine network readiness
+  set_fact:
+    network_ready: >-
+      {%- if network_pods is defined and network_pods.resources is defined and network_pods.resources | length > 0 -%}
+        {%- set running_pods = network_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list -%}
+        {{ running_pods | length > 0 }}
+      {%- else -%}
+        false
+      {%- endif -%}
+
+- name: Determine storage readiness
+  set_fact:
+    storage_ready: >-
+      {%- if storage_classes is defined and storage_classes.resources is defined -%}
+        {{ storage_classes.resources | length > 0 }}
+      {%- else -%}
+        false
+      {%- endif -%}
+
+- name: Update Kubernetes summary data
+  set_fact:
+    kubernetes_summary:
+      cluster_status: "{{ cluster_status }}"
+      nodes: "{{ processed_nodes | default([]) }}"
+      system_pods: "{{ processed_system_pods | default([]) }}"
+      network_ready: "{{ network_ready | bool }}"
+      storage_ready: "{{ storage_ready | bool }}"
+
+- name: Generate summary report
+  include_tasks: "{{ playbook_dir }}/tasks/summary_tracker.yml"
+  vars:
+    generate_summary_report: true
+    generate_k8s_summary_report: true
+    should_save_summary: true 
