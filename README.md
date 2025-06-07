@@ -120,7 +120,7 @@ You can quickly update your `user_input.yml` by replacing only the **values** in
 **Keep the placeholder keywords (`PUBLIC_IP`, `PRIVATE_IP`, etc.) on the left side exactly as-is.**
 
 > ⚠️ **Warning:**
-> Replace **only** the values on the right-hand side (`172.25.232.9`, `root`, etc.) with your actual environment details.
+> Replace **only** the values on the right-hand side (`192.168.1.100`, `root`, etc.) with your actual environment details.
 > **Do not modify** the placeholder keywords (`PUBLIC_IP`, `PRIVATE_IP`, etc.) — they are required for matching.
 
 #### 🧪 Example Command
