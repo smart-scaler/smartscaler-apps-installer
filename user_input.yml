@@ -128,9 +128,16 @@ avesha_docker_password: "{{ lookup('env', 'AVESHA_DOCKER_PASSWORD') }}" # Requir
 # Required Execution Order
 execution_order:
   # Core Infrastructure
+  # - metallb_chart                 
+  # - metallb_l2_config            
+  # - metallb_ip_pool              
+  # - nginx_ingress_config         
+  # - nginx_ingress_chart  
+
+  # EGS Application
   - kubeslice_controller_egs  # Install EGS controller first
   - kubeslice_ui_egs         # Install EGS UI after controller
-  - egs_project_manifest     # Create EGS project
+  - egs_project_manifest              # Create EGS project
   - egs_cluster_registration_worker_1 # Register worker-1 cluster
   - fetch_worker_secret_worker_1 # Fetch worker secret after registration
   - kubeslice_worker_egs_worker_1 # Install worker after fetching secret
