@@ -133,6 +133,16 @@ execution_order:
   # - metallb_ip_pool              
   # - nginx_ingress_config         
   # - nginx_ingress_chart  
+  
+  # Base Existing Applications
+  - gpu_operator_chart
+  - prometheus_stack
+  - pushgateway_manifest
+  - keda_chart
+  - nim_operator_chart        # This creates the nim namespace
+  - create_avesha_secret     # Move this before NGC secrets
+  - create_ngc_secrets       # These need the nim namespace
+  - verify_ngc_secrets
 
   # EGS Application
   - kubeslice_controller_egs  # Install EGS controller first
@@ -142,15 +152,6 @@ execution_order:
   - fetch_worker_secret_worker_1 # Fetch worker secret after registration
   - kubeslice_worker_egs_worker_1 # Install worker after fetching secret
 
-  # Existing Applications
-  - gpu_operator_chart
-  - prometheus_stack
-  - pushgateway_manifest
-  - keda_chart
-  - nim_operator_chart        # This creates the nim namespace
-  - create_avesha_secret     # Move this before NGC secrets
-  - create_ngc_secrets       # These need the nim namespace
-  - verify_ngc_secrets
 
   # # NIM Components
   - nim_cache_manifest_70b
