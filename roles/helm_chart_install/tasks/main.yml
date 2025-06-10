@@ -34,6 +34,7 @@
       - "Reset Values: {{ item.reset_values | default(true) }}"
       - "Reuse Values: {{ item.reuse_values | default(false) }}"
       - "Values: {{ item.release_values | default({}) }}"
+      - "Values Files: {{ item.values_files | default([]) }}"
 
 - name: Install/Upgrade Helm chart
   kubernetes.core.helm:
@@ -47,6 +48,7 @@
     wait: "{{ item.wait | default(false) }}"
     timeout: "{{ item.timeout | default('600s') }}"
     values: "{{ item.release_values | default({}) }}"
+    values_files: "{{ item.values_files | default([]) }}"
     force: "{{ item.force | default(false) }}"
     atomic: "{{ item.atomic | default(false) }}"
     reset_values: "{{ item.reset_values | default(true) }}"
