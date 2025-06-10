@@ -41,11 +41,4 @@ container_manager=containerd
 dns_mode=coredns
 
 # Add both public and private IPs to SSL keys for all nodes
-supplementary_addresses_in_ssl_keys=[
-  {% for node in control_plane_nodes %}
-  "{{ node.ansible_host }}", "{{ node.private_ip | default(node.ansible_host) }}"{% if not loop.last or worker_nodes %}, {% endif %}
-  {% endfor %}
-  {% for node in worker_nodes %}
-  "{{ node.ansible_host }}", "{{ node.private_ip | default(node.ansible_host) }}"{% if not loop.last %}, {% endif %}
-  {% endfor %}
-] 
+supplementary_addresses_in_ssl_keys=[{% for node in control_plane_nodes %}"{{ node.ansible_host }}", "{{ node.private_ip | default(node.ansible_host) }}"{% if not loop.last or worker_nodes %}, {% endif %}{% endfor %}{% for node in worker_nodes %}"{{ node.ansible_host }}", "{{ node.private_ip | default(node.ansible_host) }}"{% if not loop.last %}, {% endif %}{% endfor %}] 
