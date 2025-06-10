@@ -1,0 +1,41 @@
+name: trivy
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches: [ "main" ]
+  schedule:
+    - cron: '29 19 * * 6'
+permissions:
+  contents: read
+
+jobs:
+  build:
+    permissions:
+      contents: read # for actions/checkout to fetch code
+      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
+      actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run Trivy vulnerability scanner in repo mode
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'repo'
+          ignore-unfixed: true
+          format: 'table'
+          output: 'trivy-results'
+          severity: 'CRITICAL'
+          github-pat: ${{ secrets.TOKEN }}
+        env:
+          TRIVY_DB_REPOSITORY: "public.ecr.aws/aquasecurity/trivy-db"
+
+      - name: upload github artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-results
+          path: ./trivy-results
