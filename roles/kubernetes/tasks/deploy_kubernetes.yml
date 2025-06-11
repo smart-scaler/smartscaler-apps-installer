@@ -18,6 +18,7 @@
   slurp:
     src: "{{ playbook_dir }}/user_input.yml"
   register: user_input_content
+  delegate_to: localhost
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Parse user_input.yml content
@@ -60,19 +61,53 @@
       Group Vars Path: {{ inventory_dir }}/kubespray/group_vars/all/all.yml
   when: kubernetes_deployment.enabled | default(false)
 
+- name: Check SSH key file exists
+  stat:
+    path: "{{ kubernetes_deployment.ssh_key_path | expanduser | realpath }}"
+  register: ssh_key_stat
+  delegate_to: localhost
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Fail if SSH key not found
+  fail:
+    msg: "SSH key file not found at {{ kubernetes_deployment.ssh_key_path }}. Please ensure the key file exists and the path is correct."
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - not ssh_key_stat.stat.exists
+
+- name: Set SSH key permissions
+  file:
+    path: "{{ kubernetes_deployment.ssh_key_path | expanduser | realpath }}"
+    mode: '0600'
+  delegate_to: localhost
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - ssh_key_stat.stat.exists
+
 - name: Test SSH connection to all hosts
   command:
-    cmd: "ssh -i {{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ item.ansible_user | default('root') }}@{{ item.ansible_host }} 'echo SSH connection successful'"
+    cmd: "ssh -i {{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}@{{ item.ansible_host }} 'echo SSH connection successful'"
   loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
   register: ssh_test
   changed_when: false
   ignore_errors: true
+  delegate_to: localhost
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Display SSH test results
   debug:
-    var: ssh_test
-  when: kubernetes_deployment.enabled | default(false)
+    msg: |
+      SSH test results:
+      {% for result in ssh_test.results %}
+      Host: {{ result.item.name }} ({{ result.item.ansible_host }})
+      Status: {{ 'Success' if result.rc == 0 else 'Failed' }}
+      {% if result.rc != 0 %}
+      Error: {{ result.stderr }}
+      {% endif %}
+      {% endfor %}
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - ssh_test is defined
 
 - name: Set Ansible environment variables
   set_fact:
@@ -101,7 +136,6 @@
   setup:
     gather_subset: '!all,network'
     filter: "ansible_default_ipv4"
-  delegate_to: "{{ item.ansible_host }}"
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
@@ -163,13 +197,13 @@
 
 - name: Set node IP variables
   set_fact:
-    control_plane_ips: >-
+    control_plane_ips: >
       {{ kubernetes_deployment.control_plane_nodes | map(attribute='private_ip') | 
          map('default', ansible_default_ipv4.address) | list }}
-    worker_node_ips: >-
+    worker_node_ips: >
       {{ kubernetes_deployment.worker_nodes | default([]) | map(attribute='private_ip') | 
          map('default', ansible_default_ipv4.address) | list }}
-    first_control_plane_ip: >-
+    first_control_plane_ip: >
       {{ kubernetes_deployment.control_plane_nodes[0].private_ip | 
          default(hostvars[groups['kube_control_plane'][0]].ansible_default_ipv4.address) }}
   when: kubernetes_deployment.enabled | default(false)
@@ -197,106 +231,118 @@
     - summary_enabled | default(true)
     - kubernetes_deployment.enabled | default(false)
 
+- name: Create async directory
+  file:
+    path: "/home/{{ kubernetes_deployment.default_ansible_user }}/.ansible_async"
+    state: directory
+    mode: '0755'
+    owner: "{{ kubernetes_deployment.default_ansible_user }}"
+    group: "{{ kubernetes_deployment.default_ansible_user }}"
+  become: true
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Create Kubespray vars file
+  template:
+    src: kubespray_vars.yml.j2
+    dest: /tmp/kubespray-vars.yml
+  delegate_to: localhost
+
+- name: Ensure Ansible async directory exists
+  file:
+    path: "/tmp/ansible-async"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+
 - name: Run Kubespray cluster deployment
   command:
-    cmd: >
-      ansible-playbook -i {{ inventory_dir }}/kubespray/inventory.ini
-      {{ kubespray_dir }}/cluster.yml
-      -e @{{ inventory_dir }}/kubespray/group_vars/all/all.yml
-      -e @{{ inventory_dir }}/kubespray/group_vars/k8s_cluster/addons.yml
-      -e "kube_apiserver_ip={{ kubernetes_deployment.api_server.host }}"
-      -e "loadbalancer_apiserver={address: '{{ kubernetes_deployment.api_server.host }}', port: {{ kubernetes_deployment.api_server.port }}}"
-      -e "apiserver_loadbalancer_domain_name={{ kubernetes_deployment.api_server.host }}"
-      -e "supplementary_addresses_in_ssl_keys=['{{ kubernetes_deployment.api_server.host }}'] + {{ control_plane_ips | to_json }} + {{ worker_node_ips | to_json }}"
-      -e "kube_apiserver_bind_address={{ first_control_plane_ip }}"
-      -e "kube_apiserver_advertise_address={{ first_control_plane_ip }}"
-      -e "kubernetes_deployment={{ kubernetes_deployment }}"
-      --become
-      --become-method={{ kubespray_become_method }}
-      --become-user={{ kubespray_become_user }}
+    cmd: >-
+      ansible-playbook -i {{ inventory_dir }}/kubespray/inventory.ini cluster.yml
+      -e @/tmp/kubespray-vars.yml
+      -e @/tmp/kubespray-extra-vars.json
       -e ansible_ssh_private_key_file={{ kubernetes_deployment.ssh_key_path | expanduser | realpath }}
       -e ansible_user={{ kubernetes_deployment.default_ansible_user | default('root') }}
-      -e ansible_become_pass=''
+      -e ansible_become_pass="{{ kubernetes_deployment.ansible_sudo_pass | default('') }}"
+      -e ansible_async_dir=/tmp/ansible-async
+      --become
+      --become-method=sudo
+      --become-user=root
       --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
       -vvvv
-  environment: "{{ kubespray_env | combine(kubespray_extra_env) | combine({'ANSIBLE_CONFIG': playbook_dir + '/ansible.cfg'}) }}"
-  register: kubespray_result
-  async: "{{ kubespray_async_timeout }}"
-  poll: "{{ kubespray_poll_interval }}"
+  args:
+    chdir: "{{ kubespray_dir }}"
+  async: "{{ kubernetes_deployment.async_config.timeout | default(3600) }}"
+  poll: "{{ kubernetes_deployment.async_config.poll_interval | default(5) }}"
+  register: kubespray_deployment
+  delegate_to: localhost
+  environment:
+    ANSIBLE_LOG_PATH: "{{ playbook_dir }}/ansible.log"
+    ANSIBLE_CALLBACK_PLUGINS: "{{ playbook_dir }}/callback_plugins"
+    ANSIBLE_STDOUT_CALLBACK: debug
+    ANSIBLE_DISPLAY_SKIPPED_HOSTS: "True"
+    ANSIBLE_DISPLAY_OK_HOSTS: "True"
+    ANSIBLE_SHOW_CUSTOM_STATS: "True"
+    ANSIBLE_LOAD_CALLBACK_PLUGINS: "True"
+
+- name: Wait for Kubespray deployment
+  async_status:
+    jid: "{{ kubespray_deployment.ansible_job_id }}"
+  register: job_result
+  until: job_result.finished
+  retries: "{{ (kubernetes_deployment.async_config.timeout | default(3600)) | int // (kubernetes_deployment.async_config.poll_interval | default(5)) | int }}"
+  delay: "{{ kubernetes_deployment.async_config.poll_interval | default(5) }}"
+  when: kubespray_deployment.ansible_job_id is defined
+  delegate_to: localhost
+
+- name: Check deployment result
+  fail:
+    msg: "Kubespray deployment failed. Check ansible.log for details."
+  when: job_result.rc is defined and job_result.rc != 0
+
+- name: Verify cluster access
+  command:
+    cmd: "kubectl cluster-info"
+  register: cluster_info
+  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  remote_user: "{{ kubernetes_deployment.default_ansible_user }}"
   ignore_errors: true
-  when: kubernetes_deployment.enabled | default(false)
+  environment:
+    KUBECONFIG: "/etc/kubernetes/admin.conf"
 
-- name: Track successful Kubernetes deployment
-  set_fact:
-    installation_summary:
-      total_items: "{{ (installation_summary.total_items | int) + 1 }}"
-      successful_items: "{{ installation_summary.successful_items + [deployment_info] }}"
-      failed_items: "{{ installation_summary.failed_items }}"
-      skipped_items: "{{ installation_summary.skipped_items }}"
-      kubernetes_components: "{{ installation_summary.kubernetes_components + [deployment_info] }}"
-      helm_charts: "{{ installation_summary.helm_charts }}"
-      manifests: "{{ installation_summary.manifests }}"
-      kubectl_commands: "{{ installation_summary.kubectl_commands }}"
-      command_executions: "{{ installation_summary.command_executions }}"
-  vars:
-    deployment_info:
-      name: "kubespray-cluster-deployment"
-      type: "kubernetes"
-      status: "success"
-      timestamp: "{{ ansible_date_time.iso8601 }}"
-      details: "Kubespray deployment completed successfully in {{ kubespray_result.delta if kubespray_result.delta is defined else 'unknown time' }}"
-  when: 
-    - summary_enabled | default(true)
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result is succeeded
-
-- name: Track failed Kubernetes deployment
-  set_fact:
-    installation_summary:
-      total_items: "{{ (installation_summary.total_items | int) + 1 }}"
-      successful_items: "{{ installation_summary.successful_items }}"
-      failed_items: "{{ installation_summary.failed_items + [deployment_info] }}"
-      skipped_items: "{{ installation_summary.skipped_items }}"
-      kubernetes_components: "{{ installation_summary.kubernetes_components }}"
-      helm_charts: "{{ installation_summary.helm_charts }}"
-      manifests: "{{ installation_summary.manifests }}"
-      kubectl_commands: "{{ installation_summary.kubectl_commands }}"
-      command_executions: "{{ installation_summary.command_executions }}"
-  vars:
-    deployment_info:
-      name: "kubespray-cluster-deployment"
-      type: "kubernetes"
-      status: "failed"
-      timestamp: "{{ ansible_date_time.iso8601 }}"
-      error: "{{ kubespray_result.msg | default('Kubespray deployment failed') }} - RC: {{ kubespray_result.rc | default('unknown') }}"
-      details: "Failed after {{ kubespray_result.delta if kubespray_result.delta is defined else 'unknown time' }}"
-  when: 
-    - summary_enabled | default(true)
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result is failed
-
-- name: Display warning if async timeout occurred
+- name: Display cluster information
   debug:
-    msg: "WARNING: Kubespray deployment exceeded the async timeout of {{ kubespray_async_timeout }} seconds. The deployment is still running in the background."
-  when: 
-    - kubespray_result is defined 
-    - kubespray_result.msg is defined
-    - kubespray_result.msg is search("async task did not complete within the requested time")
+    var: cluster_info.stdout_lines
+  when: cluster_info.rc == 0
 
-- name: Continue with deployment
-  debug:
-    msg: "Proceeding with the rest of the deployment tasks..."
-  when: kubernetes_deployment.enabled | default(false)
+- name: Get cluster node status
+  command:
+    cmd: "kubectl get nodes -o wide"
+  register: node_status
+  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  remote_user: "{{ kubernetes_deployment.default_ansible_user }}"
+  ignore_errors: true
+  environment:
+    KUBECONFIG: "/etc/kubernetes/admin.conf"
 
-- name: Display Kubespray deployment result
+- name: Display node status
   debug:
-    msg: |
-      STDOUT:
-      {{ kubespray_result.stdout_lines | default([]) | join('\n') }}
-      
-      STDERR:
-      {{ kubespray_result.stderr_lines | default([]) | join('\n') }}
-  when: kubespray_result is defined and kubernetes_deployment.enabled | default(false)
+    var: node_status.stdout_lines
+  when: node_status.rc == 0
+
+- name: Get cluster pod status
+  command:
+    cmd: "kubectl get pods -A -o wide"
+  register: pod_status
+  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  remote_user: "{{ kubernetes_deployment.default_ansible_user }}"
+  ignore_errors: true
+  environment:
+    KUBECONFIG: "/etc/kubernetes/admin.conf"
+
+- name: Display pod status
+  debug:
+    var: pod_status.stdout_lines
+  when: pod_status.rc == 0
 
 - name: Get current user
   command: whoami
@@ -349,22 +395,17 @@
       when: dir_ownership_result is failed
 
 - name: Create temporary directory on remote host
-  file:
-    path: "/tmp/kubeconfig-temp"
-    state: directory
-    mode: '0755'
-  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  raw: mkdir -p /tmp/kubeconfig-temp && chmod 755 /tmp/kubeconfig-temp
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
     ansible_become: true
 
 - name: Wait for kubeconfig file to be created
-  wait_for:
-    path: /etc/kubernetes/admin.conf
-    state: present
-    timeout: 600
-  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  shell: |
+    timeout 600 bash -c 'while [ ! -f /etc/kubernetes/admin.conf ]; do sleep 5; echo "Waiting for kubeconfig..."; done'
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
@@ -373,8 +414,11 @@
   ignore_errors: true
 
 - name: Copy kubeconfig to temporary location with sudo
-  shell: "cp /etc/kubernetes/admin.conf /tmp/kubeconfig-temp/admin.conf && chmod 644 /tmp/kubeconfig-temp/admin.conf && chown {{ kubernetes_deployment.default_ansible_user }}:{{ kubernetes_deployment.default_ansible_user }} /tmp/kubeconfig-temp/admin.conf"
-  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  shell: |
+    cp /etc/kubernetes/admin.conf /tmp/kubeconfig-temp/admin.conf && \
+    chmod 644 /tmp/kubeconfig-temp/admin.conf && \
+    chown {{ kubernetes_deployment.default_ansible_user }}:{{ kubernetes_deployment.default_ansible_user }} /tmp/kubeconfig-temp/admin.conf
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
@@ -393,7 +437,7 @@
     src: "/tmp/kubeconfig-temp/admin.conf"
     dest: "{{ lookup('env', 'PWD') }}/output/kubeconfig"
     flat: yes
-  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
@@ -404,7 +448,7 @@
   file:
     path: "/tmp/kubeconfig-temp"
     state: absent
-  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"

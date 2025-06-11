@@ -95,3 +95,6 @@ output/*
 
 # Kubernetes collections
 collections/ansible_collections/kubernetes.core-*.info/
+
+# New directory
+files/dev-charts-ent-egs/

@@ -1,14 +1,13 @@
 ---
 - name: Deploy Kubernetes Cluster Only
-  hosts: localhost
+  hosts: k8s_cluster
   gather_facts: true
-  become: true
-  become_method: sudo
   vars_files:
     - user_input.yml
   vars:
     inventory_dir: "{{ playbook_dir }}/inventory"
     kubespray_dir: "{{ playbook_dir }}/kubespray"
+    ansible_become_pass: "{{ kubernetes_deployment.ansible_sudo_pass }}"
 
   pre_tasks:
     - name: Load and verify user_input.yml

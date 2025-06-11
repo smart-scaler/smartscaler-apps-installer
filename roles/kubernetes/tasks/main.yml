@@ -26,6 +26,74 @@
   register: current_dir
   changed_when: false
 
+- name: Check if local Kubespray exists
+  stat:
+    path: "{{ kubespray_dir }}"
+    get_checksum: no
+    get_attributes: no
+    get_mime: no
+  register: kubespray_stat
+  delegate_to: localhost
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Create Kubespray directory if it doesn't exist
+  file:
+    path: "{{ kubespray_dir }}"
+    state: directory
+    mode: '0755'
+  when: not kubespray_stat.stat.exists and kubernetes_deployment.enabled | default(false)
+
+- name: Download Kubespray
+  get_url:
+    url: "{{ kubespray_download_url }}"
+    dest: "/tmp/kubespray-{{ kubespray_version }}.tar.gz"
+    mode: '0644'
+  delegate_to: localhost
+  when: not kubespray_stat.stat.exists and kubernetes_deployment.enabled | default(false)
+
+- name: Extract Kubespray
+  unarchive:
+    src: "/tmp/kubespray-{{ kubespray_version }}.tar.gz"
+    dest: "{{ playbook_dir }}"
+    remote_src: yes
+  delegate_to: localhost
+  when: not kubespray_stat.stat.exists and kubernetes_deployment.enabled | default(false)
+
+- name: Rename Kubespray directory
+  command:
+    cmd: "mv {{ playbook_dir }}/kubespray-{{ kubespray_version | replace('v', '') }} {{ kubespray_dir }}"
+  delegate_to: localhost
+  when: not kubespray_stat.stat.exists and kubernetes_deployment.enabled | default(false)
+
+- name: Clean up Kubespray archive
+  file:
+    path: "/tmp/kubespray-{{ kubespray_version }}.tar.gz"
+    state: absent
+  delegate_to: localhost
+  when: not kubespray_stat.stat.exists and kubernetes_deployment.enabled | default(false)
+
+- name: Create Kubespray inventory directory
+  file:
+    path: "{{ inventory_dir }}/kubespray"
+    state: directory
+    mode: '0755'
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Check if inventory.ini exists
+  stat:
+    path: "{{ inventory_dir }}/kubespray/inventory.ini"
+  register: inventory_stat
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Generate Kubespray inventory
+  template:
+    src: inventory.ini.j2
+    dest: "{{ inventory_dir }}/kubespray/inventory.ini"
+  vars:
+    k8s_masters: "{{ kubernetes_deployment.control_plane_nodes | default([]) }}"
+    k8s_workers: "{{ kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+
 - name: Show inventory file contents
   command: cat {{ inventory_dir }}/kubespray/inventory.ini
   register: inventory_contents
@@ -39,43 +107,6 @@
       Kubespray Dir: {{ kubespray_dir }}
       Group Vars Path: {{ inventory_dir }}/kubespray/group_vars/all/all.yml
 
-- name: Check if local Kubespray exists
-  stat:
-    path: "{{ kubespray_dir }}"
-  register: kubespray_stat
-  when: kubernetes_deployment.enabled | default(false)
-
-- name: Create Kubespray directory if it doesn't exist
-  file:
-    path: "{{ kubespray_dir }}"
-    state: directory
-    mode: '0755'
-  when: not kubespray_stat.stat.exists and kubernetes_deployment.enabled | default(false)
-
-- name: Create Kubespray inventory directory
-  file:
-    path: "{{ inventory_dir }}/kubespray"
-    state: directory
-    mode: '0755'
-  when: kubernetes_deployment.enabled | default(false)
-
-- name: Copy Kubespray sample inventory directory
-  synchronize:
-    src: "{{ kubespray_dir }}/inventory/sample/"
-    dest: "{{ inventory_dir }}/kubespray"
-    delete: no
-    recursive: yes
-  when: kubernetes_deployment.enabled | default(false)
-
-- name: Generate Kubespray inventory
-  template:
-    src: inventory.ini.j2
-    dest: "{{ inventory_dir }}/kubespray/inventory.ini"
-  vars:
-    k8s_masters: "{{ kubernetes_deployment.control_plane_nodes | default([]) }}"
-    k8s_workers: "{{ kubernetes_deployment.worker_nodes | default([]) }}"
-  when: kubernetes_deployment.enabled | default(false)
-
 - name: Ensure group_vars directory exists
   file:
     path: "{{ inventory_dir }}/kubespray/group_vars"
@@ -83,10 +114,20 @@
     mode: '0755'
   when: kubernetes_deployment.enabled | default(false)
 
-- name: Copy group_vars from Kubespray
-  command: "cp -rf {{ kubespray_dir }}/inventory/sample/group_vars {{ inventory_dir }}/kubespray/"
-  args:
-    creates: "{{ inventory_dir }}/kubespray/group_vars/all"
+- name: Ensure group_vars/all directory exists
+  file:
+    path: "{{ inventory_dir }}/kubespray/group_vars/all"
+    state: directory
+    mode: '0755'
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Generate group_vars/all/all.yml
+  template:
+    src: group_vars_all.yml.j2
+    dest: "{{ inventory_dir }}/kubespray/group_vars/all/all.yml"
+  vars:
+    supplementary_addresses_in_ssl_keys: |
+      ["{{ kubernetes_deployment.api_server.host }}"{% for node in kubernetes_deployment.control_plane_nodes + (kubernetes_deployment.worker_nodes | default([])) %},"{{ node.ansible_host }}"{% if node.private_ip and node.private_ip != node.ansible_host %},"{{ node.private_ip }}"{% endif %}{% endfor %}]
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Setup firewall and prerequisites
@@ -172,4 +213,34 @@
         - kubernetes_deployment.nvidia_runtime.enabled | default(false)
         - nvidia_runtime_result is failed
   become: true
-  when: kubernetes_deployment.enabled | default(false) 
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Create host_vars directory for explicit IP configuration
+  file:
+    path: "{{ inventory_dir }}/kubespray/host_vars"
+    state: directory
+    mode: '0755'
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Copy Kubespray group_vars directory
+  command:
+    cmd: "cp -r {{ kubespray_dir }}/inventory/sample/group_vars {{ inventory_dir }}/kubespray/"
+  delegate_to: localhost
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - not ansible_check_mode
+
+- name: Ensure k8s_cluster directory exists
+  file:
+    path: "{{ inventory_dir }}/kubespray/group_vars/k8s_cluster"
+    state: directory
+    mode: '0755'
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Copy k8s_cluster addons.yml
+  command:
+    cmd: "cp {{ kubespray_dir }}/inventory/sample/group_vars/k8s_cluster/addons.yml {{ inventory_dir }}/kubespray/group_vars/k8s_cluster/"
+  delegate_to: localhost
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - not ansible_check_mode 

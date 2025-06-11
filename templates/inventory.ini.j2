@@ -1,44 +1,83 @@
+# Kubernetes Inventory Configuration
 [all]
 {% for node in control_plane_nodes %}
-{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} access_ip={{ node.private_ip | default(node.ansible_host) }} ansible_default_ipv4_address={{ node.private_ip | default(node.ansible_host) }}
+{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} ansible_python_interpreter={{ kubernetes_deployment.python_config.interpreter_path | default('/usr/bin/python3') }} ansible_become=true ansible_become_method=sudo ansible_become_user=root ansible_become_flags="-S --preserve-env" ansible_become_pass="{{ kubernetes_deployment.ansible_sudo_pass | default(node.ansible_user) | default(default_ansible_user) }}"
 {% endfor %}
-{% for node in worker_nodes %}
-{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} access_ip={{ node.private_ip | default(node.ansible_host) }} ansible_default_ipv4_address={{ node.private_ip | default(node.ansible_host) }}
+{% for node in worker_nodes | default([]) %}
+{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} ansible_python_interpreter={{ kubernetes_deployment.python_config.interpreter_path | default('/usr/bin/python3') }} ansible_become=true ansible_become_method=sudo ansible_become_user=root ansible_become_flags="-S --preserve-env" ansible_become_pass="{{ kubernetes_deployment.ansible_sudo_pass | default(node.ansible_user) | default(default_ansible_user) }}"
 {% endfor %}
 
+# Global Variables
+[all:vars]
+# SSH configuration
+ansible_ssh_extra_args="-o StrictHostKeyChecking=no"
+ansible_become=true
+ansible_become_method=sudo
+ansible_become_user=root
+ansible_become_flags="-S --preserve-env"
+
+# Control Plane Configuration
 [kube_control_plane]
 {% for node in control_plane_nodes %}
 {{ node.name }}
 {% endfor %}
 
+# etcd Configuration
 [etcd]
 {% for node in control_plane_nodes %}
 {{ node.name }}
 {% endfor %}
 
+# Node Configuration
 [kube_node]
 {% for node in control_plane_nodes %}
 {{ node.name }}
 {% endfor %}
-{% for node in worker_nodes %}
+{% for node in worker_nodes | default([]) %}
 {{ node.name }}
 {% endfor %}
 
+# Cluster Groups
 [k8s_cluster:children]
 kube_control_plane
 kube_node
 
 [calico_rr]
 
+# Kubernetes Cluster Variables
 [k8s_cluster:vars]
-# Network plugin (calico, flannel, weave or cilium)
-kube_network_plugin=calico
+# Network plugin configuration
+kube_network_plugin="{{ kubernetes_deployment.network_plugin | default('calico') }}"
 
-# Container runtime (containerd, crio)
-container_manager=containerd
+# Container runtime configuration
+container_manager="{{ kubernetes_deployment.container_runtime | default('containerd') }}"
 
-# DNS mode (coredns, nodelocaldns)
-dns_mode=coredns
+# DNS configuration
+dns_mode="{{ kubernetes_deployment.dns_mode | default('coredns') }}"
 
-# Add both public and private IPs to SSL keys for all nodes
-supplementary_addresses_in_ssl_keys=[{% for node in control_plane_nodes %}"{{ node.ansible_host }}", "{{ node.private_ip | default(node.ansible_host) }}"{% if not loop.last or worker_nodes %}, {% endif %}{% endfor %}{% for node in worker_nodes %}"{{ node.ansible_host }}", "{{ node.private_ip | default(node.ansible_host) }}"{% if not loop.last %}, {% endif %}{% endfor %}] 
+# Network configuration
+kube_service_addresses="{{ kubernetes_deployment.network_config.service_subnet | default('10.233.0.0/18') }}"
+kube_pods_subnet="{{ kubernetes_deployment.network_config.pod_subnet | default('10.233.64.0/18') }}"
+kube_network_node_prefix={{ kubernetes_deployment.network_config.node_prefix | default(24) }}
+
+# API Server Configuration
+kube_apiserver_ip="{{ kubernetes_deployment.api_server.host }}"
+apiserver_loadbalancer_domain_name="{{ kubernetes_deployment.api_server.host }}"
+loadbalancer_apiserver='{"address":"{{ kubernetes_deployment.api_server.host }}","port":{{ kubernetes_deployment.api_server.port }}}'
+
+# SSL Configuration
+supplementary_addresses_in_ssl_keys='["{{ kubernetes_deployment.api_server.host }}"{% for node in control_plane_nodes + (worker_nodes | default([])) %},"{{ node.ansible_host }}"{% if node.private_ip and node.private_ip != node.ansible_host %},"{{ node.private_ip }}"{% endif %}{% endfor %}]'
+
+# Additional Kubernetes Configuration
+{% if kubernetes_deployment.additional_vars is defined %}
+{% for key, value in kubernetes_deployment.additional_vars.items() %}
+{{ key }}={{ value }}
+{% endfor %}
+{% endif %}
+
+# NVIDIA Configuration
+{% if kubernetes_deployment.nvidia_runtime.enabled | default(false) %}
+nvidia_accelerator_enabled=true
+nvidia_driver_install_container=true
+nvidia_container_runtime_package_architecture="{{ kubernetes_deployment.nvidia_runtime.architecture | default('amd64') }}"
+{% endif %} 
