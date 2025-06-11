@@ -195,39 +195,19 @@
       ================================================
   when: kubernetes_summary is defined and (kubernetes_summary.nodes | length > 0 or kubernetes_summary.system_pods | length > 0 or generate_k8s_summary_report | default(false))
 
+- name: Ensure output directory exists
+  file:
+    path: "{{ playbook_dir }}/output"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  become: false
+
 - name: Save summary to file
   copy:
-    content: |
-      # Smart Scaler Installation Summary
-      Generated: {{ ansible_date_time.iso8601 }}
-      
-      ## Overall Statistics
-      - Total Items: {{ installation_summary.total_items }}
-      - Successful: {{ installation_summary.successful_items | length }}
-      - Failed: {{ installation_summary.failed_items | length }}
-      - Skipped: {{ installation_summary.skipped_items | length }}
-      
-      ## Detailed Results
-      
-      ### Successful Installations
-      {% for item in installation_summary.successful_items %}
-      - {{ item.name }} ({{ item.type }}) - {{ item.timestamp }}
-      {% endfor %}
-      
-      ### Failed Installations
-      {% for item in installation_summary.failed_items %}
-      - {{ item.name }} ({{ item.type }}) - {{ item.error }} - {{ item.timestamp }}
-      {% endfor %}
-      
-      ### Skipped Installations
-      {% for item in installation_summary.skipped_items %}
-      - {{ item.name }} ({{ item.type }}) - {{ item.reason }} - {{ item.timestamp }}
-      {% endfor %}
-      
-      ## Kubernetes Cluster Summary
-      - Cluster Status: {{ kubernetes_summary.cluster_status }}
-      - Network Ready: {{ kubernetes_summary.network_ready }}
-      - Storage Ready: {{ kubernetes_summary.storage_ready }}
-      - Total Nodes: {{ kubernetes_summary.nodes | length }}
-    dest: "./output/installation_summary_{{ ansible_date_time.epoch }}.md"
+    content: "{{ installation_summary | to_nice_yaml }}"
+    dest: "{{ playbook_dir }}/output/installation_summary_{{ ansible_date_time.epoch }}.md"
+    force: true
+  delegate_to: localhost
+  become: false
   when: should_save_summary | default(false) 

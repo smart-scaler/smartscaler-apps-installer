@@ -304,10 +304,9 @@ helm_charts:
         password: "{{ global_image_pull_secret.password }}"
 
   # MetalLB Chart Configuration
-
   metallb_chart:
     release_name: "metallb"
-    chart_ref: "metallb"
+    chart_ref: "files/charts/metallb/metallb"
     release_namespace: "{{ metallb.namespace }}"
     create_namespace: true
     wait: true
@@ -316,7 +315,6 @@ helm_charts:
     atomic: false
     skip_diff: true
     dependencies: []
-    chart_repo_url: "https://metallb.github.io/metallb"
     chart_version: "0.13.10"
     release_values:
       prometheus:
@@ -339,7 +337,7 @@ helm_charts:
   # Nginx Ingress Controller Chart
   nginx_ingress_chart:
     release_name: "ingress-nginx"
-    chart_ref: "ingress-nginx"
+    chart_ref: "files/charts/ingress-nginx/ingress-nginx"
     release_namespace: "ingress-nginx"
     create_namespace: true
     wait: true
@@ -348,8 +346,6 @@ helm_charts:
     atomic: false
     skip_diff: true
     dependencies: []
-    chart_repo_url: "https://kubernetes.github.io/ingress-nginx"
-    chart_repo_name: "ingress-nginx"
     chart_version: "4.7.1"
     release_values:
       controller:
@@ -402,7 +398,7 @@ helm_charts:
 
   gpu_operator_chart:
     release_name: "gpu-operator"
-    chart_ref: "gpu-operator"
+    chart_ref: "files/charts/gpu-operator/gpu-operator"
     release_namespace: "gpu-operator"
     create_namespace: true
     wait: false
@@ -411,7 +407,6 @@ helm_charts:
     atomic: false
     skip_diff: true
     chart_version: "v25.3.0"
-    chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
     dependencies: []
     release_values:
       mig:
@@ -434,7 +429,7 @@ helm_charts:
   # Prometheus Stack
   prometheus_stack:
     release_name: "prometheus"
-    chart_ref: "kube-prometheus-stack"
+    chart_ref: "files/charts/kube-prometheus-stack"
     release_namespace: "monitoring"
     create_namespace: true
     wait: false
@@ -442,7 +437,6 @@ helm_charts:
     force: false
     atomic: false
     skip_diff: true
-    chart_repo_url: "https://prometheus-community.github.io/helm-charts"
     chart_version: "55.5.0"
     release_values:
       kubeEtcd:
@@ -500,7 +494,7 @@ helm_charts:
   # KEDA Chart
   keda_chart:
     release_name: "keda"
-    chart_ref: "keda"
+    chart_ref: "files/charts/keda/keda"
     release_namespace: "keda"
     create_namespace: true
     wait: false
@@ -508,14 +502,13 @@ helm_charts:
     force: true
     atomic: false
     skip_diff: true
-    chart_repo_url: "https://kedacore.github.io/charts"
     chart_version: "2.12.1"
     dependencies: []
 
   # NIM Operator Chart
   nim_operator_chart:
     release_name: "nim"
-    chart_ref: "k8s-nim-operator"
+    chart_ref: "files/charts/nim-operator"
     release_namespace: "nim"
     create_namespace: true
     wait: false
@@ -523,7 +516,6 @@ helm_charts:
     force: true
     atomic: false
     skip_diff: true
-    chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
     chart_version: "v1.0.1"
     dependencies: []
 

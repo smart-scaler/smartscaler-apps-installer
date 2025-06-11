@@ -197,34 +197,83 @@
     - summary_enabled | default(true)
     - kubernetes_deployment.enabled | default(false)
 
+- name: Create Kubespray vars file
+  template:
+    src: kubespray_vars.yml.j2
+    dest: /tmp/kubespray-vars.yml
+  delegate_to: localhost
+
+- name: Create extra vars file
+  copy:
+    content: |
+      {
+        "ansible_ssh_private_key_file": "{{ kubernetes_deployment.ssh_key_path | expanduser | realpath }}",
+        "ansible_user": "{{ kubernetes_deployment.default_ansible_user }}",
+        "ansible_become_pass": "{{ kubernetes_deployment.ansible_sudo_pass }}",
+        "ansible_python_interpreter": "/usr/bin/python3"
+      }
+    dest: /tmp/kubespray-extra-vars.json
+  delegate_to: localhost
+
 - name: Run Kubespray cluster deployment
-  command:
-    cmd: >
-      ansible-playbook -i {{ inventory_dir }}/kubespray/inventory.ini
-      {{ kubespray_dir }}/cluster.yml
-      -e @{{ inventory_dir }}/kubespray/group_vars/all/all.yml
-      -e @{{ inventory_dir }}/kubespray/group_vars/k8s_cluster/addons.yml
-      -e "kube_apiserver_ip={{ kubernetes_deployment.api_server.host }}"
-      -e "loadbalancer_apiserver={address: '{{ kubernetes_deployment.api_server.host }}', port: {{ kubernetes_deployment.api_server.port }}}"
-      -e "apiserver_loadbalancer_domain_name={{ kubernetes_deployment.api_server.host }}"
-      -e "supplementary_addresses_in_ssl_keys=['{{ kubernetes_deployment.api_server.host }}'] + {{ control_plane_ips | to_json }} + {{ worker_node_ips | to_json }}"
-      -e "kube_apiserver_bind_address={{ first_control_plane_ip }}"
-      -e "kube_apiserver_advertise_address={{ first_control_plane_ip }}"
-      -e "kubernetes_deployment={{ kubernetes_deployment }}"
-      --become
-      --become-method={{ kubespray_become_method }}
-      --become-user={{ kubespray_become_user }}
+  shell:
+    cmd: >-
+      ansible-playbook -i {{ inventory_dir }}/kubespray/inventory.ini cluster.yml
+      -e @/tmp/kubespray-vars.yml
+      -e @/tmp/kubespray-extra-vars.json
       -e ansible_ssh_private_key_file={{ kubernetes_deployment.ssh_key_path | expanduser | realpath }}
       -e ansible_user={{ kubernetes_deployment.default_ansible_user | default('root') }}
-      -e ansible_become_pass=''
+      -e ansible_become_pass="{{ kubernetes_deployment.ansible_sudo_pass | default('') }}"
+      -e ansible_async_dir=/tmp/ansible-async
+      -e ANSIBLE_KEEP_REMOTE_FILES=1
+      -e ANSIBLE_LOG_PATH={{ playbook_dir }}/ansible-kubespray.log
+      --become
+      --become-method=sudo
+      --become-user=root
       --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+      --forks={{ kubernetes_deployment.async_config.forks | default(20) }}
       -vvvv
-  environment: "{{ kubespray_env | combine(kubespray_extra_env) | combine({'ANSIBLE_CONFIG': playbook_dir + '/ansible.cfg'}) }}"
-  register: kubespray_result
-  async: "{{ kubespray_async_timeout }}"
-  poll: "{{ kubespray_poll_interval }}"
-  ignore_errors: true
-  when: kubernetes_deployment.enabled | default(false)
+    chdir: "{{ kubespray_dir }}"
+  environment:
+    ANSIBLE_STDOUT_CALLBACK: "debug"
+    ANSIBLE_SHOW_CUSTOM_STATS: "true"
+    ANSIBLE_DISPLAY_SKIPPED_HOSTS: "true"
+    ANSIBLE_DISPLAY_OK_HOSTS: "true"
+    ANSIBLE_HOST_KEY_CHECKING: "false"
+    ANSIBLE_RETRY_FILES_ENABLED: "true"
+    ANSIBLE_RETRY_FILES_SAVE_PATH: "{{ playbook_dir }}/ansible-retry"
+    ANSIBLE_INVENTORY_CACHE: "true"
+    ANSIBLE_CACHE_PLUGIN: "jsonfile"
+    ANSIBLE_CACHE_PLUGIN_CONNECTION: "{{ playbook_dir }}/ansible-cache"
+    ANSIBLE_CACHE_PLUGIN_TIMEOUT: "86400"
+    LC_ALL: "C.UTF-8"
+    LANG: "C.UTF-8"
+  async: "{{ kubernetes_deployment.async_config.timeout | default(3600) }}"
+  poll: "{{ kubernetes_deployment.async_config.poll_interval | default(5) }}"
+  register: kubespray_deployment
+  delegate_to: localhost
+
+- name: Wait for Kubespray deployment
+  ansible.builtin.async_status:
+    jid: "{{ kubespray_deployment.ansible_job_id }}"
+  register: job_result
+  until: job_result.finished
+  retries: "{{ (kubernetes_deployment.async_config.timeout | default(3600)) | int // (kubernetes_deployment.async_config.poll_interval | default(5)) | int }}"
+  delay: "{{ kubernetes_deployment.async_config.poll_interval | default(5) }}"
+  when: kubespray_deployment.ansible_job_id is defined
+  delegate_to: localhost
+
+- name: Display deployment progress
+  ansible.builtin.debug:
+    msg: "Deployment Progress: {{ (job_result.elapsed | default(0) / kubernetes_deployment.async_config.timeout | default(3600) * 100) | round(2) }}% complete"
+  when: job_result.finished is defined and not job_result.finished
+
+- name: Check deployment result
+  ansible.builtin.fail:
+    msg: |
+      Kubespray deployment failed. Check {{ playbook_dir }}/ansible-kubespray.log for details.
+      Last error: {{ job_result.msg | default('Unknown error') }}
+  when: job_result.rc is defined and job_result.rc != 0
 
 - name: Track successful Kubernetes deployment
   set_fact:
@@ -244,11 +293,11 @@
       type: "kubernetes"
       status: "success"
       timestamp: "{{ ansible_date_time.iso8601 }}"
-      details: "Kubespray deployment completed successfully in {{ kubespray_result.delta if kubespray_result.delta is defined else 'unknown time' }}"
+      details: "Kubespray deployment completed successfully in {{ kubespray_deployment.elapsed | default('unknown time') }}"
   when: 
     - summary_enabled | default(true)
     - kubernetes_deployment.enabled | default(false)
-    - kubespray_result is succeeded
+    - kubespray_deployment is succeeded
 
 - name: Track failed Kubernetes deployment
   set_fact:
@@ -268,20 +317,20 @@
       type: "kubernetes"
       status: "failed"
       timestamp: "{{ ansible_date_time.iso8601 }}"
-      error: "{{ kubespray_result.msg | default('Kubespray deployment failed') }} - RC: {{ kubespray_result.rc | default('unknown') }}"
-      details: "Failed after {{ kubespray_result.delta if kubespray_result.delta is defined else 'unknown time' }}"
+      error: "{{ kubespray_deployment.msg | default('Kubespray deployment failed') }} - RC: {{ kubespray_deployment.rc | default('unknown') }}"
+      details: "Failed after {{ kubespray_deployment.elapsed | default('unknown time') }}"
   when: 
     - summary_enabled | default(true)
     - kubernetes_deployment.enabled | default(false)
-    - kubespray_result is failed
+    - kubespray_deployment is failed
 
 - name: Display warning if async timeout occurred
   debug:
-    msg: "WARNING: Kubespray deployment exceeded the async timeout of {{ kubespray_async_timeout }} seconds. The deployment is still running in the background."
+    msg: "WARNING: Kubespray deployment exceeded the async timeout of {{ kubernetes_deployment.async_config.timeout | default(3600) }} seconds. The deployment is still running in the background."
   when: 
-    - kubespray_result is defined 
-    - kubespray_result.msg is defined
-    - kubespray_result.msg is search("async task did not complete within the requested time")
+    - kubespray_deployment is defined 
+    - kubespray_deployment.msg is defined
+    - kubespray_deployment.msg is search("async task did not complete within the requested time")
 
 - name: Continue with deployment
   debug:
@@ -292,11 +341,11 @@
   debug:
     msg: |
       STDOUT:
-      {{ kubespray_result.stdout_lines | default([]) | join('\n') }}
+      {{ kubespray_deployment.stdout_lines | default([]) | join('\n') }}
       
       STDERR:
-      {{ kubespray_result.stderr_lines | default([]) | join('\n') }}
-  when: kubespray_result is defined and kubernetes_deployment.enabled | default(false)
+      {{ kubespray_deployment.stderr_lines | default([]) | join('\n') }}
+  when: kubespray_deployment is defined and kubernetes_deployment.enabled | default(false)
 
 - name: Get current user
   command: whoami
