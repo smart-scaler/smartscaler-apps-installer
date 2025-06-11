@@ -10,12 +10,12 @@
 ###############################################################################
 kubernetes_deployment:
   # Master switch for Kubernetes deployment
-  enabled: true                           # Enable kubernetes deployment
+  enabled: false                           # Enable kubernetes deployment
   
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
   api_server:
-    host: "172.31.35.227"  # Reference global IP
+    host: "PUBLIC_IP"  # Reference global IP
     port: 6443              # The port for the Kubernetes API server
                            # 6443 is the default secure port for Kubernetes
     secure: true           # Whether to use HTTPS for API server connections
@@ -23,26 +23,26 @@ kubernetes_deployment:
 
   # SSH Access Configuration
   # Required for Kubespray to access and configure nodes
-  ssh_key_path: "/home/richie/Downloads/k8s-nvidia.pem"  # Full path to the SSH private key file
+  ssh_key_path: "/absolute/path/to/.ssh/k8s_rsa"  # Full path to the SSH private key file
                                  # Used to authenticate with the cluster nodes
-  default_ansible_user: "nvidia"  # Default SSH user for all nodes
+  default_ansible_user: ""  # Default SSH user for all nodes
                                  # Common values: ubuntu (Ubuntu), ec2-user (AWS)
 
   # Ansible Sudo Password Configuration
   # Optional: Can be set here, via ANSIBLE_SUDO_PASS environment variable,
   # or will prompt if neither is set
-  ansible_sudo_pass: "nvidia"  # Set to the same value as default_ansible_user
+  ansible_sudo_pass: ""  # Set to the same value as default_ansible_user
 
   # Control Plane Node Configuration
   # Defines the master nodes that will run the Kubernetes control plane
   control_plane_nodes:
     - name: "master-1"                # Unique identifier for the control plane node
-      ansible_host: "172.31.35.227"   # Reference global IP
-      ansible_user: "nvidia"          # SSH username for this specific node
+      ansible_host: "PUBLIC_IP"   # Reference global IP
+      ansible_user: "REPLACE_SSH_USER"          # SSH username for this specific node
       ansible_become: true            # Enable privilege escalation (sudo)
       ansible_become_method: "sudo"   # Method for privilege escalation
       ansible_become_user: "root"     # Target user for privilege escalation
-      private_ip: "172.31.35.227"    # Internal/private IP address
+      private_ip: "PUBLIC_IP"    # Internal/private IP address
 
   # Kubernetes Network Configuration
   # Defines the network ranges for various Kubernetes components
@@ -60,12 +60,12 @@ kubernetes_deployment:
   container_runtime: "containerd"    # Container runtime for Kubernetes
   dns_mode: "coredns"               # DNS service for the cluster
 
-  # NVIDIA Container Runtime Configuration
-  nvidia_runtime:
-    enabled: false                  # Enable NVIDIA container runtime
-    install_toolkit: false          # Install NVIDIA Container Toolkit
-    configure_containerd: false     # Configure containerd for NVIDIA runtime
-    create_runtime_class: false     # Create Kubernetes RuntimeClass for NVIDIA
+  # REPLACE_SSH_USER Container Runtime Configuration
+  REPLACE_SSH_USER_runtime:
+    enabled: false                  # Enable REPLACE_SSH_USER container runtime
+    install_toolkit: false          # Install REPLACE_SSH_USER Container Toolkit
+    configure_containerd: false     # Configure containerd for REPLACE_SSH_USER runtime
+    create_runtime_class: false     # Create Kubernetes RuntimeClass for REPLACE_SSH_USER
 
   # Additional Variables (optional)
   additional_vars:
@@ -108,7 +108,7 @@ validate_prerequisites:
 execution_order_enabled: true                # Required: Must be enabled for ordered execution
 
 # Required Kubeconfig Settings
-global_control_plane_ip: "172.31.35.227"         # Provide the public IP for metallb/Nginx
+global_control_plane_ip: "PUBLIC_IP"         # Provide the public IP for metallb/Nginx
 global_kubeconfig: "output/kubeconfig"        # Required: Path to kubeconfig file
 global_kubecontext: "kubernetes-admin@cluster.local"  # Required: Kubernetes context
 use_global_context: true                     # Required: Use global context
@@ -410,7 +410,7 @@ helm_charts:
     atomic: false
     skip_diff: true
     chart_version: "v25.3.0"
-    chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
+    chart_repo_url: "https://helm.ngc.REPLACE_SSH_USER.com/REPLACE_SSH_USER"
     dependencies: []
     release_values:
       mig:
@@ -423,12 +423,12 @@ helm_charts:
         default: true
         enabled: true
       hostPaths:
-        driverInstallDir: "/home/kubernetes/bin/nvidia"
+        driverInstallDir: "/home/kubernetes/bin/REPLACE_SSH_USER"
       toolkit:
-        installDir: "/home/kubernetes/bin/nvidia"
+        installDir: "/home/kubernetes/bin/REPLACE_SSH_USER"
         env:
           - name: "CONTAINERD_RUNTIME_CLASS"
-            value: "nvidia"
+            value: "REPLACE_SSH_USER"
 
   # Prometheus Stack
   prometheus_stack:
@@ -522,7 +522,7 @@ helm_charts:
     force: true
     atomic: false
     skip_diff: true
-    chart_repo_url: "https://helm.ngc.nvidia.com/nvidia"
+    chart_repo_url: "https://helm.ngc.REPLACE_SSH_USER.com/REPLACE_SSH_USER"
     chart_version: "v1.0.1"
     dependencies: []
 
@@ -739,9 +739,9 @@ manifests:
     variables:
       nim_cache_name: "meta-llama3-1b-instruct"
       nim_cache_namespace: "nim"
-      nim_cache_runtime_class: "nvidia"
+      nim_cache_runtime_class: "REPLACE_SSH_USER"
       nim_cache_tolerations:
-        - key: "nvidia.com/gpu"
+        - key: "REPLACE_SSH_USER.com/gpu"
           operator: "Exists"
           effect: "NoSchedule"
       nim_cache_model_puller: "nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8.5"
@@ -774,7 +774,7 @@ manifests:
     variables:
       nim_service_name: "meta-llama3-1b-instruct"
       nim_service_namespace: "nim"
-      nim_service_runtime_class: "nvidia"
+      nim_service_runtime_class: "REPLACE_SSH_USER"
       nim_service_env:
         - name: "LOG_LEVEL"
           value: "INFO"
@@ -785,7 +785,7 @@ manifests:
         - name: "OMP_NUM_THREADS"
           value: "8"
       nim_service_tolerations:
-        - key: "nvidia.com/gpu"
+        - key: "REPLACE_SSH_USER.com/gpu"
           operator: "Exists"
           effect: "NoSchedule"
       nim_service_image_repository: "nvcr.io/nim/meta/llama-3.2-1b-instruct"  # Test value to verify variable passing
@@ -804,7 +804,7 @@ manifests:
       nim_service_replicas: 1
       nim_service_resources:
         limits:
-          nvidia.com/gpu: 1
+          REPLACE_SSH_USER.com/gpu: 1
       nim_service_expose_type: "ClusterIP"
       nim_service_expose_port: 8000
 
@@ -857,7 +857,7 @@ manifests:
         app_name: "nim-llama-1b"
         app_version: "1.0"
       smart_scaler_tolerations:
-        - key: "nvidia.com/gpu"
+        - key: "REPLACE_SSH_USER.com/gpu"
           operator: "Exists"
           effect: "NoSchedule"
       smart_scaler_resources:
@@ -921,9 +921,9 @@ manifests:
     variables:
       nim_cache_name: "meta-llama3-8b-instruct"
       nim_cache_namespace: "nim"
-      nim_cache_runtime_class: "nvidia"
+      nim_cache_runtime_class: "REPLACE_SSH_USER"
       nim_cache_tolerations:
-        - key: "nvidia.com/gpu"
+        - key: "REPLACE_SSH_USER.com/gpu"
           operator: "Exists"
           effect: "NoSchedule"
       nim_cache_model_puller: "nvcr.io/nim/meta/llama-3.1-8b-instruct:1.8.4"
@@ -956,7 +956,7 @@ manifests:
     variables:
       nim_service_name: "meta-llama3-8b-instruct"
       nim_service_namespace: "nim"
-      nim_service_runtime_class: "nvidia"
+      nim_service_runtime_class: "REPLACE_SSH_USER"
       nim_service_env:
         - name: "LOG_LEVEL"
           value: "INFO"
@@ -967,7 +967,7 @@ manifests:
         - name: "OMP_NUM_THREADS"
           value: "8"
       nim_service_tolerations:
-        - key: "nvidia.com/gpu"
+        - key: "REPLACE_SSH_USER.com/gpu"
           operator: "Exists"
           effect: "NoSchedule"
       nim_service_image_repository: "nvcr.io/nim/meta/llama-3.1-8b-instruct"  # Test value to verify variable passing
@@ -986,7 +986,7 @@ manifests:
       nim_service_replicas: 1
       nim_service_resources:
         limits:
-          nvidia.com/gpu: 1
+          REPLACE_SSH_USER.com/gpu: 1
       nim_service_expose_type: "ClusterIP"
       nim_service_expose_port: 8000
 
@@ -1039,7 +1039,7 @@ manifests:
         app_name: "nim-llama-8b"
         app_version: "1.0"
       smart_scaler_tolerations:
-        - key: "nvidia.com/gpu"
+        - key: "REPLACE_SSH_USER.com/gpu"
           operator: "Exists"
           effect: "NoSchedule"
       smart_scaler_resources:
@@ -1104,9 +1104,9 @@ manifests:
     variables:
       nim_cache_name: "meta-llama3-70b-instruct"
       nim_cache_namespace: "nim"
-      nim_cache_runtime_class: "nvidia"
+      nim_cache_runtime_class: "REPLACE_SSH_USER"
       nim_cache_tolerations:
-        - key: "nvidia.com/gpu"
+        - key: "REPLACE_SSH_USER.com/gpu"
           operator: "Exists"
           effect: "NoSchedule"
       nim_cache_model_puller: "nvcr.io/nim/meta/llama-3.1-70b-instruct:1.8.5"
@@ -1161,7 +1161,7 @@ manifests:
     variables:
       nim_service_name: "meta-llama3-70b-instruct"
       nim_service_namespace: "nim"
-      nim_service_runtime_class: "nvidia"
+      nim_service_runtime_class: "REPLACE_SSH_USER"
       nim_service_env:
         - name: "LOG_LEVEL"
           value: "INFO"
@@ -1172,7 +1172,7 @@ manifests:
         - name: "OMP_NUM_THREADS"
           value: "8"
       nim_service_tolerations:
-        - key: "nvidia.com/gpu"
+        - key: "REPLACE_SSH_USER.com/gpu"
           operator: "Exists"
           effect: "NoSchedule"
       nim_service_image_repository: "nvcr.io/nim/meta/llama-3.1-70b-instruct"  # Test value to verify variable passing
@@ -1191,7 +1191,7 @@ manifests:
       nim_service_replicas: 1
       nim_service_resources:
         limits:
-          nvidia.com/gpu: 1
+          REPLACE_SSH_USER.com/gpu: 1
       nim_service_expose_type: "ClusterIP"
       nim_service_expose_port: 8000
 
@@ -1244,7 +1244,7 @@ manifests:
         app_name: "nim-llama"
         app_version: "1.0"
       smart_scaler_tolerations:
-        - key: "nvidia.com/gpu"
+        - key: "REPLACE_SSH_USER.com/gpu"
           operator: "Exists"
           effect: "NoSchedule"
       smart_scaler_resources:
