@@ -9,6 +9,7 @@
     effective_use_local_chart: "{{ item.use_local_chart | default(use_local_charts) }}"
     effective_local_chart_path: "{{ item.local_chart_path | default(local_charts_path) }}"
     effective_readd_helm_repo: "{{ item.readd_helm_repo | default(readd_helm_repos) }}"
+    effective_insecure_skip_tls_verify: "{{ item.insecure_skip_tls_verify | default(insecure_skip_tls_verify) }}"
 
 - name: Generate random string for temporary repo name
   set_fact:
@@ -19,9 +20,10 @@
   kubernetes.core.helm_repository:
     name: "{{ temp_repo_name }}"
     repo_url: "{{ effective_chart_repo_url }}"
-    username: "{{ effective_repo_username }}"
-    password: "{{ effective_repo_password }}"
+    username: "{{ effective_repo_username | default(omit) if effective_repo_username else omit }}"
+    password: "{{ effective_repo_password | default(omit) if effective_repo_password else omit }}"
     repo_state: present
+    insecure_skip_tls_verify: "{{ effective_insecure_skip_tls_verify | default(true) }}"
   when: not effective_use_local_chart and effective_readd_helm_repo
 
 - name: Debug Helm chart configuration

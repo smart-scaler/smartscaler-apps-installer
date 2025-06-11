@@ -10,12 +10,12 @@
 ###############################################################################
 kubernetes_deployment:
   # Master switch for Kubernetes deployment
-  enabled: false                           # Enable kubernetes deployment
+  enabled: true                           # Enable kubernetes deployment
   
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
   api_server:
-    host: "PUBLIC_IP"  # Reference global IP
+    host: "172.31.35.227"  # Reference global IP
     port: 6443              # The port for the Kubernetes API server
                            # 6443 is the default secure port for Kubernetes
     secure: true           # Whether to use HTTPS for API server connections
@@ -23,36 +23,58 @@ kubernetes_deployment:
 
   # SSH Access Configuration
   # Required for Kubespray to access and configure nodes
-  ssh_key_path: "/absolute/path/to/.ssh/k8s_rsa"  # Full path to the SSH private key file
-                                            # Used to authenticate with the cluster nodes
-  default_ansible_user: "REPLACE_SSH_USER"         # Default SSH user for all nodes
-                                           # Common values: ubuntu (Ubuntu), ec2-user (AWS)
+  ssh_key_path: "/home/richie/Downloads/k8s-nvidia.pem"  # Full path to the SSH private key file
+                                 # Used to authenticate with the cluster nodes
+  default_ansible_user: "nvidia"  # Default SSH user for all nodes
+                                 # Common values: ubuntu (Ubuntu), ec2-user (AWS)
+
   # Ansible Sudo Password Configuration
   # Optional: Can be set here, via ANSIBLE_SUDO_PASS environment variable,
   # or will prompt if neither is set
-  ansible_sudo_pass: ""  # Leave empty to use environment variable or prompt
+  ansible_sudo_pass: "nvidia"  # Set to the same value as default_ansible_user
 
   # Control Plane Node Configuration
   # Defines the master nodes that will run the Kubernetes control plane
   control_plane_nodes:
     - name: "master-1"                # Unique identifier for the control plane node
-      ansible_host: "PUBLIC_IP"  # Reference global IP
-      ansible_user: "REPLACE_SSH_USER"      # SSH username for this specific node
-                                     # Overrides default_ansible_user if different
-      ansible_become: true            # Enable privilege escalation (sudo)
-      ansible_become_method: "sudo"     # Method for privilege escalation
-      ansible_become_user: "root"       # Target user for privilege escalation
-      private_ip: "PRIVATE_IP"      # Internal/private IP address
-                                     # Used for internal cluster communication
+      ansible_host: "172.31.35.227"   # Reference global IP
+      ansible_user: "nvidia"          # SSH username for this specific node
+      ansible_become: false            # Enable privilege escalation (sudo)
+      ansible_become_method: "sudo"   # Method for privilege escalation
+      ansible_become_user: "root"     # Target user for privilege escalation
+      private_ip: "172.31.35.227"    # Internal/private IP address
+
   # Kubernetes Network Configuration
   # Defines the network ranges for various Kubernetes components
   network_config:
     service_subnet: "10.233.0.0/18"  # CIDR range for Kubernetes services
-                                    # Must not overlap with pod_subnet or node network
     pod_subnet: "10.233.64.0/18"    # CIDR range for Kubernetes pods
-                                   # Must not overlap with service_subnet or node network
     node_prefix: 24                 # Subnet mask for node network
-                                  # /24 allows 256 IP addresses per subnet
+
+  # Python Configuration
+  python_config:
+    interpreter_path: "/usr/bin/python3"  # Path to Python interpreter
+
+  # Kubernetes Component Configuration
+  network_plugin: "calico"           # Container Network Interface (CNI) choice
+  container_runtime: "containerd"    # Container runtime for Kubernetes
+  dns_mode: "coredns"               # DNS service for the cluster
+
+  # NVIDIA Container Runtime Configuration
+  nvidia_runtime:
+    enabled: false                  # Enable NVIDIA container runtime
+    install_toolkit: false          # Install NVIDIA Container Toolkit
+    configure_containerd: false     # Configure containerd for NVIDIA runtime
+    create_runtime_class: false     # Create Kubernetes RuntimeClass for NVIDIA
+
+  # Additional Variables (optional)
+  additional_vars:
+    kube_proxy_mode: "ipvs"
+    kube_proxy_strict_arp: true
+    enable_nodelocaldns: false
+    docker_daemon_graph: "/var/lib/docker"
+    docker_version: "latest"
+    docker_storage_options: "-s overlay2"
 
   # Firewall Configuration
   # Controls access to cluster nodes
@@ -68,26 +90,6 @@ kubernetes_deployment:
       - "10251"   # kube-scheduler
       - "10252"   # kube-controller-manager
 
-  # NVIDIA Container Runtime Configuration
-  # Required for GPU support in the cluster
-  nvidia_runtime:
-    enabled: true                           # Enable NVIDIA container runtime
-                                          # Set to true if using NVIDIA GPUs
-    install_toolkit: true                   # Install NVIDIA Container Toolkit
-                                          # Required for GPU support
-    configure_containerd: true              # Configure containerd for NVIDIA runtime
-    create_runtime_class: true              # Create Kubernetes RuntimeClass for NVIDIA
-
-  # Kubernetes Component Configuration
-  # Core Kubernetes infrastructure choices
-  network_plugin: "calico"                  # Container Network Interface (CNI) choice
-                                          # Options: calico, flannel, weave, cilium
-  
-  container_runtime: "containerd"           # Container runtime for Kubernetes
-                                          # containerd is the current standard
-  
-  dns_mode: "coredns"                      # DNS service for the cluster
-                                         # CoreDNS is the default since Kubernetes 1.13
   # Async Execution Configuration
   # Controls timeout and polling for long-running tasks
   async_config:
@@ -106,18 +108,19 @@ validate_prerequisites:
 execution_order_enabled: true                # Required: Must be enabled for ordered execution
 
 # Required Kubeconfig Settings
-global_control_plane_ip: "PUBLIC_IP"         # Provide the public IP for metallb/Nginx
+global_control_plane_ip: "172.31.35.227"         # Provide the public IP for metallb/Nginx
 global_kubeconfig: "output/kubeconfig"        # Required: Path to kubeconfig file
 global_kubecontext: "kubernetes-admin@cluster.local"  # Required: Kubernetes context
 use_global_context: true                     # Required: Use global context
 
 # Required Helm Settings
-use_local_charts: false                      # Required: Use local Helm charts
-local_charts_path: "charts"                  # Required: Path to local charts
-global_chart_repo_url: ""                    # Required: Global Helm repository URL
+use_local_charts: true                      # Required: Use local Helm charts
+local_charts_path: "files/dev-charts-ent-egs/charts"  # Required: Path to local charts (removed files/ prefix)
+global_chart_repo_url: "https://smartscaler.nexus.aveshalabs.io/repository/kubeslice-egs-helm-ent-prod"  # Required: Global Helm repository URL
 global_repo_username: ""                     # Required: Repo username if using private repos
 global_repo_password: ""                     # Required: Repo password if using private repos
-readd_helm_repos: true                       # Required: Re-add Helm repos
+readd_helm_repos: true                      # Required: Re-add Helm repos
+insecure_skip_tls_verify: true              # Skip TLS verification for Helm repos
 
 # Required Credentials
 ngc_api_key: "{{ lookup('env', 'NGC_API_KEY') }}"              # Required for NGC access
@@ -137,12 +140,12 @@ execution_order:
   # Base Existing Applications
   - gpu_operator_chart
   - prometheus_stack
-  - pushgateway_manifest
-  - keda_chart
-  - nim_operator_chart        # This creates the nim namespace
-  - create_avesha_secret     # Move this before NGC secrets
-  - create_ngc_secrets       # These need the nim namespace
-  - verify_ngc_secrets
+  # - pushgateway_manifest
+  # - keda_chart
+  # - nim_operator_chart        # This creates the nim namespace
+  # - create_avesha_secret     # Move this before NGC secrets
+  # - create_ngc_secrets       # These need the nim namespace
+  # - verify_ngc_secrets
 
   # EGS Application
   - kubeslice_controller_egs  # Install EGS controller first
@@ -154,16 +157,16 @@ execution_order:
 
 
   # # NIM Components
-  - nim_cache_manifest_70b
-  - wait_for_nim_cache_70b
-  - nim_cache_wait_job_70b
-  - nim_service_manifest_70b
-  - keda_scaled_object_manifest_70b
-  - create_inference_pod_configmap_70b
-  - smart_scaler_inference_70b
-  - create_locust_configmap_70b
-  - locust_manifest_70b
-  - smart_scaler_mcp_server_manifest
+  # - nim_cache_manifest_70b
+  # - wait_for_nim_cache_70b
+  # - nim_cache_wait_job_70b
+  # - nim_service_manifest_70b
+  # - keda_scaled_object_manifest_70b
+  # - create_inference_pod_configmap_70b
+  # - smart_scaler_inference_70b
+  # - create_locust_configmap_70b
+  # - locust_manifest_70b
+  # - smart_scaler_mcp_server_manifest
 
   #   # NIM 1B Components
   # - nim_cache_manifest_1b
@@ -220,7 +223,7 @@ helm_charts:
   # EGS Controller Chart Configuration
   kubeslice_controller_egs:
     release_name: "egs-controller"
-    chart_ref: "kubeslice-controller-egs"
+    chart_ref: "https://smartscaler.nexus.aveshalabs.io/repository/kubeslice-egs-helm-ent-prod/kubeslice-controller-egs"
     release_namespace: "kubeslice-controller"
     create_namespace: true
     wait: true
@@ -229,8 +232,7 @@ helm_charts:
     atomic: false
     skip_diff: true
     dependencies: []
-    chart_repo_url: "https://smartscaler.nexus.aveshalabs.io/repository/kubeslice-egs-helm-ent-prod"
-    chart_version: "1.14.0"
+    chart_version: "1.14.0-beta"
     release_values:
       global:
         imageRegistry: docker.io/aveshasystems
@@ -258,7 +260,7 @@ helm_charts:
   # EGS UI Chart Configuration
   kubeslice_ui_egs:
     release_name: "egs-ui"
-    chart_ref: "kubeslice-ui-egs"
+    chart_ref: "https://smartscaler.nexus.aveshalabs.io/repository/kubeslice-egs-helm-ent-prod/kubeslice-ui-egs"
     release_namespace: "kubeslice-controller"
     create_namespace: true
     wait: true
@@ -267,8 +269,7 @@ helm_charts:
     atomic: false
     skip_diff: true
     dependencies: []
-    chart_repo_url: "https://smartscaler.nexus.aveshalabs.io/repository/kubeslice-egs-helm-ent-prod"
-    chart_version: "1.14.0"
+    chart_version: "1.14.0-beta"
     release_values:
       global:
         imageRegistry: docker.io/aveshasystems
@@ -277,7 +278,7 @@ helm_charts:
           url: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
         uiproxy:
           service:
-            type: ClusterIP
+            type: NodePort
           labels:
             app: kubeslice-ui-proxy
           annotations: {}
@@ -529,7 +530,7 @@ helm_charts:
   # Kubeslice Worker Chart Configuration
   kubeslice_worker_egs_worker_1:
     release_name: "egs-worker"
-    chart_ref: "kubeslice-worker-egs"
+    chart_ref: "https://smartscaler.nexus.aveshalabs.io/repository/kubeslice-egs-helm-ent-prod/kubeslice-worker-egs"
     release_namespace: "kubeslice-system"
     create_namespace: true
     wait: true
@@ -538,8 +539,7 @@ helm_charts:
     atomic: false
     skip_diff: true
     dependencies: []
-    chart_repo_url: "https://smartscaler.nexus.aveshalabs.io/repository/kubeslice-egs-helm-ent-prod"
-    chart_version: "1.14.0"
+    chart_version: "1.14.0-beta"
     values_files:
       - "output/worker-1-values.yaml"
     release_values:
@@ -554,7 +554,7 @@ helm_charts:
       metrics:
         insecure: true
       kserve:
-        enabled: true
+        enabled: false
         kserve:
           controller:
             gateway:
