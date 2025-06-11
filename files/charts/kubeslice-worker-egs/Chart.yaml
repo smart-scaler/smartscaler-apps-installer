@@ -1,0 +1,38 @@
+apiVersion: v2
+appVersion: 1.14.0-beta
+dependencies:
+- condition: kserve.enabled
+  name: kserve
+  repository: file://./charts/kserve
+  version: v0.14.0
+description: KubeSlice operator - A Helm chart for managing life-cycle management
+  of KubeSlice
+home: https://avesha.io/products/product-slice
+keywords:
+- multicloud
+- multi cloud
+- multitenant
+- multitenancy
+- multi tenant
+- multi tenancy
+- federated mesh
+- federated clusters
+- federated k8s
+- federated kubernetes
+- cluster sprawl
+- sprawl
+- namespace sprawl
+- network policy
+- overlay network
+- mesh network
+- security
+- networking
+- infrastructure
+- application
+kubeVersion: '>= 1.19.0-0'
+maintainers:
+- email: support@avesha.io
+  name: Avesha
+name: kubeslice-worker-egs
+type: application
+version: 1.14.0-beta

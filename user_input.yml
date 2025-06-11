@@ -115,11 +115,11 @@ use_global_context: true                     # Required: Use global context
 
 # Required Helm Settings
 use_local_charts: true                      # Required: Use local Helm charts
-local_charts_path: "files/dev-charts-ent-egs/charts"  # Required: Path to local charts (removed files/ prefix)
-global_chart_repo_url: "https://smartscaler.nexus.aveshalabs.io/repository/kubeslice-egs-helm-ent-prod"  # Required: Global Helm repository URL
-global_repo_username: ""                     # Required: Repo username if using private repos
-global_repo_password: ""                     # Required: Repo password if using private repos
-readd_helm_repos: true                      # Required: Re-add Helm repos
+local_charts_path: "files/charts"           # Required: Path to local charts
+global_chart_repo_url: ""                   # Required: Global Helm repository URL
+global_repo_username: ""                    # Required: Repo username if using private repos
+global_repo_password: ""                    # Required: Repo password if using private repos
+readd_helm_repos: false                     # Required: Re-add Helm repos
 insecure_skip_tls_verify: true              # Skip TLS verification for Helm repos
 
 # Required Credentials
@@ -223,7 +223,7 @@ helm_charts:
   # EGS Controller Chart Configuration
   kubeslice_controller_egs:
     release_name: "egs-controller"
-    chart_ref: "https://smartscaler.nexus.aveshalabs.io/repository/kubeslice-egs-helm-ent-prod/kubeslice-controller-egs"
+    chart_ref: "files/charts/kubeslice-controller-egs"
     release_namespace: "kubeslice-controller"
     create_namespace: true
     wait: true
@@ -260,7 +260,7 @@ helm_charts:
   # EGS UI Chart Configuration
   kubeslice_ui_egs:
     release_name: "egs-ui"
-    chart_ref: "https://smartscaler.nexus.aveshalabs.io/repository/kubeslice-egs-helm-ent-prod/kubeslice-ui-egs"
+    chart_ref: "files/charts/kubeslice-ui-egs"
     release_namespace: "kubeslice-controller"
     create_namespace: true
     wait: true
@@ -530,7 +530,7 @@ helm_charts:
   # Kubeslice Worker Chart Configuration
   kubeslice_worker_egs_worker_1:
     release_name: "egs-worker"
-    chart_ref: "https://smartscaler.nexus.aveshalabs.io/repository/kubeslice-egs-helm-ent-prod/kubeslice-worker-egs"
+    chart_ref: "files/charts/kubeslice-worker-egs"
     release_namespace: "kubeslice-system"
     create_namespace: true
     wait: true
