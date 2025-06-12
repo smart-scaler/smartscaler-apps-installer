@@ -1,0 +1,14 @@
+validator:
+  repository: nvcr.io/nvidia/cloud-native
+  image: gpu-operator-validator
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  env:
+    - name: DISABLE_DEV_CHAR_SYMLINK_CREATION
+      value: "true"
+  args: []
+  resources: {}
+  plugin:
+    env:
+      - name: WITH_WORKLOAD
+        value: "false" 
