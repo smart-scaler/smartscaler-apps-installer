@@ -1,0 +1,10 @@
+---
+kube_apiserver_ip: "{{ kubernetes_deployment.api_server.host }}"
+loadbalancer_apiserver:
+  address: "{{ kubernetes_deployment.api_server.host }}"
+  port: {{ kubernetes_deployment.api_server.port }}
+apiserver_loadbalancer_domain_name: "{{ kubernetes_deployment.api_server.host }}"
+supplementary_addresses_in_ssl_keys:
+  - "{{ kubernetes_deployment.api_server.host }}"
+kube_apiserver_bind_address: "{{ kubernetes_deployment.api_server.host }}"
+kube_apiserver_advertise_address: "{{ kubernetes_deployment.api_server.host }}" 
