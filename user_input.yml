@@ -61,7 +61,7 @@ kubernetes_deployment:
   dns_mode: "coredns"               # DNS service for the cluster
 
   # REPLACE_SSH_USER Container Runtime Configuration
-  REPLACE_SSH_USER_runtime:
+  nvidia_runtime:
     enabled: false                  # Enable REPLACE_SSH_USER container runtime
     install_toolkit: false          # Install REPLACE_SSH_USER Container Toolkit
     configure_containerd: false     # Configure containerd for REPLACE_SSH_USER runtime
