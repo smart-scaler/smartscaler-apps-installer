@@ -106,6 +106,8 @@ kubernetes_deployment:
 # These settings must be configured regardless of deployment type
 ###############################################################################
 
+skip_prerequisites: false
+
 # Validation and Execution Settings
 validate_prerequisites:
   enabled: true                              # Required: Must be enabled for validation
