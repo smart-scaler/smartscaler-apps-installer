@@ -10,7 +10,12 @@
       delegate_to: localhost
 
     - name: Check Ansible version
-      shell: ansible --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1
+      shell: |
+        if [ -n "$VIRTUAL_ENV" ]; then
+          "$VIRTUAL_ENV/bin/python3" -m ansible.cli.adhoc --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1
+        else
+          ansible --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1
+        fi
       register: ansible_version
       failed_when: ansible_version.stdout is version('2.9', '<')
       changed_when: false
@@ -34,7 +39,7 @@
       pip:
         name: "{{ item }}"
         state: present
-        extra_args: "--user"
+        virtualenv: "{{ ansible_env.VIRTUAL_ENV | default(omit) }}"
       loop:
         - kubernetes>=12.0.0
         - openshift>=0.12.0
