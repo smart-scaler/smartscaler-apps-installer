@@ -154,10 +154,7 @@
       status: "{{ item.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('Unknown') }}"
       role: "{{ 'control-plane' if 'node-role.kubernetes.io/control-plane' in (item.metadata.labels | default({})) else 'worker' }}"
       version: "{{ item.status.nodeInfo.kubeletVersion | default('unknown') }}"
-  loop: "{{ query('dict', k8s_nodes | default({}), 'items') | first | default([]) }}"
-  when: 
-    - k8s_nodes is defined 
-    - k8s_nodes.items is defined
+  loop: "{{ k8s_nodes.items if (k8s_nodes is defined and k8s_nodes.items is defined) else [] }}"
   delegate_to: localhost
 
 - name: Process system pods information
@@ -169,10 +166,7 @@
       status: "{{ item.status.phase | default('Unknown') }}"
       namespace: "{{ item.metadata.namespace }}"
       ready: "{{ item.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('False') }}"
-  loop: "{{ query('dict', k8s_system_pods | default({}), 'items') | first | default([]) }}"
-  when: 
-    - k8s_system_pods is defined 
-    - k8s_system_pods.items is defined
+  loop: "{{ k8s_system_pods.items if (k8s_system_pods is defined and k8s_system_pods.items is defined) else [] }}"
   delegate_to: localhost
 
 - name: Determine cluster status
@@ -196,7 +190,7 @@
   set_fact:
     network_ready: >-
       {%- if network_pods is defined and network_pods.items is defined -%}
-        {%- set running_pods = query('dict', network_pods | default({}), 'items') | first | default([]) | selectattr('status.phase', 'equalto', 'Running') | list -%}
+        {%- set running_pods = network_pods.items | selectattr('status.phase', 'equalto', 'Running') | list -%}
         {{ running_pods | length > 0 }}
       {%- else -%}
         false
@@ -207,7 +201,7 @@
   set_fact:
     storage_ready: >-
       {%- if storage_classes is defined and storage_classes.items is defined -%}
-        {{ query('dict', storage_classes | default({}), 'items') | first | default([]) | length > 0 }}
+        {{ storage_classes.items | length > 0 }}
       {%- else -%}
         false
       {%- endif -%}
