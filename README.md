@@ -67,12 +67,12 @@ sudo apt-get install python3-venv python3-full -y
 python3 -m venv venv
 source venv/bin/activate
 
-# Install Python dependencies with sudo (required for system-wide tools)
+# Install Python dependencies
 chmod +x files/install-requirements.sh
-sudo ./files/install-requirements.sh
+./files/install-requirements.sh
 
 # Install Ansible collections
-sudo LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ansible-galaxy collection install -r requirements.yml --force
+LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ansible-galaxy collection install -r requirements.yml --force
 ```
 
 ### Step 2: Generate SSH Keys
@@ -157,7 +157,7 @@ If you're deploying on a **single node** and running the command from the **same
 chmod +x setup_kubernetes.sh
 
 # Run the installation script with sudo
-sudo ./setup_kubernetes.sh
+ ./setup_kubernetes.sh
 ```
 
 ### Step 5 Change ownership of the kubeconfig file
