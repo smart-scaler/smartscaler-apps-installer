@@ -1,0 +1,6 @@
+dependencies:
+- name: kubetally
+  repository: file://./charts/kubetally
+  version: 1.3.0
+digest: sha256:fb995e23f8924f22eca5591fa797a68c6597e94ee37e7880f462b3f89aedb6b7
+generated: "2025-06-11T09:10:00.274926796Z"
