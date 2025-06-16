@@ -115,21 +115,21 @@
 
 - name: Set Kubespray async configuration
   set_fact:
-    kubespray_async_timeout: "{{ async_config.timeout | default(3600) }}"
-    kubespray_poll_interval: "{{ async_config.poll_interval | default(5) }}"
+    kubespray_async_timeout: "{{ kubernetes_deployment.async_config.timeout | default(3600) }}"
+    kubespray_poll_interval: "{{ kubernetes_deployment.async_config.poll_interval | default(5) }}"
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Run Kubespray cluster deployment
   shell: |
-    . {{ venv_path }}/bin/activate && \
+    timeout {{ kubernetes_deployment.async_config.timeout | default(3600) }} bash -c '. {{ venv_path }}/bin/activate && \
     {{ venv_path }}/bin/ansible-playbook -i {{ inventory_dir }}/kubespray/inventory.ini \
     {{ kubespray_dir }}/cluster.yml \
     -e @{{ inventory_dir }}/kubespray/group_vars/all/all.yml \
     -e @{{ inventory_dir }}/kubespray/group_vars/k8s_cluster/addons.yml \
     -e "kube_apiserver_ip={{ kubernetes_deployment.api_server.host }}" \
-    -e "loadbalancer_apiserver={address: '{{ kubernetes_deployment.api_server.host }}', port: {{ kubernetes_deployment.api_server.port }}}" \
+    -e "loadbalancer_apiserver={address: \"{{ kubernetes_deployment.api_server.host }}\", port: {{ kubernetes_deployment.api_server.port }}}" \
     -e "apiserver_loadbalancer_domain_name={{ kubernetes_deployment.api_server.host }}" \
-    -e "supplementary_addresses_in_ssl_keys=['{{ kubernetes_deployment.api_server.host }}'] + {{ control_plane_ips | to_json }} + {{ worker_node_ips | to_json }}" \
+    -e "supplementary_addresses_in_ssl_keys=[\"{{ kubernetes_deployment.api_server.host }}\"] + {{ control_plane_ips | to_json }} + {{ worker_node_ips | to_json }}" \
     -e "kube_apiserver_bind_address={{ first_control_plane_ip }}" \
     -e "kube_apiserver_advertise_address={{ first_control_plane_ip }}" \
     -e "kubernetes_deployment={{ kubernetes_deployment }}" \
@@ -137,12 +137,12 @@
     --become-method={{ kubespray_become_method }} \
     --become-user={{ kubespray_become_user }} \
     -e ansible_ssh_private_key_file={{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} \
-    -e ansible_user={{ kubernetes_deployment.default_ansible_user | default('root') }} \
-    -e ansible_become_pass='' \
-    --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+    -e ansible_user={{ kubernetes_deployment.default_ansible_user | default("root") }} \
+    -e ansible_become_pass="" \
     -e "ANSIBLE_TIMEOUT={{ kubespray_async_timeout }}" \
     -e "ANSIBLE_INTERNAL_POLL_INTERVAL={{ kubespray_poll_interval }}" \
-    -vvvv
+    --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+    -vvvv'
   args:
     executable: /bin/bash
   environment:
@@ -156,8 +156,8 @@
     ANSIBLE_TIMEOUT: "{{ kubespray_async_timeout }}"
     ANSIBLE_INTERNAL_POLL_INTERVAL: "{{ kubespray_poll_interval }}"
   register: kubespray_result
-  async: "{{ kubespray_async_timeout }}"
-  poll: "{{ kubespray_poll_interval }}"
+  async: "{{ kubernetes_deployment.async_config.timeout | default(3600) }}"
+  poll: "{{ kubernetes_deployment.async_config.poll_interval | default(5) }}"
   ignore_errors: true
   when: kubernetes_deployment.enabled | default(false)
 
@@ -213,7 +213,7 @@
     executable: /bin/bash
   register: cluster_info_result
   until: cluster_info_result.rc is defined and cluster_info_result.rc == 0
-  retries: "{{ (async_config.timeout | int / 10) | int }}"
+  retries: "{{ ((kubernetes_deployment.async_config.timeout | default(3600)) / 10) | int }}"
   delay: 10
   environment:
     PATH: "{{ system_path }}:{{ venv_path }}/bin"
@@ -221,8 +221,8 @@
     PYTHONPATH: "{{ venv_python_path }}"
   when: kubernetes_deployment.enabled | default(false)
   delegate_to: localhost
-  async: "{{ async_config.timeout }}"
-  poll: "{{ async_config.poll_interval }}"
+  async: "{{ kubernetes_deployment.async_config.timeout | default(3600) }}"
+  poll: "{{ kubernetes_deployment.async_config.poll_interval | default(5) }}"
 
 - name: Debug variables
   debug:
