@@ -5,6 +5,27 @@
     processed_nodes: []
     processed_system_pods: []
 
+- name: Check kubeconfig file permissions
+  stat:
+    path: "{{ global_kubeconfig }}"
+  register: kubeconfig_stat
+  when: global_kubeconfig is defined
+  ignore_errors: true
+  become: true
+
+- name: Fix kubeconfig permissions if needed
+  file:
+    path: "{{ global_kubeconfig }}"
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
+    mode: '0600'
+  become: true
+  when: 
+    - global_kubeconfig is defined
+    - kubeconfig_stat.stat.exists
+    - (kubeconfig_stat.stat.pw_name != ansible_user_id or kubeconfig_stat.stat.gr_name != ansible_user_id)
+  ignore_errors: true
+
 - name: Get cluster nodes
   kubernetes.core.k8s_info:
     api_version: v1
@@ -13,6 +34,7 @@
   register: k8s_nodes
   ignore_errors: true
   when: global_kubeconfig is defined
+  become: true
 
 - name: Get system pods status
   kubernetes.core.k8s_info:
@@ -23,6 +45,7 @@
   register: k8s_system_pods
   ignore_errors: true
   when: global_kubeconfig is defined
+  become: true
 
 - name: Get cluster info
   kubernetes.core.k8s_cluster_info:
@@ -30,6 +53,7 @@
   register: k8s_cluster_info
   ignore_errors: true
   when: global_kubeconfig is defined
+  become: true
 
 - name: Check network readiness (CNI)
   kubernetes.core.k8s_info:
@@ -42,6 +66,7 @@
   register: network_pods
   ignore_errors: true
   when: global_kubeconfig is defined
+  become: true
 
 - name: Check storage readiness
   kubernetes.core.k8s_info:
@@ -51,6 +76,7 @@
   register: storage_classes
   ignore_errors: true
   when: global_kubeconfig is defined
+  become: true
 
 - name: Process cluster nodes information
   set_fact:
