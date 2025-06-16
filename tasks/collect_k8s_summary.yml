@@ -5,55 +5,52 @@
     processed_nodes: []
     processed_system_pods: []
 
-- name: Check kubeconfig file permissions
-  stat:
-    path: "{{ global_kubeconfig }}"
-  register: kubeconfig_stat
+- name: Create temporary directory for kubeconfig
+  tempfile:
+    state: directory
+    suffix: kubeconfig
+  register: temp_kubeconfig_dir
   when: global_kubeconfig is defined
-  ignore_errors: true
-  become: true
 
-- name: Fix kubeconfig permissions if needed
-  file:
-    path: "{{ global_kubeconfig }}"
-    owner: "{{ ansible_user_id }}"
-    group: "{{ ansible_user_id }}"
+- name: Copy kubeconfig to temporary location
+  copy:
+    src: "{{ global_kubeconfig }}"
+    dest: "{{ temp_kubeconfig_dir.path }}/config"
     mode: '0600'
+    remote_src: yes
   become: true
-  when: 
-    - global_kubeconfig is defined
-    - kubeconfig_stat.stat.exists
-    - (kubeconfig_stat.stat.pw_name != ansible_user_id or kubeconfig_stat.stat.gr_name != ansible_user_id)
-  ignore_errors: true
+  when: global_kubeconfig is defined
+
+- name: Set temporary kubeconfig path
+  set_fact:
+    temp_kubeconfig: "{{ temp_kubeconfig_dir.path }}/config"
+  when: global_kubeconfig is defined
 
 - name: Get cluster nodes
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Node
-    kubeconfig: "{{ global_kubeconfig }}"
+    kubeconfig: "{{ temp_kubeconfig }}"
   register: k8s_nodes
   ignore_errors: true
   when: global_kubeconfig is defined
-  become: true
 
 - name: Get system pods status
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Pod
     namespace: kube-system
-    kubeconfig: "{{ global_kubeconfig }}"
+    kubeconfig: "{{ temp_kubeconfig }}"
   register: k8s_system_pods
   ignore_errors: true
   when: global_kubeconfig is defined
-  become: true
 
 - name: Get cluster info
   kubernetes.core.k8s_cluster_info:
-    kubeconfig: "{{ global_kubeconfig }}"
+    kubeconfig: "{{ temp_kubeconfig }}"
   register: k8s_cluster_info
   ignore_errors: true
   when: global_kubeconfig is defined
-  become: true
 
 - name: Check network readiness (CNI)
   kubernetes.core.k8s_info:
@@ -62,21 +59,19 @@
     namespace: kube-system
     label_selectors:
       - "k8s-app=calico-node"
-    kubeconfig: "{{ global_kubeconfig }}"
+    kubeconfig: "{{ temp_kubeconfig }}"
   register: network_pods
   ignore_errors: true
   when: global_kubeconfig is defined
-  become: true
 
 - name: Check storage readiness
   kubernetes.core.k8s_info:
     api_version: storage.k8s.io/v1
     kind: StorageClass
-    kubeconfig: "{{ global_kubeconfig }}"
+    kubeconfig: "{{ temp_kubeconfig }}"
   register: storage_classes
   ignore_errors: true
   when: global_kubeconfig is defined
-  become: true
 
 - name: Process cluster nodes information
   set_fact:
@@ -157,4 +152,11 @@
   vars:
     generate_summary_report: true
     generate_k8s_summary_report: true
-    should_save_summary: true 
+    should_save_summary: true
+
+- name: Cleanup temporary kubeconfig directory
+  file:
+    path: "{{ temp_kubeconfig_dir.path }}"
+    state: absent
+  when: temp_kubeconfig_dir is defined
+  ignore_errors: true 
