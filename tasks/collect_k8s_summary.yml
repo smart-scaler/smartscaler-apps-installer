@@ -154,7 +154,7 @@
       status: "{{ item.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('Unknown') }}"
       role: "{{ 'control-plane' if 'node-role.kubernetes.io/control-plane' in (item.metadata.labels | default({})) else 'worker' }}"
       version: "{{ item.status.nodeInfo.kubeletVersion | default('unknown') }}"
-  loop: "{{ k8s_nodes.items if (k8s_nodes is defined and k8s_nodes.items is defined) else [] }}"
+  loop: "{{ k8s_nodes | json_query('items[]') | default([]) }}"
   delegate_to: localhost
 
 - name: Process system pods information
@@ -166,7 +166,7 @@
       status: "{{ item.status.phase | default('Unknown') }}"
       namespace: "{{ item.metadata.namespace }}"
       ready: "{{ item.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('False') }}"
-  loop: "{{ k8s_system_pods.items if (k8s_system_pods is defined and k8s_system_pods.items is defined) else [] }}"
+  loop: "{{ k8s_system_pods | json_query('items[]') | default([]) }}"
   delegate_to: localhost
 
 - name: Determine cluster status
@@ -189,22 +189,15 @@
 - name: Determine network readiness
   set_fact:
     network_ready: >-
-      {%- if network_pods is defined and network_pods.items is defined -%}
-        {%- set running_pods = network_pods.items | selectattr('status.phase', 'equalto', 'Running') | list -%}
-        {{ running_pods | length > 0 }}
-      {%- else -%}
-        false
-      {%- endif -%}
+      {%- set running_pods = network_pods | default({}) | json_query('items[?status.phase==`Running`]') | default([]) -%}
+      {{ running_pods | length > 0 }}
   delegate_to: localhost
 
 - name: Determine storage readiness
   set_fact:
     storage_ready: >-
-      {%- if storage_classes is defined and storage_classes.items is defined -%}
-        {{ storage_classes.items | length > 0 }}
-      {%- else -%}
-        false
-      {%- endif -%}
+      {%- set storage_items = storage_classes | json_query('items[]') | default([]) -%}
+      {{ storage_items | length > 0 }}
   delegate_to: localhost
 
 - name: Update Kubernetes summary data
