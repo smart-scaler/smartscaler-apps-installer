@@ -1,0 +1,121 @@
+---
+- name: Validate Common System Prerequisites
+  when: not (skip_prerequisites | default(false) | bool)
+  block:
+    - name: Check Python version
+      shell: python3 --version | cut -d' ' -f2
+      register: python_version
+      failed_when: python_version.stdout is version('3.10', '<')
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Check Ansible version
+      shell: ansible --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1
+      register: ansible_version
+      failed_when: ansible_version.stdout is version('2.9', '<')
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Check kubectl installation
+      shell: kubectl version --client -o json
+      register: kubectl_version
+      failed_when: false
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Check helm installation
+      shell: helm version --short
+      register: helm_version
+      failed_when: false
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Check required Python packages
+      pip:
+        name: "{{ item }}"
+        state: present
+        extra_args: "--user"
+      loop:
+        - kubernetes>=12.0.0
+        - openshift>=0.12.0
+        - PyYAML>=6.0.1
+        - jinja2>=2.11
+      delegate_to: localhost
+
+    - name: Check system resources
+      shell: |
+        echo "Memory:" $(free -g | awk '/^Mem:/{print $2}')
+        echo "Disk:" $(df -h / | awk 'NR==2 {print $4}')
+        echo "CPU cores:" $(nproc)
+      register: system_resources
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Check Network Connectivity
+      block:
+        - name: Test container registry connectivity
+          shell: |
+            timeout 5 curl -s -S https://registry-1.docker.io/v2/ || exit 1
+          register: internet_check
+          ignore_errors: true
+          changed_when: false
+          delegate_to: localhost
+
+        - name: Validate internet connectivity
+          fail:
+            msg: |
+              Cannot access container registry from local machine. Please check:
+              1. Internet connectivity
+              2. Firewall rules
+              3. Proxy settings (if applicable)
+            
+            Required registry access:
+            - registry-1.docker.io
+          when: internet_check.rc != 0
+          delegate_to: localhost
+
+    - name: Set prerequisites status
+      set_fact:
+        prerequisites_failed: >-
+          {{
+            python_version.failed | default(false) or 
+            ansible_version.failed | default(false) or
+            kubectl_version is not successful or
+            helm_version is not successful or
+            internet_check.rc != 0
+          }}
+
+    - name: Display Prerequisites Check Results
+      fail:
+        msg: |
+          Missing required tools or resources on local machine. Please install/configure:
+          {% if python_version.failed | default(false) %}
+          - Python 3.10 or higher (current: {{ python_version.stdout }})
+          {% endif %}
+          {% if ansible_version.failed | default(false) %}
+          - Ansible 2.9 or higher (current: {{ ansible_version.stdout }})
+          {% endif %}
+          {% if kubectl_version is not successful %}
+          - kubectl
+          {% endif %}
+          {% if helm_version is not successful %}
+          - helm
+          {% endif %}
+          {% if internet_check.rc != 0 %}
+          - Network connectivity to the internet
+          {% endif %}
+      when: prerequisites_failed | bool
+
+- name: Display Skip Prerequisites Warning
+  debug:
+    msg: |
+      WARNING: Prerequisites checks have been skipped.
+      Please ensure your system meets all requirements:
+      - Python 3.10 or higher
+      - Ansible 2.9 or higher
+      - kubectl
+      - helm
+      - Required Python packages (kubernetes, openshift, PyYAML, jinja2)
+      - Network connectivity to the internet
+      - Sufficient system resources
+  when: skip_prerequisites | default(false) | bool 
