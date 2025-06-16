@@ -10,7 +10,7 @@
       delegate_to: localhost
 
     - name: Check Ansible version
-      shell: ansible --version | grep -oP '\[core\s+\K[0-9]+\.[0-9]+(\.[0-9]+)?'
+      shell: "ansible --version | grep -oP 'ansible \\[core\\s+\\K[0-9]+\\.[0-9]+(\\.[0-9]+)?'"
       register: ansible_version
       failed_when: ansible_version.stdout is version('2.9', '<')
       changed_when: false
