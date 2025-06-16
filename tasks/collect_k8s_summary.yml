@@ -152,9 +152,9 @@
     node_info:
       name: "{{ item.metadata.name }}"
       status: "{{ item.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('Unknown') }}"
-      role: "{{ 'control-plane' if 'node-role.kubernetes.io/control-plane' in item.metadata.labels else 'worker' }}"
+      role: "{{ 'control-plane' if 'node-role.kubernetes.io/control-plane' in (item.metadata.labels | default({})) else 'worker' }}"
       version: "{{ item.status.nodeInfo.kubeletVersion | default('unknown') }}"
-  loop: "{{ k8s_nodes.items | default([]) }}"
+  loop: "{{ (k8s_nodes | default({})).items | default([]) }}"
   when: 
     - k8s_nodes is defined 
     - k8s_nodes.items is defined
@@ -169,7 +169,7 @@
       status: "{{ item.status.phase | default('Unknown') }}"
       namespace: "{{ item.metadata.namespace }}"
       ready: "{{ item.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('False') }}"
-  loop: "{{ k8s_system_pods.items | default([]) }}"
+  loop: "{{ (k8s_system_pods | default({})).items | default([]) }}"
   when: 
     - k8s_system_pods is defined 
     - k8s_system_pods.items is defined
@@ -179,7 +179,7 @@
   set_fact:
     cluster_status: >-
       {%- if processed_nodes | length > 0 -%}
-        {%- set ready_nodes = processed_nodes | selectattr('status', 'equalto', true) | list -%}
+        {%- set ready_nodes = processed_nodes | selectattr('status', 'equalto', 'True') | list -%}
         {%- if ready_nodes | length == processed_nodes | length -%}
           healthy
         {%- elif ready_nodes | length > 0 -%}
@@ -196,7 +196,7 @@
   set_fact:
     network_ready: >-
       {%- if network_pods is defined and network_pods.items is defined -%}
-        {%- set running_pods = network_pods.items | selectattr('status.phase', 'equalto', 'Running') | list -%}
+        {%- set running_pods = (network_pods | default({})).items | default([]) | selectattr('status.phase', 'equalto', 'Running') | list -%}
         {{ running_pods | length > 0 }}
       {%- else -%}
         false
@@ -207,7 +207,7 @@
   set_fact:
     storage_ready: >-
       {%- if storage_classes is defined and storage_classes.items is defined -%}
-        {{ storage_classes.items | length > 0 }}
+        {{ (storage_classes | default({})).items | default([]) | length > 0 }}
       {%- else -%}
         false
       {%- endif -%}
