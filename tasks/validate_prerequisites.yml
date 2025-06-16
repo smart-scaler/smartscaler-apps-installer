@@ -10,10 +10,11 @@
       delegate_to: localhost
 
     - name: Check Ansible version
-      shell: "ansible --version | grep -oP 'ansible \\[core\\s+\\K[0-9]+\\.[0-9]+(\\.[0-9]+)?'"
+      shell: "{{ ansible_env.HOME }}/smartscaler-apps-installer/venv/bin/ansible --version | grep -oP 'ansible \\[core\\s+\\K[0-9]+\\.[0-9]+(\\.[0-9]+)?'"
       register: ansible_version
       failed_when: ansible_version.stdout is version('2.9', '<')
       changed_when: false
+      become: false
       delegate_to: localhost
 
     - name: Check kubectl installation
