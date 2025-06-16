@@ -94,11 +94,12 @@
   delegate_to: localhost
 
 - name: Check Required Ansible Collections
-  shell: ansible-galaxy collection list | grep -E "{{ item }}"
+  shell: "{{ ansible_env.HOME }}/smartscaler-apps-installer/venv/bin/ansible-galaxy collection list | grep -E \"{{ item }}\""
   loop: "{{ collection_requirements }}"
   register: collection_check
   ignore_errors: true
   changed_when: false
+  become: false
   delegate_to: localhost
 
 - name: Validate Ansible Collections
