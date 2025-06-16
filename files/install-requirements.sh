@@ -22,7 +22,7 @@ VENV_BIN="$VIRTUAL_ENV/bin"
 cat > "$VENV_BIN/ansible" << 'EOF'
 #!/bin/bash
 VIRTUAL_ENV_DISABLE_PROMPT=1 source "$(dirname "$0")/activate"
-python -m ansible "$@"
+python -m ansible.cli.adhoc "$@"
 EOF
 
 cat > "$VENV_BIN/ansible-playbook" << 'EOF'
@@ -46,4 +46,3 @@ echo "Verifying Ansible installation..."
 # Print success message
 echo "Installation complete. Please ensure your virtual environment is activated with:"
 echo "source $VIRTUAL_ENV/bin/activate" 
-
