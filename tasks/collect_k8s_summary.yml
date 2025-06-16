@@ -23,14 +23,24 @@
   when: global_kubeconfig is defined
   delegate_to: localhost
 
-- name: Copy kubeconfig to temporary location
-  copy:
+- name: Read kubeconfig content with elevated privileges
+  slurp:
     src: "{{ global_kubeconfig }}"
-    dest: "{{ temp_kubeconfig_dir.path }}/config"
-    mode: '0600'
-    remote_src: no
+  register: kubeconfig_content
   become: true
   when: global_kubeconfig is defined
+  delegate_to: localhost
+
+- name: Write kubeconfig to temporary location
+  copy:
+    content: "{{ kubeconfig_content.content | b64decode }}"
+    dest: "{{ temp_kubeconfig_dir.path }}/config"
+    mode: '0600'
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
+  when: 
+    - global_kubeconfig is defined
+    - kubeconfig_content is defined
   delegate_to: localhost
 
 - name: Get cluster nodes
