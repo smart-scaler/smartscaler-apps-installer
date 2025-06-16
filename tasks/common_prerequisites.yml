@@ -10,15 +10,11 @@
       delegate_to: localhost
 
     - name: Check Ansible version
-      shell: |
-        if [ -n "$VIRTUAL_ENV" ]; then
-          "$VIRTUAL_ENV/bin/python3" -m ansible.cli.adhoc --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1
-        else
-          ansible --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1
-        fi
+      shell: "{{ ansible_env.HOME }}/smartscaler-apps-installer/venv/bin/ansible --version | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -n1"
       register: ansible_version
       failed_when: ansible_version.stdout is version('2.9', '<')
       changed_when: false
+      become: false
       delegate_to: localhost
 
     - name: Check kubectl installation
