@@ -10,28 +10,48 @@
   tempfile:
     state: directory
     suffix: kubeconfig
+    mode: '0700'
   register: temp_kubeconfig_dir
   when: global_kubeconfig is defined
   delegate_to: localhost
 
-- name: Copy kubeconfig to temporary location
-  copy:
-    src: "{{ global_kubeconfig }}"
-    dest: "{{ temp_kubeconfig_dir.path }}/config"
-    mode: '0600'
-    remote_src: no  # Changed to no since we're copying on localhost
-    owner: "{{ ansible_user_id }}"
-    group: "{{ ansible_user_id }}"
+- name: Get source kubeconfig file stats
+  stat:
+    path: "{{ global_kubeconfig }}"
+  register: kubeconfig_source_stat
+  become: true
   when: global_kubeconfig is defined
   delegate_to: localhost
 
-- name: Debug kubeconfig copy
+- name: Debug source kubeconfig
   debug:
     msg: 
-      - "Source kubeconfig: {{ global_kubeconfig }}"
-      - "Destination: {{ temp_kubeconfig_dir.path }}/config"
-      - "User ID: {{ ansible_user_id }}"
-  when: global_kubeconfig is defined
+      - "Source kubeconfig exists: {{ kubeconfig_source_stat.stat.exists | default(false) }}"
+      - "Source kubeconfig path: {{ global_kubeconfig }}"
+      - "Source kubeconfig permissions: {{ kubeconfig_source_stat.stat.mode | default('unknown') }}"
+  when: kubeconfig_source_stat is defined
+  delegate_to: localhost
+
+- name: Read kubeconfig content
+  slurp:
+    src: "{{ global_kubeconfig }}"
+  register: kubeconfig_content
+  become: true
+  when: 
+    - global_kubeconfig is defined
+    - kubeconfig_source_stat.stat.exists | default(false)
+  delegate_to: localhost
+
+- name: Write kubeconfig to temporary location
+  copy:
+    content: "{{ kubeconfig_content.content | b64decode }}"
+    dest: "{{ temp_kubeconfig_dir.path }}/config"
+    mode: '0600'
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
+  when: 
+    - global_kubeconfig is defined
+    - kubeconfig_content is defined
   delegate_to: localhost
 
 - name: Verify kubeconfig exists
@@ -43,7 +63,10 @@
 
 - name: Debug kubeconfig existence
   debug:
-    msg: "Kubeconfig exists: {{ kubeconfig_stat.stat.exists | default(false) }}"
+    msg: 
+      - "Temporary kubeconfig exists: {{ kubeconfig_stat.stat.exists | default(false) }}"
+      - "Temporary kubeconfig path: {{ temp_kubeconfig_dir.path }}/config"
+      - "Temporary kubeconfig permissions: {{ kubeconfig_stat.stat.mode | default('unknown') }}"
   when: kubeconfig_stat is defined
   delegate_to: localhost
 
