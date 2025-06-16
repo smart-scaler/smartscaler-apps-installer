@@ -201,9 +201,9 @@
     KUBECONFIG={{ playbook_dir }}/output/kubeconfig kubectl cluster-info
   args:
     executable: /bin/bash
-  register: cluster_info
-  until: cluster_info.rc == 0
-  retries: 30
+  register: cluster_info_result
+  until: cluster_info_result.rc is defined and cluster_info_result.rc == 0
+  retries: "{{ (async_config.timeout | int / 10) | int }}"
   delay: 10
   environment:
     PATH: "{{ system_path }}:{{ venv_path }}/bin"
@@ -211,6 +211,8 @@
     PYTHONPATH: "{{ venv_python_path }}"
   when: kubernetes_deployment.enabled | default(false)
   delegate_to: localhost
+  async: "{{ async_config.timeout }}"
+  poll: "{{ async_config.poll_interval }}"
 
 - name: Debug variables
   debug:
