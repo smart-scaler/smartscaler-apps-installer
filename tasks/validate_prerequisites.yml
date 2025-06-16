@@ -1,4 +1,25 @@
 ---
+- name: Check kubernetes deployment flag
+  fail:
+    msg: |
+      Error: Kubernetes flag is set to true. 
+      Applications cannot be installed when kubernetes_deployment.enabled is true.
+      Please set kubernetes_deployment.enabled to false in user_input.yml to install applications.
+  when: 
+    - kubernetes_deployment is defined
+    - kubernetes_deployment.enabled | bool
+
+- name: Validate kubernetes deployment settings
+  assert:
+    that:
+      - kubernetes_deployment is defined
+      - not kubernetes_deployment.enabled
+    fail_msg: |
+      Error: Invalid kubernetes deployment configuration.
+      - kubernetes_deployment must be defined in user_input.yml
+      - kubernetes_deployment.enabled must be set to false to install applications
+    success_msg: "Kubernetes deployment check passed - applications can be installed"
+
 - name: Check if helm diff plugin is already installed
   shell: helm plugin list | grep -q "^diff"
   register: helm_diff_check
