@@ -1,0 +1,49 @@
+---
+- name: Initialize file check results
+  set_fact:
+    file_check_results: []
+
+- name: Check each values file
+  block:
+    - name: Check file existence
+      stat:
+        path: "{{ value_file }}"
+      register: current_stat
+      loop: "{{ item.value.values_files }}"
+      loop_control:
+        loop_var: value_file
+        label: "{{ value_file }}"
+
+    - name: Collect file check results
+      set_fact:
+        file_check_results: "{{ file_check_results + [{'file': value_file, 'exists': current_stat.results[idx].stat.exists}] }}"
+      loop: "{{ item.value.values_files }}"
+      loop_control:
+        loop_var: value_file
+        index_var: idx
+        label: "{{ value_file }}"
+
+- name: Get missing files
+  set_fact:
+    missing_files: "{{ file_check_results | selectattr('exists', 'equalto', false) | map(attribute='file') | list }}"
+
+- name: Fail if any values file is missing
+  fail:
+    msg: |
+      Values file(s) not found for chart '{{ item.key }}' ({{ item.value.release_name }}). Details:
+      Working Directory: {{ lookup('pipe', 'pwd') }}
+      Missing Files: {{ missing_files | join(', ') }}
+      Attempted Paths:
+      {% for result in file_check_results %}
+      - {{ result.file }}: {% if result.exists %}Found{% else %}Not Found{% endif %}
+      {% endfor %}
+  when: 
+    - missing_files | length > 0
+
+- name: Debug values file stats
+  debug:
+    msg: |
+      Values Files Stats for chart '{{ item.key }}' ({{ item.value.release_name }}):
+      {% for result in file_check_results %}
+      - File: {{ result.file }} - Exists: {{ result.exists }}
+      {% endfor %} 
