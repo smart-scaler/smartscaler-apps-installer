@@ -21,9 +21,9 @@ For more information about communication, see the [Ansible communication guide](
 ## Requirements
 
 <!--start requires_ansible-->
-## Ansible Version Compatibility
+### Ansible Version Compatibility
 
-This collection has been tested against following Ansible versions: **>=2.15.0**.
+This collection has been tested against following Ansible versions: **>=2.16.0**.
 
 For collections that support Ansible 2.9, please ensure you update your `network_os` to use the
 fully qualified collection name (for example, `cisco.ios.ios`).
@@ -52,15 +52,10 @@ Name | Description
 --- | ---
 [kubernetes.core.kubectl](https://github.com/ansible-collections/kubernetes.core/blob/main/docs/kubernetes.core.kubectl_connection.rst)|Execute tasks in pods running on Kubernetes.
 
-### K8s filter Plugins
+### K8s Filter Plugins
 Name | Description
 --- | ---
 kubernetes.core.k8s_config_resource_name|Generate resource name for the given resource of type ConfigMap, Secret
-
-### Inventory Plugins
-Name | Description
---- | ---
-[kubernetes.core.k8s](https://github.com/ansible-collections/kubernetes.core/blob/main/docs/kubernetes.core.k8s_inventory.rst)|Kubernetes (K8s) inventory source
 
 ### Lookup Plugins
 Name | Description
@@ -106,7 +101,7 @@ You can also include it in a `requirements.yml` file and install it via `ansible
 ---
 collections:
   - name: kubernetes.core
-    version: 5.3.0
+    version: 6.0.0
 ```
 
 ### Installing the Kubernetes Python Library
