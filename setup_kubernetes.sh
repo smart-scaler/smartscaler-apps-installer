@@ -334,7 +334,7 @@ export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 export LC_CTYPE=en_US.UTF-8
 
-ansible-playbook kubernetes.yml -i inventory/kubespray/inventory.ini -vv
+ansible-playbook kubernetes.yml -i inventory/kubespray/inventory.ini -e @user_input.yml -vv
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}Kubernetes deployment failed.${NC}"

@@ -310,7 +310,7 @@
         - kubernetes_deployment.enabled | bool
 
     - name: Check Kubernetes cluster access
-      shell: kubectl cluster-info
+      shell: KUBECONFIG={{ global_kubeconfig }} kubectl --context {{ global_kubecontext }} cluster-info
       register: cluster_info
       changed_when: false
       failed_when: false
@@ -318,7 +318,13 @@
 
     - name: Verify cluster access
       fail:
-        msg: "Cannot access Kubernetes cluster. Please check your kubeconfig and cluster connectivity."
+        msg: |
+          Cannot access Kubernetes cluster. Please check:
+          1. Kubeconfig file: {{ global_kubeconfig }}
+          2. Context: {{ global_kubecontext }}
+          3. Cluster connectivity
+          
+          Error: {{ cluster_info.stderr }}
       when: cluster_info.rc != 0 
 
 - name: Display Application Skip Prerequisites Warning
