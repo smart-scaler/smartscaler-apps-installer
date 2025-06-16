@@ -60,6 +60,9 @@ Ansible-based installer for Smart Scaler components and Kubernetes cluster deplo
 git clone https://github.com/smart-scaler/smartscaler-apps-installer.git
 cd smartscaler-apps-installer
 
+# Install Python3 
+sudo apt-get install python3-venv python3-full -y
+
 # Create and activate virtual environment
 python3 -m venv venv
 source venv/bin/activate
