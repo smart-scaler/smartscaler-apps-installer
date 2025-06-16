@@ -10,8 +10,16 @@
   tempfile:
     state: directory
     suffix: kubeconfig
-    mode: '0700'
   register: temp_kubeconfig_dir
+  when: global_kubeconfig is defined
+  delegate_to: localhost
+
+- name: Set temporary directory permissions
+  file:
+    path: "{{ temp_kubeconfig_dir.path }}"
+    mode: '0700'
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
   when: global_kubeconfig is defined
   delegate_to: localhost
 
