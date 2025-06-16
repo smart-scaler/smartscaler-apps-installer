@@ -113,6 +113,12 @@
     venv_python_path: "{{ venv_path }}/lib/python{{ python_version.stdout }}/site-packages"
   when: kubernetes_deployment.enabled | default(false)
 
+- name: Set Kubespray async configuration
+  set_fact:
+    kubespray_async_timeout: "{{ async_config.timeout | default(3600) }}"
+    kubespray_poll_interval: "{{ async_config.poll_interval | default(5) }}"
+  when: kubernetes_deployment.enabled | default(false)
+
 - name: Run Kubespray cluster deployment
   shell: |
     . {{ venv_path }}/bin/activate && \
@@ -134,6 +140,8 @@
     -e ansible_user={{ kubernetes_deployment.default_ansible_user | default('root') }} \
     -e ansible_become_pass='' \
     --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+    -e "ANSIBLE_TIMEOUT={{ kubespray_async_timeout }}" \
+    -e "ANSIBLE_INTERNAL_POLL_INTERVAL={{ kubespray_poll_interval }}" \
     -vvvv
   args:
     executable: /bin/bash
@@ -145,6 +153,8 @@
     PATH: "{{ system_path }}:{{ venv_path }}/bin"
     VIRTUAL_ENV: "{{ venv_path }}"
     PYTHONPATH: "{{ venv_python_path }}"
+    ANSIBLE_TIMEOUT: "{{ kubespray_async_timeout }}"
+    ANSIBLE_INTERNAL_POLL_INTERVAL: "{{ kubespray_poll_interval }}"
   register: kubespray_result
   async: "{{ kubespray_async_timeout }}"
   poll: "{{ kubespray_poll_interval }}"
