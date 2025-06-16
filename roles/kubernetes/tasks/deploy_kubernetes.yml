@@ -155,4 +155,67 @@
   file:
     path: "{{ lookup('env', 'HOME') }}/run_kubespray.sh"
     state: absent
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Create output directory
+  file:
+    path: "{{ playbook_dir }}/output"
+    state: directory
+    mode: '0755'
+  when: kubernetes_deployment.enabled | default(false)
+  delegate_to: localhost
+
+- name: Check if control node is same as master node
+  stat:
+    path: "/etc/kubernetes/admin.conf"
+  register: local_kubeconfig
+  delegate_to: localhost
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Copy kubeconfig locally if control node is master
+  copy:
+    src: "/etc/kubernetes/admin.conf"
+    dest: "{{ playbook_dir }}/output/kubeconfig"
+    mode: '0600'
+    remote_src: yes
+  become: true
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - local_kubeconfig.stat.exists | default(false)
+  delegate_to: localhost
+
+- name: Fetch kubeconfig from remote if control node is different
+  fetch:
+    src: "/etc/kubernetes/admin.conf"
+    dest: "{{ playbook_dir }}/output/kubeconfig"
+    flat: yes
+    mode: '0600'
+  become: true
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - not local_kubeconfig.stat.exists | default(true)
+
+- name: Wait for Kubernetes API to be available
+  shell: |
+    . {{ venv_path }}/bin/activate && \
+    KUBECONFIG={{ playbook_dir }}/output/kubeconfig kubectl cluster-info
+  args:
+    executable: /bin/bash
+  register: cluster_info
+  until: cluster_info.rc == 0
+  retries: 30
+  delay: 10
+  environment:
+    PATH: "{{ system_path }}:{{ venv_path }}/bin"
+    VIRTUAL_ENV: "{{ venv_path }}"
+    PYTHONPATH: "{{ venv_python_path }}"
+  when: kubernetes_deployment.enabled | default(false)
+  delegate_to: localhost
+
+- name: Debug variables
+  debug:
+    msg:
+      - "Playbook dir: {{ playbook_dir }}"
+      - "Inventory dir: {{ inventory_dir }}"
+      - "Kubespray dir: {{ kubespray_dir }}"
   when: kubernetes_deployment.enabled | default(false) 
