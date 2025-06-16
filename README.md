@@ -256,7 +256,7 @@ echo $AVESHA_DOCKER_PASSWORD
 
 ```bash
 # Deploy with explicit credentials
-sudo ansible-playbook site.yml \
+ ansible-playbook site.yml \
   -e "ngc_api_key=$NGC_API_KEY" \
   -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
   -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \
