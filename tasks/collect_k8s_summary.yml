@@ -23,121 +23,99 @@
   when: global_kubeconfig is defined
   delegate_to: localhost
 
-- name: Get source kubeconfig file stats
-  stat:
-    path: "{{ global_kubeconfig }}"
-  register: kubeconfig_source_stat
-  become: true
-  when: global_kubeconfig is defined
-  delegate_to: localhost
-
-- name: Debug source kubeconfig
-  debug:
-    msg: 
-      - "Source kubeconfig exists: {{ kubeconfig_source_stat.stat.exists | default(false) }}"
-      - "Source kubeconfig path: {{ global_kubeconfig }}"
-      - "Source kubeconfig permissions: {{ kubeconfig_source_stat.stat.mode | default('unknown') }}"
-  when: kubeconfig_source_stat is defined
-  delegate_to: localhost
-
-- name: Read kubeconfig content
-  slurp:
-    src: "{{ global_kubeconfig }}"
-  register: kubeconfig_content
-  become: true
-  when: 
-    - global_kubeconfig is defined
-    - kubeconfig_source_stat.stat.exists | default(false)
-  delegate_to: localhost
-
-- name: Write kubeconfig to temporary location
+- name: Copy kubeconfig to temporary location
   copy:
-    content: "{{ kubeconfig_content.content | b64decode }}"
+    src: "{{ global_kubeconfig }}"
     dest: "{{ temp_kubeconfig_dir.path }}/config"
     mode: '0600'
-    owner: "{{ ansible_user_id }}"
-    group: "{{ ansible_user_id }}"
-  when: 
-    - global_kubeconfig is defined
-    - kubeconfig_content is defined
-  delegate_to: localhost
-
-- name: Verify kubeconfig exists
-  stat:
-    path: "{{ temp_kubeconfig_dir.path }}/config"
-  register: kubeconfig_stat
+    remote_src: no
+  become: true
   when: global_kubeconfig is defined
-  delegate_to: localhost
-
-- name: Debug kubeconfig existence
-  debug:
-    msg: 
-      - "Temporary kubeconfig exists: {{ kubeconfig_stat.stat.exists | default(false) }}"
-      - "Temporary kubeconfig path: {{ temp_kubeconfig_dir.path }}/config"
-      - "Temporary kubeconfig permissions: {{ kubeconfig_stat.stat.mode | default('unknown') }}"
-  when: kubeconfig_stat is defined
-  delegate_to: localhost
-
-- name: Set temporary kubeconfig path
-  set_fact:
-    temp_kubeconfig: "{{ temp_kubeconfig_dir.path }}/config"
-  when: 
-    - global_kubeconfig is defined
-    - kubeconfig_stat.stat.exists | default(false)
   delegate_to: localhost
 
 - name: Get cluster nodes
-  kubernetes.core.k8s_info:
-    api_version: v1
-    kind: Node
-    kubeconfig: "{{ temp_kubeconfig }}"
-  register: k8s_nodes
+  shell: "kubectl --kubeconfig={{ temp_kubeconfig_dir.path }}/config get nodes -o json"
+  register: k8s_nodes_raw
   ignore_errors: true
+  when: global_kubeconfig is defined
+  delegate_to: localhost
+
+- name: Parse nodes output
+  set_fact:
+    k8s_nodes: "{{ k8s_nodes_raw.stdout | from_json }}"
   when: 
     - global_kubeconfig is defined
-    - kubeconfig_stat.stat.exists | default(false)
+    - k8s_nodes_raw is defined
+    - k8s_nodes_raw.rc is defined
+    - k8s_nodes_raw.rc == 0
   delegate_to: localhost
 
 - name: Get system pods status
-  kubernetes.core.k8s_info:
-    api_version: v1
-    kind: Pod
-    namespace: kube-system
-    kubeconfig: "{{ temp_kubeconfig }}"
-  register: k8s_system_pods
+  shell: "kubectl --kubeconfig={{ temp_kubeconfig_dir.path }}/config get pods -n kube-system -o json"
+  register: k8s_system_pods_raw
   ignore_errors: true
   when: global_kubeconfig is defined
+  delegate_to: localhost
+
+- name: Parse system pods output
+  set_fact:
+    k8s_system_pods: "{{ k8s_system_pods_raw.stdout | from_json }}"
+  when: 
+    - global_kubeconfig is defined
+    - k8s_system_pods_raw is defined
+    - k8s_system_pods_raw.rc is defined
+    - k8s_system_pods_raw.rc == 0
   delegate_to: localhost
 
 - name: Get cluster info
-  kubernetes.core.k8s_cluster_info:
-    kubeconfig: "{{ temp_kubeconfig }}"
-  register: k8s_cluster_info
+  shell: "kubectl --kubeconfig={{ temp_kubeconfig_dir.path }}/config cluster-info dump --output=json"
+  register: k8s_cluster_info_raw
   ignore_errors: true
   when: global_kubeconfig is defined
+  delegate_to: localhost
+
+- name: Parse cluster info output
+  set_fact:
+    k8s_cluster_info: "{{ k8s_cluster_info_raw.stdout | from_json }}"
+  when: 
+    - global_kubeconfig is defined
+    - k8s_cluster_info_raw is defined
+    - k8s_cluster_info_raw.rc is defined
+    - k8s_cluster_info_raw.rc == 0
   delegate_to: localhost
 
 - name: Check network readiness (CNI)
-  kubernetes.core.k8s_info:
-    api_version: v1
-    kind: Pod
-    namespace: kube-system
-    label_selectors:
-      - "k8s-app=calico-node"
-    kubeconfig: "{{ temp_kubeconfig }}"
-  register: network_pods
+  shell: "kubectl --kubeconfig={{ temp_kubeconfig_dir.path }}/config get pods -n kube-system -l k8s-app=calico-node -o json"
+  register: network_pods_raw
   ignore_errors: true
   when: global_kubeconfig is defined
   delegate_to: localhost
 
+- name: Parse network pods output
+  set_fact:
+    network_pods: "{{ network_pods_raw.stdout | from_json }}"
+  when: 
+    - global_kubeconfig is defined
+    - network_pods_raw is defined
+    - network_pods_raw.rc is defined
+    - network_pods_raw.rc == 0
+  delegate_to: localhost
+
 - name: Check storage readiness
-  kubernetes.core.k8s_info:
-    api_version: storage.k8s.io/v1
-    kind: StorageClass
-    kubeconfig: "{{ temp_kubeconfig }}"
-  register: storage_classes
+  shell: "kubectl --kubeconfig={{ temp_kubeconfig_dir.path }}/config get sc -o json"
+  register: storage_classes_raw
   ignore_errors: true
   when: global_kubeconfig is defined
+  delegate_to: localhost
+
+- name: Parse storage classes output
+  set_fact:
+    storage_classes: "{{ storage_classes_raw.stdout | from_json }}"
+  when: 
+    - global_kubeconfig is defined
+    - storage_classes_raw is defined
+    - storage_classes_raw.rc is defined
+    - storage_classes_raw.rc == 0
   delegate_to: localhost
 
 - name: Process cluster nodes information
@@ -149,11 +127,10 @@
       status: "{{ item.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('Unknown') }}"
       role: "{{ 'control-plane' if 'node-role.kubernetes.io/control-plane' in item.metadata.labels else 'worker' }}"
       version: "{{ item.status.nodeInfo.kubeletVersion | default('unknown') }}"
-  loop: "{{ k8s_nodes.resources | default([]) }}"
+  loop: "{{ k8s_nodes.items | default([]) }}"
   when: 
     - k8s_nodes is defined 
-    - k8s_nodes.resources is defined
-    - k8s_nodes.resources | length > 0
+    - k8s_nodes.items is defined
   delegate_to: localhost
 
 - name: Process system pods information
@@ -165,11 +142,10 @@
       status: "{{ item.status.phase | default('Unknown') }}"
       namespace: "{{ item.metadata.namespace }}"
       ready: "{{ item.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('False') }}"
-  loop: "{{ k8s_system_pods.resources | default([]) }}"
+  loop: "{{ k8s_system_pods.items | default([]) }}"
   when: 
     - k8s_system_pods is defined 
-    - k8s_system_pods.resources is defined
-    - k8s_system_pods.resources | length > 0
+    - k8s_system_pods.items is defined
   delegate_to: localhost
 
 - name: Determine cluster status
@@ -192,8 +168,8 @@
 - name: Determine network readiness
   set_fact:
     network_ready: >-
-      {%- if network_pods is defined and network_pods.resources is defined and network_pods.resources | length > 0 -%}
-        {%- set running_pods = network_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list -%}
+      {%- if network_pods is defined and network_pods.items is defined -%}
+        {%- set running_pods = network_pods.items | selectattr('status.phase', 'equalto', 'Running') | list -%}
         {{ running_pods | length > 0 }}
       {%- else -%}
         false
@@ -203,8 +179,8 @@
 - name: Determine storage readiness
   set_fact:
     storage_ready: >-
-      {%- if storage_classes is defined and storage_classes.resources is defined -%}
-        {{ storage_classes.resources | length > 0 }}
+      {%- if storage_classes is defined and storage_classes.items is defined -%}
+        {{ storage_classes.items | length > 0 }}
       {%- else -%}
         false
       {%- endif -%}
