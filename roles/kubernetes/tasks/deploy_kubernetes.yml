@@ -194,6 +194,18 @@
     - local_kubeconfig.stat.exists | default(false)
   delegate_to: localhost
 
+- name: Fix kubeconfig ownership for local copy
+  file:
+    path: "{{ playbook_dir }}/output/kubeconfig"
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
+    mode: '0600'
+  become: true
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - local_kubeconfig.stat.exists | default(false)
+  delegate_to: localhost
+
 - name: Fetch kubeconfig from remote if control node is different
   fetch:
     src: "/etc/kubernetes/admin.conf"
@@ -204,6 +216,24 @@
   when: 
     - kubernetes_deployment.enabled | default(false)
     - not local_kubeconfig.stat.exists | default(true)
+
+- name: Fix kubeconfig ownership for fetched file
+  file:
+    path: "{{ playbook_dir }}/output/kubeconfig"
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
+    mode: '0600'
+  become: true
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - not local_kubeconfig.stat.exists | default(true)
+  delegate_to: localhost
+
+- name: Set global kubeconfig path
+  set_fact:
+    global_kubeconfig: "{{ playbook_dir }}/output/kubeconfig"
+  when: kubernetes_deployment.enabled | default(false)
+  delegate_to: localhost
 
 - name: Wait for Kubernetes API to be available
   shell: |
