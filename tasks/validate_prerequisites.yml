@@ -72,6 +72,8 @@
   pip:
     name: "{{ item }}"
     state: present
+    virtualenv: "{{ playbook_dir }}/venv"
+    virtualenv_python: "{{ ansible_python.executable }}"
   loop: "{{ python_requirements }}"
   ignore_errors: true
   register: pip_check
