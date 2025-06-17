@@ -155,24 +155,24 @@ execution_order:
 
 
   # EGS Application
-  - kubeslice_controller_egs  # Install EGS controller first
-  - kubeslice_ui_egs         # Install EGS UI after controller
-  - egs_project_manifest              # Create EGS project
-  - egs_cluster_registration_worker_1 # Register worker-1 cluster
-  - fetch_worker_secret_worker_1 # Fetch worker secret after registration
-  - kubeslice_worker_egs_worker_1 # Install worker after fetching secret
+  # - kubeslice_controller_egs  # Install EGS controller first
+  # - kubeslice_ui_egs         # Install EGS UI after controller
+  # - egs_project_manifest              # Create EGS project
+  # - egs_cluster_registration_worker_1 # Register worker-1 cluster
+  # - fetch_worker_secret_worker_1 # Fetch worker secret after registration
+  # - kubeslice_worker_egs_worker_1 # Install worker after fetching secret
 
   # NIM 70B Components
-  # - nim_cache_manifest_70b
-  # - wait_for_nim_cache_70b
-  # - nim_cache_wait_job_70b
-  # - nim_service_manifest_70b
-  # - keda_scaled_object_manifest_70b
-  # - create_inference_pod_configmap_70b
-  # - smart_scaler_inference_70b
-  # - create_locust_configmap_70b
-  # - locust_manifest_70b
-  # - smart_scaler_mcp_server_manifest
+  - nim_cache_manifest_70b
+  - wait_for_nim_cache_70b
+  - nim_cache_wait_job_70b
+  - nim_service_manifest_70b
+  - keda_scaled_object_manifest_70b
+  - create_inference_pod_configmap_70b
+  - smart_scaler_inference_70b
+  - create_locust_configmap_70b
+  - locust_manifest_70b
+  - smart_scaler_mcp_server_manifest
 
   #   # NIM 1B Components
   # - nim_cache_manifest_1b
