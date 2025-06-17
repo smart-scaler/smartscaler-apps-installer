@@ -293,14 +293,35 @@
         group: "{{ ansible_user_id }}"
       delegate_to: localhost
 
+    - name: Copy kubeconfig to output directory with proper permissions
+      copy:
+        src: "{{ global_kubeconfig }}"
+        dest: "{{ playbook_dir }}/output/kubeconfig"
+        mode: '0600'
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+        remote_src: true
+      when: global_kubeconfig != "output/kubeconfig"
+      delegate_to: localhost
+      ignore_errors: true
+
+    - name: Ensure kubeconfig file has proper permissions
+      file:
+        path: "{{ playbook_dir }}/output/kubeconfig"
+        state: file
+        mode: '0600'
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+      delegate_to: localhost
+
     - name: Get cluster info
       kubernetes.core.k8s_cluster_info:
-        kubeconfig: "{{ global_kubeconfig }}"
+        kubeconfig: "{{ playbook_dir }}/output/kubeconfig"
         context: "{{ global_kubecontext | default(omit) }}"
       register: k8s_cluster_info
       become: false
       environment:
-        KUBECONFIG: "{{ global_kubeconfig }}"
+        KUBECONFIG: "{{ playbook_dir }}/output/kubeconfig"
 
     - name: Debug cluster info
       debug:
