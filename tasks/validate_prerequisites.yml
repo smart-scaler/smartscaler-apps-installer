@@ -271,27 +271,6 @@
 
 - name: Validate kubeconfig settings
   block:
-    - name: Set kubeconfig facts
-      set_fact:
-        original_kubeconfig: "{{ global_kubeconfig }}"
-        global_kubeconfig: "{{ ansible_env.HOME }}/.kube/config.tmp"
-      delegate_to: localhost
-
-    - name: Ensure .kube directory exists
-      file:
-        path: "{{ ansible_env.HOME }}/.kube"
-        state: directory
-        mode: '0700'
-      delegate_to: localhost
-
-    - name: Copy kubeconfig to temporary location
-      copy:
-        src: "{{ original_kubeconfig }}"
-        dest: "{{ global_kubeconfig }}"
-        mode: '0600'
-        remote_src: true
-      delegate_to: localhost
-
     - name: Get cluster info
       kubernetes.core.k8s_cluster_info:
         kubeconfig: "{{ global_kubeconfig }}"
@@ -308,17 +287,6 @@
           - API Server: {{ k8s_cluster_info.connection.host }}
           - Context: {{ global_kubecontext | default("current-context") }}
           - Server Version: {{ k8s_cluster_info.version.server.kubernetes.gitVersion }}
-
-    - name: Cleanup temporary kubeconfig
-      file:
-        path: "{{ global_kubeconfig }}"
-        state: absent
-      delegate_to: localhost
-
-    - name: Restore original kubeconfig path
-      set_fact:
-        global_kubeconfig: "{{ original_kubeconfig }}"
-      delegate_to: localhost
 
 # Include common prerequisites
 - name: Include common prerequisites
