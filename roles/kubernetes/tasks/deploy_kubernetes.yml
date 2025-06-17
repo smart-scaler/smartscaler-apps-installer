@@ -161,18 +161,26 @@
   ignore_errors: true
   when: kubernetes_deployment.enabled | default(false)
 
-- name: Cleanup temporary deployment script
-  file:
-    path: "{{ lookup('env', 'HOME') }}/run_kubespray.sh"
-    state: absent
-  when: kubernetes_deployment.enabled | default(false)
+- name: Display warning if async timeout occurred
+  debug:
+    msg: |
+      WARNING: Kubespray deployment async timeout occurred after {{ kubernetes_deployment.async_config.timeout | default(3600) }} seconds.
+      This does not necessarily mean the deployment failed - it may still be in progress.
+      Please check the cluster status manually using 'kubectl get nodes' once the deployment completes.
+      You can also check the Kubespray logs for more details.
+  when:
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result.rc is defined
+    - kubespray_result.rc == 124  # timeout exit code
 
 - name: Check Kubespray deployment status
   fail:
     msg: "Kubespray deployment failed. Please check the logs for more details."
   when: 
     - kubernetes_deployment.enabled | default(false)
-    - kubespray_result.rc is defined and kubespray_result.rc != 0
+    - kubespray_result.rc is defined
+    - kubespray_result.rc != 0
+    - kubespray_result.rc != 124  # don't fail on timeout
 
 - name: Wait for kubeconfig file to be created on first control plane node
   wait_for:
