@@ -4,22 +4,34 @@
     venv_path: "./venv"
     python_executable: "python3"
   delegate_to: localhost
+  become: false
+
+- name: Check Python version
+  shell: |
+    python3 -c "import sys; print('.'.join(map(str, sys.version_info[:3])))"
+  args:
+    executable: /bin/bash
+  register: python_version
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Fail if Python version is too low
+  fail:
+    msg: "Python version must be 3.10 or higher. Current version: {{ python_version.stdout }}"
+  when: python_version.stdout is version('3.10', '<')
+  delegate_to: localhost
+  become: false
 
 - name: Validate Common System Prerequisites
   when: not (skip_prerequisites | default(false) | bool)
   block:
-    - name: Check Python version
-      shell: python3 --version | cut -d' ' -f2
-      register: python_version
-      failed_when: python_version.stdout is version('3.10', '<')
-      changed_when: false
-      delegate_to: localhost
-
     - name: Check if virtual environment exists
       stat:
         path: "{{ venv_path }}"
       register: venv_check
       delegate_to: localhost
+      become: false
 
     - name: Create virtual environment if not exists
       shell: |
@@ -27,6 +39,7 @@
       args:
         creates: "{{ venv_path }}"
       delegate_to: localhost
+      become: false
 
     - name: Check if Ansible is installed in virtual environment
       shell: |
@@ -41,6 +54,7 @@
       register: ansible_check
       changed_when: false
       delegate_to: localhost
+      become: false
       environment:
         PATH: "{{ venv_path }}/bin:{{ ansible_env.PATH }}"
         VIRTUAL_ENV: "{{ venv_path }}"
@@ -52,6 +66,7 @@
         virtualenv: "{{ venv_path }}"
         virtualenv_command: "python3 -m venv"
       delegate_to: localhost
+      become: false
       when: ansible_check.stdout is defined and ansible_check.stdout == "not_installed"
 
     - name: Recheck Ansible version after installation
@@ -63,6 +78,7 @@
       register: ansible_version_recheck
       changed_when: false
       delegate_to: localhost
+      become: false
       environment:
         PATH: "{{ venv_path }}/bin:{{ ansible_env.PATH }}"
         VIRTUAL_ENV: "{{ venv_path }}"
@@ -72,6 +88,7 @@
         msg: "Ansible version must be 2.9 or higher. Current version: {{ ansible_version_recheck.stdout }}"
       when: ansible_version_recheck.stdout is version('2.9.0', '<')
       delegate_to: localhost
+      become: false
 
     - name: Check kubectl installation
       shell: kubectl version --client -o json
