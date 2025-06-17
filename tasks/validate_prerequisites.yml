@@ -271,57 +271,35 @@
 
 - name: Validate kubeconfig settings
   block:
-    - name: Check if kubeconfig file exists
-      stat:
-        path: "{{ global_kubeconfig }}"
-      register: kubeconfig_stat
-      when: global_kubeconfig is defined
+    - name: Set kubeconfig facts
+      set_fact:
+        original_kubeconfig: "{{ global_kubeconfig }}"
+        global_kubeconfig: "{{ ansible_env.HOME }}/.kube/config.tmp"
+      delegate_to: localhost
 
-    - name: Fail if kubeconfig doesn't exist
-      fail:
-        msg: "Kubeconfig file {{ global_kubeconfig }} does not exist. Please provide a valid kubeconfig file path in user_input.yml (global_kubeconfig)."
-      when: 
-        - global_kubeconfig is defined
-        - not kubeconfig_stat.stat.exists
-
-    - name: Ensure output directory exists with proper permissions
+    - name: Ensure .kube directory exists
       file:
-        path: "{{ playbook_dir }}/output"
+        path: "{{ ansible_env.HOME }}/.kube"
         state: directory
-        mode: '0755'
-        owner: "{{ ansible_user_id }}"
-        group: "{{ ansible_user_id }}"
+        mode: '0700'
       delegate_to: localhost
 
-    - name: Copy kubeconfig to output directory with proper permissions
+    - name: Copy kubeconfig to temporary location
       copy:
-        src: "{{ global_kubeconfig }}"
-        dest: "{{ playbook_dir }}/output/kubeconfig"
+        src: "{{ original_kubeconfig }}"
+        dest: "{{ global_kubeconfig }}"
         mode: '0600'
-        owner: "{{ ansible_user_id }}"
-        group: "{{ ansible_user_id }}"
         remote_src: true
-      when: global_kubeconfig != "output/kubeconfig"
-      delegate_to: localhost
-      ignore_errors: true
-
-    - name: Ensure kubeconfig file has proper permissions
-      file:
-        path: "{{ playbook_dir }}/output/kubeconfig"
-        state: file
-        mode: '0600'
-        owner: "{{ ansible_user_id }}"
-        group: "{{ ansible_user_id }}"
       delegate_to: localhost
 
     - name: Get cluster info
       kubernetes.core.k8s_cluster_info:
-        kubeconfig: "{{ playbook_dir }}/output/kubeconfig"
+        kubeconfig: "{{ global_kubeconfig }}"
         context: "{{ global_kubecontext | default(omit) }}"
       register: k8s_cluster_info
       become: false
       environment:
-        KUBECONFIG: "{{ playbook_dir }}/output/kubeconfig"
+        KUBECONFIG: "{{ global_kubeconfig }}"
 
     - name: Debug cluster info
       debug:
@@ -330,6 +308,17 @@
           - API Server: {{ k8s_cluster_info.connection.host }}
           - Context: {{ global_kubecontext | default("current-context") }}
           - Server Version: {{ k8s_cluster_info.version.server.kubernetes.gitVersion }}
+
+    - name: Cleanup temporary kubeconfig
+      file:
+        path: "{{ global_kubeconfig }}"
+        state: absent
+      delegate_to: localhost
+
+    - name: Restore original kubeconfig path
+      set_fact:
+        global_kubeconfig: "{{ original_kubeconfig }}"
+      delegate_to: localhost
 
 # Include common prerequisites
 - name: Include common prerequisites
