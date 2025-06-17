@@ -83,7 +83,7 @@ kubernetes_deployment:
                                           # Required for GPU support
     configure_containerd: true              # Configure containerd for NVIDIA runtime
     create_runtime_class: true              # Create Kubernetes RuntimeClass for NVIDIA
-    architecture: "arm64"                   # Architecture for NVIDIA container runtime package
+    architecture: "amd64"                   # Architecture for NVIDIA container runtime package
 
   # Kubernetes Component Configuration
   # Core Kubernetes infrastructure choices
