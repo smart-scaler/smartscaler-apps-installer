@@ -10,7 +10,7 @@
       delegate_to: localhost
 
     - name: Check Ansible version
-      shell: "{{ ansible_env.HOME }}/smartscaler-apps-installer/venv/bin/ansible --version | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -n1"
+      shell: "ansible --version | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -n1"
       register: ansible_version
       failed_when: ansible_version.stdout is version('2.9', '<')
       changed_when: false
