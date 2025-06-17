@@ -1,0 +1,44 @@
+---
+- name: Configure UFW rule
+  ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    comment: "{{ item.comment }}"
+  become: true
+  become_flags: -H -S
+  delegate_to: "{{ current_host.ansible_host }}"
+  loop:
+    - port: '22'
+      proto: tcp
+      comment: SSH
+    - port: '6443'
+      proto: tcp
+      comment: Kubernetes API Server
+    - port: '2379'
+      proto: tcp
+      comment: etcd client API
+    - port: '2380'
+      proto: tcp
+      comment: etcd server API
+    - port: '10250'
+      proto: tcp
+      comment: Kubelet API
+    - port: '10251'
+      proto: tcp
+      comment: kube-scheduler
+    - port: '10252'
+      proto: tcp
+      comment: kube-controller-manager
+    - port: '10255'
+      proto: tcp
+      comment: Kubelet read-only API
+    - port: '8472'
+      proto: udp
+      comment: Flannel VXLAN
+    - port: '30000:32767'
+      proto: tcp
+      comment: NodePort Services
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8 
