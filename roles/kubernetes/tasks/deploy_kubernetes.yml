@@ -189,98 +189,82 @@
     timeout: 300
   when: 
     - kubernetes_deployment.enabled | default(false)
-    - kubespray_result.rc is defined and kubespray_result.rc == 0
+    - kubespray_result.rc is defined
+    - (kubespray_result.rc == 0 or kubespray_result.rc == 124)
   delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
   become: true
+  ignore_errors: "{{ kubespray_result.rc == 124 }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
 
 - name: Create output directory
   file:
     path: "{{ playbook_dir }}/output"
     state: directory
     mode: '0755'
+  delegate_to: localhost
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Check kubeconfig with direct SSH command
+  shell: |
+    ssh -i {{ kubernetes_deployment.ssh_key_path }} -o StrictHostKeyChecking=no {{ kubernetes_deployment.default_ansible_user }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }} "sudo test -f /etc/kubernetes/admin.conf && echo 'exists' || echo 'not found'"
+  register: kubeconfig_check
+  delegate_to: localhost
   when: 
     - kubernetes_deployment.enabled | default(false)
-    - kubespray_result.rc is defined and kubespray_result.rc == 0
-  delegate_to: localhost
+    - kubespray_result.rc is defined
+    - (kubespray_result.rc == 0 or kubespray_result.rc == 124)
+  ignore_errors: true
 
-- name: Check if control node is same as master node
+- name: Debug - Show kubeconfig check result
+  debug:
+    msg: "Kubeconfig check result: {{ kubeconfig_check.stdout | default('check failed') }}"
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubeconfig_check is defined
+
+- name: Copy kubeconfig from remote host
+  shell: |
+    mkdir -p {{ playbook_dir }}/output
+    ssh -i {{ kubernetes_deployment.ssh_key_path }} -o StrictHostKeyChecking=no {{ kubernetes_deployment.default_ansible_user }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }} "sudo cat /etc/kubernetes/admin.conf" > {{ playbook_dir }}/output/kubeconfig
+  delegate_to: localhost
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubeconfig_check is success
+    - kubeconfig_check.stdout == 'exists'
+  ignore_errors: "{{ kubespray_result.rc == 124 }}"
+
+- name: Debug - Check local kubeconfig
   stat:
-    path: "/etc/kubernetes/admin.conf"
-  register: local_kubeconfig
+    path: "{{ playbook_dir }}/output/kubeconfig"
+  register: local_kubeconfig_check
   delegate_to: localhost
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Debug - Show local kubeconfig status
+  debug:
+    msg: >-
+      Local kubeconfig exists: {{ local_kubeconfig_check.stat.exists | default(false) }}
+      {%- if local_kubeconfig_check.stat.exists %}
+      , Size: {{ local_kubeconfig_check.stat.size }}
+      , Permissions: {{ local_kubeconfig_check.stat.mode }}
+      {%- endif %}
   when: 
     - kubernetes_deployment.enabled | default(false)
-    - kubespray_result.rc is defined and kubespray_result.rc == 0
+    - local_kubeconfig_check is defined
 
-- name: Copy kubeconfig locally if control node is master
-  copy:
-    src: "/etc/kubernetes/admin.conf"
-    dest: "{{ playbook_dir }}/output/kubeconfig"
-    mode: '0600'
-    remote_src: yes
-  become: true
-  when: 
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result.rc is defined and kubespray_result.rc == 0
-    - local_kubeconfig.stat.exists | default(false)
-  delegate_to: localhost
-
-- name: Fix kubeconfig ownership for local copy
+- name: Fix kubeconfig ownership and permissions
   file:
     path: "{{ playbook_dir }}/output/kubeconfig"
     owner: "{{ ansible_user_id }}"
     group: "{{ ansible_user_id }}"
     mode: '0600'
   become: true
-  when: 
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result.rc is defined and kubespray_result.rc == 0
-    - local_kubeconfig.stat.exists | default(false)
   delegate_to: localhost
-
-- name: Ensure readable permissions on kubeconfig for fetch
-  file:
-    path: "/etc/kubernetes/admin.conf"
-    mode: '0644'
-  become: true
   when: 
     - kubernetes_deployment.enabled | default(false)
-    - kubespray_result.rc is defined and kubespray_result.rc == 0
-  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
-
-- name: Fetch kubeconfig from remote if control node is different
-  fetch:
-    src: "/etc/kubernetes/admin.conf"
-    dest: "{{ playbook_dir }}/output/kubeconfig"
-    flat: yes
-  become: true
-  when: 
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result.rc is defined and kubespray_result.rc == 0
-    - not local_kubeconfig.stat.exists | default(true)
-  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
-
-- name: Restore secure permissions on remote kubeconfig
-  file:
-    path: "/etc/kubernetes/admin.conf"
-    mode: '0600'
-  become: true
-  when: 
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result.rc is defined and kubespray_result.rc == 0
-  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
-
-- name: Fix kubeconfig ownership and permissions locally
-  file:
-    path: "{{ playbook_dir }}/output/kubeconfig"
-    owner: "{{ ansible_user_id }}"
-    group: "{{ ansible_user_id }}"
-    mode: '0600'
-  become: true
-  when: 
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result.rc is defined and kubespray_result.rc == 0
-  delegate_to: localhost
+    - local_kubeconfig_check.stat.exists | default(false)
 
 - name: Set global kubeconfig path
   set_fact:
@@ -296,16 +280,26 @@
     executable: /bin/bash
   register: cluster_info_result
   until: cluster_info_result.rc is defined and cluster_info_result.rc == 0
-  retries: "{{ ((kubernetes_deployment.async_config.timeout | default(3600)) / 10) | int }}"
+  retries: 30
   delay: 10
   environment:
     PATH: "{{ system_path }}:{{ venv_path }}/bin"
     VIRTUAL_ENV: "{{ venv_path }}"
-    PYTHONPATH: "{{ venv_python_path }}"
-  when: kubernetes_deployment.enabled | default(false)
-  delegate_to: localhost
-  async: "{{ kubernetes_deployment.async_config.timeout | default(3600) }}"
-  poll: "{{ kubernetes_deployment.async_config.poll_interval | default(5) }}"
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - local_kubeconfig_check.stat.exists | default(false)
+  ignore_errors: "{{ kubespray_result.rc == 124 }}"
+
+- name: Display status message for async timeout
+  debug:
+    msg: |
+      Kubespray deployment is still in progress (async timeout).
+      - Kubeconfig check: {{ kubeconfig_check.stdout | default('not available') }}
+      - Local kubeconfig: {{ local_kubeconfig_check.stat.exists | default(false) }}
+      Please wait for the deployment to complete and then check the cluster status manually.
+  when:
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result.rc == 124
 
 - name: Debug variables
   debug:
