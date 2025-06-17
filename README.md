@@ -161,10 +161,10 @@ chmod +x setup_kubernetes.sh
  ./setup_kubernetes.sh
 ```
 
-### Step 5 Change ownership of the kubeconfig file
+### Step 5 Change ownership of the smartscaler working directory
 
 ```bash
-sudo chown $(whoami):$(whoami) output/kubeconfig
+sudo chown $(whoami):$(whoami) -R .
 
 # Set the KUBECONFIG environment variable
 export KUBECONFIG=output/kubeconfig
