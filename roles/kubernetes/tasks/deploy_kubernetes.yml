@@ -60,410 +60,254 @@
       Group Vars Path: {{ inventory_dir }}/kubespray/group_vars/all/all.yml
   when: kubernetes_deployment.enabled | default(false)
 
-- name: Test SSH connection to all hosts
-  command:
-    cmd: "ssh -i {{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ item.ansible_user | default('root') }}@{{ item.ansible_host }} 'echo SSH connection successful'"
-  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
-  register: ssh_test
-  changed_when: false
-  ignore_errors: true
-  when: kubernetes_deployment.enabled | default(false)
-
-- name: Display SSH test results
-  debug:
-    var: ssh_test
+- name: Create async directory
+  file:
+    path: "/tmp/.ansible_async"
+    state: directory
+    mode: '0755'
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Set Ansible environment variables
   set_fact:
-    ansible_env_vars: "{{ kubespray_env | combine(kubespray_extra_env) }}"
-  when: kubernetes_deployment.enabled | default(false)
-
-- name: Set default values for async execution
-  set_fact:
-    kubespray_async_timeout: "{{ kubernetes_deployment.async_config.timeout | default(3600) }}"
-    kubespray_poll_interval: "{{ kubernetes_deployment.async_config.poll_interval | default(10) }}"
-  when: kubernetes_deployment.enabled | default(false)
-
-- name: Clear Ansible fact cache to prevent IP conflicts
-  file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - "~/.ansible/tmp"
-    - "~/.ansible/cp"
-    - "/tmp/ansible-facts-*"
-  ignore_errors: true
-  delegate_to: localhost
-  when: kubernetes_deployment.enabled | default(false)
-
-- name: Force refresh network facts on target hosts
-  setup:
-    gather_subset: '!all,network'
-    filter: "ansible_default_ipv4"
-  delegate_to: "{{ item.ansible_host }}"
-  vars:
-    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
-    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
-  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
-  ignore_errors: true
-  when: kubernetes_deployment.enabled | default(false)
-
-- name: Create host_vars directory for explicit IP configuration
-  file:
-    path: "{{ inventory_dir }}/kubespray/host_vars"
-    state: directory
-    mode: '0755'
-  when: kubernetes_deployment.enabled | default(false)
-
-- name: Create host_vars files for control plane nodes with explicit IP settings
-  template:
-    src: "{{ playbook_dir }}/templates/host_vars.yml.j2"
-    dest: "{{ inventory_dir }}/kubespray/host_vars/{{ item.name }}.yml"
-  vars:
-    node_private_ip: "{{ item.private_ip }}"
-    node_access_ip: "{{ item.private_ip }}"
-  loop: "{{ kubernetes_deployment.control_plane_nodes }}"
-  when: kubernetes_deployment.enabled | default(false)
-
-- name: Create host_vars files for worker nodes with explicit IP settings
-  template:
-    src: "{{ playbook_dir }}/templates/host_vars.yml.j2"
-    dest: "{{ inventory_dir }}/kubespray/host_vars/{{ item.name }}.yml"
-  vars:
-    node_private_ip: "{{ item.private_ip }}"
-    node_access_ip: "{{ item.private_ip }}"
-  loop: "{{ kubernetes_deployment.worker_nodes | default([]) }}"
-  when: kubernetes_deployment.enabled | default(false)
-
-- name: Verify IP configuration before deployment
-  debug:
-    msg: |
-      === IP Configuration Verification ===
-      Control Plane Nodes:
-      {% for node in kubernetes_deployment.control_plane_nodes %}
-      - {{ node.name }}: 
-        - ansible_host (public): {{ node.ansible_host }}
-        - private_ip (etcd only): {{ node.private_ip }}
-        - host_vars file: {{ inventory_dir }}/kubespray/host_vars/{{ node.name }}.yml
-      {% endfor %}
-      {% if kubernetes_deployment.worker_nodes is defined and kubernetes_deployment.worker_nodes|length > 0 %}
-      Worker Nodes:
-      {% for node in kubernetes_deployment.worker_nodes %}
-      - {{ node.name }}:
-        - ansible_host (public): {{ node.ansible_host }}
-        - private_ip (etcd only): {{ node.private_ip }}
-        - host_vars file: {{ inventory_dir }}/kubespray/host_vars/{{ node.name }}.yml
-      {% endfor %}
-      {% endif %}
-      
-      IMPORTANT: Only etcd-specific variables are overridden to fix binding issues.
-      API Server will remain accessible on public IP: {{ kubernetes_deployment.api_server.host }}:{{ kubernetes_deployment.api_server.port }}
+    ansible_async_dir: "/tmp/.ansible_async"
+    ansible_local_tmp: "/tmp/.ansible/tmp"
+    ansible_remote_tmp: "/tmp/.ansible/tmp"
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Set node IP variables
   set_fact:
-    control_plane_ips: >-
-      {{ kubernetes_deployment.control_plane_nodes | map(attribute='private_ip') | 
-         map('default', ansible_default_ipv4.address) | list }}
-    worker_node_ips: >-
-      {{ kubernetes_deployment.worker_nodes | default([]) | map(attribute='private_ip') | 
-         map('default', ansible_default_ipv4.address) | list }}
-    first_control_plane_ip: >-
-      {{ kubernetes_deployment.control_plane_nodes[0].private_ip | 
-         default(hostvars[groups['kube_control_plane'][0]].ansible_default_ipv4.address) }}
+    control_plane_ips: "{{ kubernetes_deployment.control_plane_nodes | map(attribute='private_ip') | map('default', ansible_default_ipv4.address) | list }}"
+    worker_node_ips: "{{ kubernetes_deployment.worker_nodes | default([]) | map(attribute='private_ip') | map('default', ansible_default_ipv4.address) | list }}"
+    first_control_plane_ip: "{{ kubernetes_deployment.control_plane_nodes[0].private_ip | default(hostvars[groups['kube_control_plane'][0]].ansible_default_ipv4.address) }}"
   when: kubernetes_deployment.enabled | default(false)
 
-- name: Track Kubernetes deployment start
+- name: Set PATH variable
   set_fact:
-    installation_summary:
-      total_items: "{{ (installation_summary.total_items | int) + 1 }}"
-      successful_items: "{{ installation_summary.successful_items + [deployment_info] }}"
-      failed_items: "{{ installation_summary.failed_items }}"
-      skipped_items: "{{ installation_summary.skipped_items }}"
-      kubernetes_components: "{{ installation_summary.kubernetes_components + [deployment_info] }}"
-      helm_charts: "{{ installation_summary.helm_charts }}"
-      manifests: "{{ installation_summary.manifests }}"
-      kubectl_commands: "{{ installation_summary.kubectl_commands }}"
-      command_executions: "{{ installation_summary.command_executions }}"
-  vars:
-    deployment_info:
-      name: "kubespray-cluster-deployment"
-      type: "kubernetes"
-      status: "success"
-      timestamp: "{{ ansible_date_time.iso8601 }}"
-      details: "Starting Kubespray cluster deployment with {{ kubernetes_deployment.control_plane_nodes | length }} control plane nodes"
+    system_path: "{{ ansible_env.PATH | default('/usr/local/bin:/usr/bin:/bin') }}"
+    venv_path: "{{ playbook_dir }}/venv"
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Check if virtualenv exists
+  stat:
+    path: "{{ venv_path }}/bin/python"
+  register: venv_python
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Create virtualenv if it doesn't exist
+  shell: |
+    python3 -m venv {{ venv_path }}
+    {{ venv_path }}/bin/pip install --upgrade pip
+    {{ venv_path }}/bin/pip install -r {{ playbook_dir }}/requirements.txt
   when: 
-    - summary_enabled | default(true)
     - kubernetes_deployment.enabled | default(false)
+    - not venv_python.stat.exists | default(false)
+
+- name: Get Python version from virtualenv
+  shell: "{{ venv_path }}/bin/python -c 'import sys; print(\"{}.{}\".format(sys.version_info.major, sys.version_info.minor))'"
+  register: python_version
+  changed_when: false
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Set Python paths
+  set_fact:
+    venv_python_path: "{{ venv_path }}/lib/python{{ python_version.stdout }}/site-packages"
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Set Kubespray async configuration
+  set_fact:
+    kubespray_async_timeout: "{{ kubernetes_deployment.async_config.timeout | default(3600) }}"
+    kubespray_poll_interval: "{{ kubernetes_deployment.async_config.poll_interval | default(5) }}"
+  when: kubernetes_deployment.enabled | default(false)
 
 - name: Run Kubespray cluster deployment
-  command:
-    cmd: >
-      ansible-playbook -i {{ inventory_dir }}/kubespray/inventory.ini
-      {{ kubespray_dir }}/cluster.yml
-      -e @{{ inventory_dir }}/kubespray/group_vars/all/all.yml
-      -e @{{ inventory_dir }}/kubespray/group_vars/k8s_cluster/addons.yml
-      -e "kube_apiserver_ip={{ kubernetes_deployment.api_server.host }}"
-      -e "loadbalancer_apiserver={address: '{{ kubernetes_deployment.api_server.host }}', port: {{ kubernetes_deployment.api_server.port }}}"
-      -e "apiserver_loadbalancer_domain_name={{ kubernetes_deployment.api_server.host }}"
-      -e "supplementary_addresses_in_ssl_keys=['{{ kubernetes_deployment.api_server.host }}'] + {{ control_plane_ips | to_json }} + {{ worker_node_ips | to_json }}"
-      -e "kube_apiserver_bind_address={{ first_control_plane_ip }}"
-      -e "kube_apiserver_advertise_address={{ first_control_plane_ip }}"
-      -e "kubernetes_deployment={{ kubernetes_deployment }}"
-      --become
-      --become-method={{ kubespray_become_method }}
-      --become-user={{ kubespray_become_user }}
-      -e ansible_ssh_private_key_file={{ kubernetes_deployment.ssh_key_path | expanduser | realpath }}
-      -e ansible_user={{ kubernetes_deployment.default_ansible_user | default('root') }}
-      -e ansible_become_pass=''
-      --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-      -vvvv
-  environment: "{{ kubespray_env | combine(kubespray_extra_env) | combine({'ANSIBLE_CONFIG': playbook_dir + '/ansible.cfg'}) }}"
+  shell: |
+    timeout {{ kubernetes_deployment.async_config.timeout | default(3600) }} bash -c '. {{ venv_path }}/bin/activate && \
+    {{ venv_path }}/bin/ansible-playbook -i {{ inventory_dir }}/kubespray/inventory.ini \
+    {{ kubespray_dir }}/cluster.yml \
+    -e @{{ inventory_dir }}/kubespray/group_vars/all/all.yml \
+    -e @{{ inventory_dir }}/kubespray/group_vars/k8s_cluster/addons.yml \
+    -e "kube_apiserver_ip={{ kubernetes_deployment.api_server.host }}" \
+    -e "loadbalancer_apiserver={address: \"{{ kubernetes_deployment.api_server.host }}\", port: {{ kubernetes_deployment.api_server.port }}}" \
+    -e "apiserver_loadbalancer_domain_name={{ kubernetes_deployment.api_server.host }}" \
+    -e "supplementary_addresses_in_ssl_keys=[\"{{ kubernetes_deployment.api_server.host }}\"] + {{ control_plane_ips | to_json }} + {{ worker_node_ips | to_json }}" \
+    -e "kube_apiserver_bind_address={{ first_control_plane_ip }}" \
+    -e "kube_apiserver_advertise_address={{ first_control_plane_ip }}" \
+    -e "kubernetes_deployment={{ kubernetes_deployment }}" \
+    --become \
+    --become-method={{ kubespray_become_method }} \
+    --become-user={{ kubespray_become_user }} \
+    -e ansible_ssh_private_key_file={{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} \
+    -e ansible_user={{ kubernetes_deployment.default_ansible_user | default("root") }} \
+    -e ansible_become_pass="" \
+    -e "ANSIBLE_TIMEOUT={{ kubespray_async_timeout }}" \
+    -e "ANSIBLE_INTERNAL_POLL_INTERVAL={{ kubespray_poll_interval }}" \
+    --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+    -vvvv'
+  args:
+    executable: /bin/bash
+  environment:
+    ANSIBLE_ASYNC_DIR: "/tmp/.ansible_async"
+    ANSIBLE_LOCAL_TEMP: "/tmp/.ansible/tmp"
+    ANSIBLE_REMOTE_TEMP: "/tmp/.ansible/tmp"
+    ANSIBLE_CONFIG: "{{ playbook_dir }}/ansible.cfg"
+    PATH: "{{ system_path }}:{{ venv_path }}/bin"
+    VIRTUAL_ENV: "{{ venv_path }}"
+    PYTHONPATH: "{{ venv_python_path }}"
+    ANSIBLE_TIMEOUT: "{{ kubespray_async_timeout }}"
+    ANSIBLE_INTERNAL_POLL_INTERVAL: "{{ kubespray_poll_interval }}"
   register: kubespray_result
-  async: "{{ kubespray_async_timeout }}"
-  poll: "{{ kubespray_poll_interval }}"
+  async: "{{ kubernetes_deployment.async_config.timeout | default(3600) }}"
+  poll: "{{ kubernetes_deployment.async_config.poll_interval | default(5) }}"
   ignore_errors: true
   when: kubernetes_deployment.enabled | default(false)
-
-- name: Track successful Kubernetes deployment
-  set_fact:
-    installation_summary:
-      total_items: "{{ (installation_summary.total_items | int) + 1 }}"
-      successful_items: "{{ installation_summary.successful_items + [deployment_info] }}"
-      failed_items: "{{ installation_summary.failed_items }}"
-      skipped_items: "{{ installation_summary.skipped_items }}"
-      kubernetes_components: "{{ installation_summary.kubernetes_components + [deployment_info] }}"
-      helm_charts: "{{ installation_summary.helm_charts }}"
-      manifests: "{{ installation_summary.manifests }}"
-      kubectl_commands: "{{ installation_summary.kubectl_commands }}"
-      command_executions: "{{ installation_summary.command_executions }}"
-  vars:
-    deployment_info:
-      name: "kubespray-cluster-deployment"
-      type: "kubernetes"
-      status: "success"
-      timestamp: "{{ ansible_date_time.iso8601 }}"
-      details: "Kubespray deployment completed successfully in {{ kubespray_result.delta if kubespray_result.delta is defined else 'unknown time' }}"
-  when: 
-    - summary_enabled | default(true)
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result is succeeded
-
-- name: Track failed Kubernetes deployment
-  set_fact:
-    installation_summary:
-      total_items: "{{ (installation_summary.total_items | int) + 1 }}"
-      successful_items: "{{ installation_summary.successful_items }}"
-      failed_items: "{{ installation_summary.failed_items + [deployment_info] }}"
-      skipped_items: "{{ installation_summary.skipped_items }}"
-      kubernetes_components: "{{ installation_summary.kubernetes_components }}"
-      helm_charts: "{{ installation_summary.helm_charts }}"
-      manifests: "{{ installation_summary.manifests }}"
-      kubectl_commands: "{{ installation_summary.kubectl_commands }}"
-      command_executions: "{{ installation_summary.command_executions }}"
-  vars:
-    deployment_info:
-      name: "kubespray-cluster-deployment"
-      type: "kubernetes"
-      status: "failed"
-      timestamp: "{{ ansible_date_time.iso8601 }}"
-      error: "{{ kubespray_result.msg | default('Kubespray deployment failed') }} - RC: {{ kubespray_result.rc | default('unknown') }}"
-      details: "Failed after {{ kubespray_result.delta if kubespray_result.delta is defined else 'unknown time' }}"
-  when: 
-    - summary_enabled | default(true)
-    - kubernetes_deployment.enabled | default(false)
-    - kubespray_result is failed
 
 - name: Display warning if async timeout occurred
   debug:
-    msg: "WARNING: Kubespray deployment exceeded the async timeout of {{ kubespray_async_timeout }} seconds. The deployment is still running in the background."
+    msg: |
+      WARNING: Kubespray deployment async timeout occurred after {{ kubernetes_deployment.async_config.timeout | default(3600) }} seconds.
+      This does not necessarily mean the deployment failed - it may still be in progress.
+      Please check the cluster status manually using 'kubectl get nodes' once the deployment completes.
+      You can also check the Kubespray logs for more details.
+  when:
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result.rc is defined
+    - kubespray_result.rc == 124  # timeout exit code
+
+- name: Check Kubespray deployment status
+  fail:
+    msg: "Kubespray deployment failed. Please check the logs for more details."
   when: 
-    - kubespray_result is defined 
-    - kubespray_result.msg is defined
-    - kubespray_result.msg is search("async task did not complete within the requested time")
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result.rc is defined
+    - kubespray_result.rc != 0
+    - kubespray_result.rc != 124  # don't fail on timeout
 
-- name: Continue with deployment
-  debug:
-    msg: "Proceeding with the rest of the deployment tasks..."
-  when: kubernetes_deployment.enabled | default(false)
-
-- name: Display Kubespray deployment result
-  debug:
-    msg: |
-      STDOUT:
-      {{ kubespray_result.stdout_lines | default([]) | join('\n') }}
-      
-      STDERR:
-      {{ kubespray_result.stderr_lines | default([]) | join('\n') }}
-  when: kubespray_result is defined and kubernetes_deployment.enabled | default(false)
-
-- name: Get current user
-  command: whoami
-  register: current_user
-  changed_when: false
-  delegate_to: localhost
-  become: false
-
-- name: Get current user's group
-  command: id -gn
-  register: current_group
-  changed_when: false
-  delegate_to: localhost
-  become: false
-
-- name: Get real home directory
-  command: "echo $HOME"
-  register: real_home
-  changed_when: false
-  become: false
-  delegate_to: localhost
-
-- name: Ensure output directory exists
-  file:
-    path: "{{ lookup('env', 'PWD') }}/output"
-    state: directory
-    mode: '0755'
-  become: false
-  when: kubernetes_deployment.enabled | default(false)
-
-- name: Fix output directory ownership
-  block:
-    - name: Try fixing directory ownership without sudo
-      file:
-        path: "{{ lookup('env', 'PWD') }}/output"
-        owner: "{{ lookup('env', 'USER') }}"
-        group: "{{ lookup('env', 'USER') }}"
-        recurse: yes
-      delegate_to: localhost
-      become: false
-      ignore_errors: true
-      register: dir_ownership_result
-
-    - name: Fix directory ownership with sudo if needed
-      shell: |
-        sudo chown -R {{ lookup('env', 'USER') }}:{{ lookup('env', 'USER') }} {{ lookup('env', 'PWD') }}/output
-        sudo chmod -R 755 {{ lookup('env', 'PWD') }}/output
-      delegate_to: localhost
-      ignore_errors: true
-      when: dir_ownership_result is failed
-
-- name: Create temporary directory on remote host
-  file:
-    path: "/tmp/kubeconfig-temp"
-    state: directory
-    mode: '0755'
-  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
-  vars:
-    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
-    ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
-    ansible_become: true
-
-- name: Wait for kubeconfig file to be created
+- name: Wait for kubeconfig file to be created on first control plane node
   wait_for:
-    path: /etc/kubernetes/admin.conf
+    path: "/etc/kubernetes/admin.conf"
     state: present
-    timeout: 600
+    timeout: 300
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result.rc is defined
+    - (kubespray_result.rc == 0 or kubespray_result.rc == 124)
   delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  become: true
+  ignore_errors: "{{ kubespray_result.rc == 124 }}"
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
-    ansible_become: true
-  register: kubeconfig_wait
-  ignore_errors: true
 
-- name: Copy kubeconfig to temporary location with sudo
-  shell: "cp /etc/kubernetes/admin.conf /tmp/kubeconfig-temp/admin.conf && chmod 644 /tmp/kubeconfig-temp/admin.conf && chown {{ kubernetes_deployment.default_ansible_user }}:{{ kubernetes_deployment.default_ansible_user }} /tmp/kubeconfig-temp/admin.conf"
-  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
-  vars:
-    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
-    ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
-    ansible_become: true
-  ignore_errors: true
-  register: kubeconfig_copy_result
-  when: kubeconfig_wait is success
-
-- name: Display warning if kubeconfig copy failed
-  debug:
-    msg: "WARNING: Failed to copy kubeconfig from /etc/kubernetes/admin.conf. This is expected if the cluster is not yet fully initialized."
-  when: kubeconfig_copy_result is failed or kubeconfig_wait is failed
-
-- name: Fetch kubeconfig from temporary location
-  fetch:
-    src: "/tmp/kubeconfig-temp/admin.conf"
-    dest: "{{ lookup('env', 'PWD') }}/output/kubeconfig"
-    flat: yes
-  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
-  vars:
-    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
-    ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
-  register: kubeconfig_fetch
-  when: kubeconfig_copy_result is success
-
-- name: Clean up temporary directory
+- name: Create output directory
   file:
-    path: "/tmp/kubeconfig-temp"
-    state: absent
-  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
-  vars:
-    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
-    ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
-    ansible_become: true
-  when: kubeconfig_fetch is success
+    path: "{{ playbook_dir }}/output"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
+  delegate_to: localhost
+  when: kubernetes_deployment.enabled | default(false)
 
-- name: Fix all local file permissions and ownership
-  block:
-    - name: Try fixing permissions and ownership without sudo
-      file:
-        path: "{{ item }}"
-        mode: '0644'  # Changed to allow read access for others
-        owner: "{{ lookup('env', 'USER') }}"
-        group: "{{ lookup('env', 'USER') }}"
-      with_items:
-        - "{{ lookup('env', 'PWD') }}/output/kubeconfig"
-        - "{{ lookup('env', 'PWD') }}/inventory"
-        - "{{ lookup('env', 'PWD') }}/inventory/kubespray"
-      delegate_to: localhost
-      become: false
-      ignore_errors: true
-      register: fix_perms_result
+- name: Check kubeconfig with direct SSH command
+  shell: |
+    ssh -i {{ kubernetes_deployment.ssh_key_path }} -o StrictHostKeyChecking=no {{ kubernetes_deployment.default_ansible_user }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }} "sudo test -f /etc/kubernetes/admin.conf && echo 'exists' || echo 'not found'"
+  register: kubeconfig_check
+  delegate_to: localhost
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result.rc is defined
+    - (kubespray_result.rc == 0 or kubespray_result.rc == 124)
+  ignore_errors: true
 
-    - name: Fix permissions and ownership with sudo if needed
-      shell: |
-        sudo chown -R {{ lookup('env', 'USER') }}:{{ lookup('env', 'USER') }} {{ item }}
-        sudo chmod 644 {{ item }}  # Explicit permission setting
-      with_items:
-        - "{{ lookup('env', 'PWD') }}/output/kubeconfig"
-        - "{{ lookup('env', 'PWD') }}/inventory"
-        - "{{ lookup('env', 'PWD') }}/inventory/kubespray"
-      delegate_to: localhost
-      ignore_errors: true
-      when: fix_perms_result is failed
+- name: Debug - Show kubeconfig check result
+  debug:
+    msg: "Kubeconfig check result: {{ kubeconfig_check.stdout | default('check failed') }}"
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubeconfig_check is defined
 
-    - name: Ensure directories have execute permission
-      shell: |
-        sudo chmod 755 {{ item }}
-      with_items:
-        - "{{ lookup('env', 'PWD') }}/output"
-        - "{{ lookup('env', 'PWD') }}/inventory"
-        - "{{ lookup('env', 'PWD') }}/inventory/kubespray"
-      delegate_to: localhost
-      ignore_errors: true
-  when: kubeconfig_fetch is success
+- name: Copy kubeconfig from remote host
+  shell: |
+    mkdir -p {{ playbook_dir }}/output
+    ssh -i {{ kubernetes_deployment.ssh_key_path }} -o StrictHostKeyChecking=no {{ kubernetes_deployment.default_ansible_user }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }} "sudo cat /etc/kubernetes/admin.conf" > {{ playbook_dir }}/output/kubeconfig
+    chmod 600 {{ playbook_dir }}/output/kubeconfig
+    chown {{ ansible_user_id }}:{{ ansible_user_id }} {{ playbook_dir }}/output/kubeconfig
+  delegate_to: localhost
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubeconfig_check is success
+    - kubeconfig_check.stdout == 'exists'
+  ignore_errors: "{{ kubespray_result.rc == 124 }}"
 
-- name: Verify kubeconfig exists
+- name: Debug - Check local kubeconfig
   stat:
-    path: "{{ lookup('env', 'PWD') }}/output/kubeconfig"
-  register: kubeconfig_stat
+    path: "{{ playbook_dir }}/output/kubeconfig"
+  register: local_kubeconfig_check
+  delegate_to: localhost
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Debug - Show local kubeconfig status
+  debug:
+    msg: >-
+      Local kubeconfig exists: {{ local_kubeconfig_check.stat.exists | default(false) }}
+      {%- if local_kubeconfig_check.stat.exists %}
+      , Size: {{ local_kubeconfig_check.stat.size }}
+      , Permissions: {{ local_kubeconfig_check.stat.mode }}
+      {%- endif %}
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - local_kubeconfig_check is defined
+
+- name: Fix kubeconfig ownership and permissions
+  file:
+    path: "{{ playbook_dir }}/output/kubeconfig"
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
+    mode: '0600'
+  delegate_to: localhost
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - local_kubeconfig_check.stat.exists | default(false)
+
+- name: Set global kubeconfig path
+  set_fact:
+    global_kubeconfig: "{{ playbook_dir }}/output/kubeconfig"
+  when: kubernetes_deployment.enabled | default(false)
   delegate_to: localhost
 
-- name: Display kubeconfig location
+- name: Wait for Kubernetes API to be available
+  shell: |
+    . {{ venv_path }}/bin/activate && \
+    KUBECONFIG={{ playbook_dir }}/output/kubeconfig kubectl cluster-info
+  args:
+    executable: /bin/bash
+  register: cluster_info_result
+  until: cluster_info_result.rc is defined and cluster_info_result.rc == 0
+  retries: 30
+  delay: 10
+  environment:
+    PATH: "{{ system_path }}:{{ venv_path }}/bin"
+    VIRTUAL_ENV: "{{ venv_path }}"
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - local_kubeconfig_check.stat.exists | default(false)
+  ignore_errors: "{{ kubespray_result.rc == 124 }}"
+
+- name: Display status message for async timeout
   debug:
     msg: |
-      Kubeconfig has been copied to:
-      - Global location: {{ lookup('env', 'PWD') }}/output/kubeconfig
-      
-      You can now use kubectl with:
-      export KUBECONFIG={{ lookup('env', 'PWD') }}/output/kubeconfig
-      kubectl get nodes
-  when: kubeconfig_stat.stat.exists 
+      Kubespray deployment is still in progress (async timeout).
+      - Kubeconfig check: {{ kubeconfig_check.stdout | default('not available') }}
+      - Local kubeconfig: {{ local_kubeconfig_check.stat.exists | default(false) }}
+      Please wait for the deployment to complete and then check the cluster status manually.
+  when:
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result.rc == 124
+
+- name: Debug variables
+  debug:
+    msg:
+      - "Playbook dir: {{ playbook_dir }}"
+      - "Inventory dir: {{ inventory_dir }}"
+      - "Kubespray dir: {{ kubespray_dir }}"
+  when: kubernetes_deployment.enabled | default(false) 

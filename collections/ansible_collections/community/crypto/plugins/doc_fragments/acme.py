@@ -120,7 +120,7 @@ notes:
     the module can in principle be used with any CA providing an ACME endpoint, such as L(Buypass Go SSL,https://www.buypass.com/ssl/products/acme).
   - So far, the ACME modules have only been tested by the developers against Let's Encrypt (staging and production), Buypass
     (staging and production), ZeroSSL (production), and L(Pebble testing server,https://github.com/letsencrypt/Pebble). We
-    have got community feedback that they also work with Sectigo ACME Service for InCommon. If you experience problems with
+    have got community feedback that they also work with Sectigo ACME Service for InCommon and with HARICA. If you experience problems with
     another ACME server, please L(create an issue,https://github.com/ansible-collections/community.crypto/issues/new/choose)
     to help us supporting it. Feedback that an ACME server not mentioned does work is also appreciated.
 requirements:
@@ -146,6 +146,7 @@ options:
       - For B(Buypass), the production directory URL for ACME v2 and v1 is U(https://api.buypass.com/acme/directory).
       - For B(ZeroSSL), the production directory URL for ACME v2 is U(https://acme.zerossl.com/v2/DV90).
       - For B(Sectigo), the production directory URL for ACME v2 is U(https://acme-qa.secure.trust-provider.com/v2/DV).
+      - For B(HARICA), the production directory URL for ACME v2 is U(https://acme.harica.gr/XXX/directory) with XXX being specific to your account.
       - The notes for this module contain a list of ACME services this module has been tested against.
     required: true
     type: str
@@ -185,6 +186,7 @@ options:
   account_key_src:
     description:
       - Path to a file containing the ACME account RSA or Elliptic Curve key.
+      - "For Elliptic Curve keys only the following curves are supported: V(secp256r1), V(secp384r1), and V(secp521r1)."
       - 'Private keys can be created with the M(community.crypto.openssl_privatekey) or M(community.crypto.openssl_privatekey_pipe)
         modules. If the requisite (cryptography) is not available, keys can also be created directly with the C(openssl) command
         line tool: RSA keys can be created with C(openssl genrsa ...). Elliptic curve keys can be created with C(openssl ecparam
@@ -197,6 +199,7 @@ options:
   account_key_content:
     description:
       - Content of the ACME account RSA or Elliptic Curve key.
+      - "For Elliptic Curve keys only the following curves are supported: V(secp256r1), V(secp384r1), and V(secp521r1)."
       - Mutually exclusive with O(account_key_src).
       - Required if O(account_key_src) is not used.
       - B(Warning:) the content will be written into a temporary file, which will be deleted by Ansible when the module completes.

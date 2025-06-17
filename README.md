@@ -60,16 +60,20 @@ Ansible-based installer for Smart Scaler components and Kubernetes cluster deplo
 git clone https://github.com/smart-scaler/smartscaler-apps-installer.git
 cd smartscaler-apps-installer
 
+# Install Python3 
+sudo apt update
+sudo apt-get install python3-venv python3-full -y
+
 # Create and activate virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
-# Install Python dependencies with sudo (required for system-wide tools)
+# Install Python dependencies
 chmod +x files/install-requirements.sh
-sudo ./files/install-requirements.sh
+./files/install-requirements.sh
 
 # Install Ansible collections
-sudo LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ansible-galaxy collection install -r requirements.yml --force
+LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ansible-galaxy collection install -r requirements.yml --force
 ```
 
 ### Step 2: Generate SSH Keys
@@ -154,13 +158,13 @@ If you're deploying on a **single node** and running the command from the **same
 chmod +x setup_kubernetes.sh
 
 # Run the installation script with sudo
-sudo ./setup_kubernetes.sh
+ ./setup_kubernetes.sh
 ```
 
-### Step 5 Change ownership of the kubeconfig file
+### Step 5 Change ownership of the smartscaler working directory
 
 ```bash
-sudo chown $(whoami):$(whoami) output/kubeconfig
+sudo chown $(whoami):$(whoami) -R .
 
 # Set the KUBECONFIG environment variable
 export KUBECONFIG=output/kubeconfig
@@ -225,7 +229,7 @@ You can quickly replace the placeholder values in your `user_input.yml` configur
 ```bash
 sed -i \
    -e '/kubernetes_deployment:/,/^[^ ]/ s/enabled: true/enabled: false/' \
-  path/to/your/user_input.yml
+  user_input.yml
 ```
 ---
 
@@ -253,7 +257,7 @@ echo $AVESHA_DOCKER_PASSWORD
 
 ```bash
 # Deploy with explicit credentials
-sudo ansible-playbook site.yml \
+ ansible-playbook site.yml \
   -e "ngc_api_key=$NGC_API_KEY" \
   -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
   -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \

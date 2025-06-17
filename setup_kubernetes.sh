@@ -177,6 +177,65 @@ try:
             user = node.get('ansible_user', template_vars['default_ansible_user'])
             print(f"  - {node['name']}: Public IP: {node['ansible_host']}, Private IP: {node['private_ip']} (user: {user})")
 
+    # Verify and log NVIDIA configuration
+    print("\nVerifying NVIDIA Configuration:")
+    nvidia_config = user_input['kubernetes_deployment'].get('nvidia_runtime', {})
+    if nvidia_config.get('enabled', False):
+        print("✓ NVIDIA Runtime is enabled")
+        print(f"  - Install Toolkit: {nvidia_config.get('install_toolkit', False)}")
+        print(f"  - Architecture: {nvidia_config.get('architecture', 'amd64')}")
+        print(f"  - Configure Containerd: {nvidia_config.get('configure_containerd', False)}")
+        print(f"  - Create Runtime Class: {nvidia_config.get('create_runtime_class', False)}")
+        
+        # Verify required configurations
+        missing_configs = []
+        if not nvidia_config.get('install_toolkit'):
+            missing_configs.append("install_toolkit should be true for NVIDIA support")
+        if not nvidia_config.get('configure_containerd'):
+            missing_configs.append("configure_containerd should be true for NVIDIA support")
+        if missing_configs:
+            print("\nWarning: Potential NVIDIA configuration issues:")
+            for issue in missing_configs:
+                print(f"  - {issue}")
+    else:
+        print("ℹ NVIDIA Runtime is disabled")
+
+    # Verify inventory file contents
+    print("\nVerifying generated inventory.ini:")
+    with open('inventory/kubespray/inventory.ini', 'r') as f:
+        inventory_content = f.read()
+        
+    if nvidia_config.get('enabled', False):
+        expected_configs = [
+            f'nvidia_accelerator_enabled={str(nvidia_config.get("enabled", False)).lower()}',
+            f'nvidia_driver_install_container={str(nvidia_config.get("install_toolkit", False)).lower()}',
+            f'nvidia_container_runtime_package_architecture="{nvidia_config.get("architecture", "amd64")}"'
+        ]
+        
+        missing_inventory_configs = []
+        for config in expected_configs:
+            if config not in inventory_content:
+                missing_inventory_configs.append(config)
+        
+        if missing_inventory_configs:
+            print("\nError: Missing or incorrect NVIDIA configurations in inventory.ini:")
+            print("Expected configurations:")
+            for config in expected_configs:
+                print(f"  - {config}")
+            print("\nActual content in inventory.ini:")
+            print(inventory_content)
+            sys.exit(1)
+        else:
+            print("✓ All NVIDIA configurations properly set in inventory.ini")
+
+    # Print complete generated inventory
+    print("\n" + "="*80)
+    print("Complete Generated Inventory File (inventory/kubespray/inventory.ini):")
+    print("="*80)
+    with open('inventory/kubespray/inventory.ini', 'r') as f:
+        print(f.read())
+    print("="*80 + "\n")
+
 except FileNotFoundError as e:
     print(f"Error: File not found - {str(e)}", file=sys.stderr)
     sys.exit(1)
@@ -275,7 +334,7 @@ export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 export LC_CTYPE=en_US.UTF-8
 
-ansible-playbook kubernetes.yml -i inventory/kubespray/inventory.ini -vv
+ansible-playbook kubernetes.yml -i inventory/kubespray/inventory.ini -e @user_input.yml -vv
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}Kubernetes deployment failed.${NC}"

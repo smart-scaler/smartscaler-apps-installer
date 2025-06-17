@@ -34,25 +34,36 @@
     - ufw_available | default(false)
   tags: nvidia_ports
 
+- name: Ensure required locale is available
+  shell: |
+    if ! locale -a | grep -q "en_US.utf8"; then
+      if command -v locale-gen > /dev/null; then
+        sudo locale-gen en_US.UTF-8
+      elif command -v localedef > /dev/null; then
+        sudo localedef -i en_US -f UTF-8 en_US.UTF-8
+      fi
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: false
+  delegate_to: localhost
+  when: kubernetes_deployment.enabled | default(false)
+
 - name: Configure NVIDIA Container Runtime ports
-  ufw:
+  community.general.ufw:
     rule: allow
-    from_ip: "{{ item.0 }}"
-    port: "{{ item.1 }}"
+    from_ip: "{{ item[0] }}"
+    to_port: "{{ item[1] }}"
     proto: tcp
-    comment: "NVIDIA Container Runtime"
-  loop: "{{ all_node_ips | product(['8080', '3476']) | list }}"
-  when: 
-    - kubernetes_deployment.nvidia_runtime.enabled | default(false)
-    - ufw_available | default(false)
-  delegate_to: "{{ inventory_hostname }}"
-  vars:
-    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
-    ansible_user: "{{ kubernetes_deployment.default_ansible_user }}"
+  with_nested:
+    - "{{ kubernetes_deployment.control_plane_nodes | map(attribute='ansible_host') | list }}"
+    - ["8080", "3476"]  # NVIDIA Container Runtime ports
+  when: kubernetes_deployment.enabled | default(false)
   environment:
-    LC_ALL: C.UTF-8
-    LANG: C.UTF-8
-  tags: nvidia_ports
+    LANG: "en_US.UTF-8"
+    LC_ALL: "en_US.UTF-8"
+    LC_CTYPE: "en_US.UTF-8"
+  delegate_to: localhost
 
 - name: Allow containerd communication
   ufw:

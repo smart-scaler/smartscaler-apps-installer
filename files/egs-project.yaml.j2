@@ -1,0 +1,9 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: Project
+metadata:
+  name: {{ manifest_vars.project_name | default('avesha') }}
+  namespace: {{ manifest_vars.project_namespace | default('kubeslice-controller') }}
+spec:
+  serviceAccount:
+    readWrite:
+      - {{ manifest_vars.admin_user | default('admin') }} 

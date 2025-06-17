@@ -1,0 +1,17 @@
+apiVersion: v2
+appVersion: 1.0.1
+description: NVIDIA NIM Operator creates/configures/manages NVIDIA NIM microservices
+  in Kubernetes
+home: https://docs.nvidia.com/nim-operator/latest/index.html
+icon: https://assets.nvidiagrid.net/ngc/logos/NIMOperator.png
+keywords:
+- gpu
+- nim
+- nemo
+- operator
+- ai
+name: k8s-nim-operator
+sources:
+- https://github.com/NVIDIA/k8s-nim-operator
+type: application
+version: 1.0.1

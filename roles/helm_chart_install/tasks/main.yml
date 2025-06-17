@@ -10,35 +10,97 @@
     effective_local_chart_path: "{{ item.local_chart_path | default(local_charts_path) }}"
     effective_readd_helm_repo: "{{ item.readd_helm_repo | default(readd_helm_repos) }}"
 
+- name: Check if local chart exists
+  stat:
+    path: "{{ effective_local_chart_path }}/{{ item.chart_ref }}/Chart.yaml"
+  register: local_chart_stat
+  when: effective_use_local_chart
+
+- name: Set chart source based on availability
+  set_fact:
+    use_repo_fallback: "{{ (effective_use_local_chart and not local_chart_stat.stat.exists) and (item.chart_repo_url is defined and item.chart_repo_url|length > 0) }}"
+    chart_source_type: >-
+      {%- if not effective_use_local_chart -%}
+        remote
+      {%- elif effective_use_local_chart and local_chart_stat.stat.exists -%}
+        local
+      {%- elif item.chart_repo_url is defined and item.chart_repo_url|length > 0 -%}
+        fallback_remote
+      {%- else -%}
+        unknown
+      {%- endif -%}
+
+- name: Debug chart source
+  debug:
+    msg: 
+      - "Chart: {{ item.release_name }}"
+      - "Source Type: {{ chart_source_type }}"
+      - "Local Chart Path: {{ effective_local_chart_path }}/{{ item.chart_ref }}"
+      - "Chart Repo URL: {{ item.chart_repo_url | default('Not defined') }}"
+      - "Using Repository Fallback: {{ use_repo_fallback | default(false) }}"
+
 - name: Generate random string for temporary repo name
   set_fact:
     temp_repo_name: "{{ 999999999 | random | string }}"
-  when: not effective_use_local_chart
+  when: chart_source_type in ['remote', 'fallback_remote']
 
 - name: Add Helm repository
   kubernetes.core.helm_repository:
     name: "{{ temp_repo_name }}"
-    repo_url: "{{ effective_chart_repo_url }}"
+    repo_url: "{{ item.chart_repo_url | default(effective_chart_repo_url) }}"
     username: "{{ effective_repo_username }}"
     password: "{{ effective_repo_password }}"
     repo_state: present
-  when: not effective_use_local_chart and effective_readd_helm_repo
+  when: 
+    - chart_source_type in ['remote', 'fallback_remote']
+    - effective_readd_helm_repo
+    - (item.chart_repo_url is defined and item.chart_repo_url|length > 0) or (effective_chart_repo_url is defined and effective_chart_repo_url|length > 0)
+
+- name: Fail if no valid chart source is available
+  fail:
+    msg: |
+      No valid chart source found for {{ item.release_name }}:
+      - Local chart not found at: {{ effective_local_chart_path }}/{{ item.chart_ref }}
+      - No chart repository URL defined
+      Please either:
+      1. Provide correct local chart path, or
+      2. Define chart_repo_url in the chart configuration
+  when: chart_source_type == 'unknown'
 
 - name: Debug Helm chart configuration
   debug:
     msg:
       - "Chart: {{ item.release_name }}"
       - "Namespace: {{ item.release_namespace }}"
+      - "Using Local Chart: {{ chart_source_type == 'local' }}"
+      - "Chart Path: {% if chart_source_type == 'local' %}{{ effective_local_chart_path }}/{{ item.chart_ref }}{% else %}{{ temp_repo_name }}/{{ item.chart_ref | regex_replace('^\\./', '') | regex_replace('.*/([^/]+)$', '\\1') }}{% endif %}"
       - "Force: {{ item.force | default(false) }}"
       - "Atomic: {{ item.atomic | default(false) }}"
       - "Reset Values: {{ item.reset_values | default(true) }}"
       - "Reuse Values: {{ item.reuse_values | default(false) }}"
       - "Values: {{ item.release_values | default({}) }}"
+      - "Values Files: {{ item.values_files | default([]) }}"
+
+- name: Debug values file paths
+  debug:
+    msg:
+      - "Values Files Path Resolution for {{ item.key }}:"
+      - "Working Directory: {{ lookup('pipe', 'pwd') }}"
+      - "Relative Paths: {{ item.value.values_files | default([]) }}"
+  when: 
+    - item.value.values_files is defined
+    - item.value.values_files | length > 0
+
+- name: Include values file verification tasks
+  include_tasks: verify_values_files.yml
+  when: 
+    - item.value.values_files is defined
+    - item.value.values_files | length > 0
 
 - name: Install/Upgrade Helm chart
   kubernetes.core.helm:
     name: "{{ item.release_name }}"
-    chart_ref: "{{ temp_repo_name + '/' + item.chart_ref if not effective_use_local_chart else effective_local_chart_path + '/' + item.chart_ref }}"
+    chart_ref: "{% if chart_source_type == 'local' %}{{ effective_local_chart_path }}/{{ item.chart_ref }}{% else %}{{ temp_repo_name }}/{{ item.chart_ref | regex_replace('^\\./', '') | regex_replace('.*/([^/]+)$', '\\1') }}{% endif %}"
     chart_version: "{{ item.chart_version | default(omit) }}"
     release_namespace: "{{ item.release_namespace }}"
     create_namespace: "{{ item.create_namespace | default(true) }}"
@@ -47,6 +109,7 @@
     wait: "{{ item.wait | default(false) }}"
     timeout: "{{ item.timeout | default('600s') }}"
     values: "{{ item.release_values | default({}) }}"
+    values_files: "{{ item.values_files | default(omit) }}"
     force: "{{ item.force | default(false) }}"
     atomic: "{{ item.atomic | default(false) }}"
     reset_values: "{{ item.reset_values | default(true) }}"
@@ -79,4 +142,6 @@
   kubernetes.core.helm_repository:
     name: "{{ temp_repo_name }}"
     repo_state: absent
-  when: not effective_use_local_chart and effective_readd_helm_repo 
+  when: 
+    - chart_source_type in ['remote', 'fallback_remote']
+    - effective_readd_helm_repo 

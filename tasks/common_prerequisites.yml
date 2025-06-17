@@ -1,0 +1,198 @@
+---
+- name: Set common variables
+  set_fact:
+    venv_path: "./venv"
+    python_executable: "python3"
+  delegate_to: localhost
+  become: false
+
+- name: Check Python version
+  command: python3 --version
+  register: python_version_raw
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Set Python version
+  set_fact:
+    python_version: "{{ python_version_raw.stdout.split()[1] }}"
+  delegate_to: localhost
+  become: false
+
+- name: Fail if Python version is too low
+  fail:
+    msg: "Python version must be 3.10 or higher. Current version: {{ python_version }}"
+  when: python_version is version('3.10', '<')
+  delegate_to: localhost
+  become: false
+
+- name: Validate Common System Prerequisites
+  when: not (skip_prerequisites | default(false) | bool)
+  block:
+    - name: Check if virtual environment exists
+      stat:
+        path: "{{ venv_path }}"
+      register: venv_check
+      delegate_to: localhost
+      become: false
+
+    - name: Create virtual environment if not exists
+      shell: |
+        python3 -m venv {{ venv_path }}
+      args:
+        creates: "{{ venv_path }}"
+      delegate_to: localhost
+      become: false
+
+    - name: Check if Ansible is installed in virtual environment
+      shell: |
+        . {{ venv_path }}/bin/activate
+        if command -v ansible >/dev/null 2>&1; then
+          ansible --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1
+        else
+          echo "not_installed"
+        fi
+      args:
+        executable: /bin/bash
+      register: ansible_check
+      changed_when: false
+      delegate_to: localhost
+      become: false
+      environment:
+        PATH: "{{ venv_path }}/bin:{{ ansible_env.PATH }}"
+        VIRTUAL_ENV: "{{ venv_path }}"
+
+    - name: Install Ansible in virtual environment if not present
+      pip:
+        name: ansible>=2.9.0
+        state: present
+        virtualenv: "{{ venv_path }}"
+        virtualenv_command: "python3 -m venv"
+      delegate_to: localhost
+      become: false
+      when: ansible_check.stdout is defined and ansible_check.stdout == "not_installed"
+
+    - name: Recheck Ansible version after installation
+      shell: |
+        . {{ venv_path }}/bin/activate
+        ansible --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1
+      args:
+        executable: /bin/bash
+      register: ansible_version_recheck
+      changed_when: false
+      delegate_to: localhost
+      become: false
+      environment:
+        PATH: "{{ venv_path }}/bin:{{ ansible_env.PATH }}"
+        VIRTUAL_ENV: "{{ venv_path }}"
+
+    - name: Check Ansible version requirement
+      fail:
+        msg: "Ansible version must be 2.9 or higher. Current version: {{ ansible_version_recheck.stdout }}"
+      when: ansible_version_recheck.stdout is version('2.9.0', '<')
+      delegate_to: localhost
+      become: false
+
+    - name: Check kubectl installation
+      shell: kubectl version --client -o json
+      register: kubectl_version
+      failed_when: false
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Check helm installation
+      shell: helm version --short
+      register: helm_version
+      failed_when: false
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Check required Python packages
+      pip:
+        name: "{{ item }}"
+        state: present
+        virtualenv: "{{ ansible_env.VIRTUAL_ENV | default(omit) }}"
+      loop:
+        - kubernetes>=12.0.0
+        - openshift>=0.12.0
+        - PyYAML>=6.0.1
+        - jinja2>=2.11
+      delegate_to: localhost
+
+    - name: Check system resources
+      shell: |
+        echo "Memory:" $(free -g | awk '/^Mem:/{print $2}')
+        echo "Disk:" $(df -h / | awk 'NR==2 {print $4}')
+        echo "CPU cores:" $(nproc)
+      register: system_resources
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Check Network Connectivity
+      block:
+        - name: Test container registry connectivity
+          shell: |
+            timeout 5 curl -s -S https://registry-1.docker.io/v2/ || exit 1
+          register: internet_check
+          ignore_errors: true
+          changed_when: false
+          delegate_to: localhost
+
+        - name: Validate internet connectivity
+          fail:
+            msg: |
+              Cannot access container registry from local machine. Please check:
+              1. Internet connectivity
+              2. Firewall rules
+              3. Proxy settings (if applicable)
+            
+            Required registry access:
+            - registry-1.docker.io
+          when: internet_check.rc != 0
+          delegate_to: localhost
+
+    - name: Set prerequisites status
+      set_fact:
+        prerequisites_failed: >-
+          {{
+            python_version.failed | default(false) or 
+            ansible_check.failed | default(false) or
+            kubectl_version is not successful or
+            helm_version is not successful or
+            internet_check.rc != 0
+          }}
+
+    - name: Display Prerequisites Check Results
+      fail:
+        msg: |
+          Missing required tools or resources on local machine. Please install/configure:
+          {% if python_version.failed | default(false) %}
+          - Python 3.10 or higher (current: {{ python_version.stdout }})
+          {% endif %}
+          {% if ansible_check.failed | default(false) %}
+          - Ansible 2.9 or higher (current: {{ ansible_check.stdout }})
+          {% endif %}
+          {% if kubectl_version is not successful %}
+          - kubectl
+          {% endif %}
+          {% if helm_version is not successful %}
+          - helm
+          {% endif %}
+          {% if internet_check.rc != 0 %}
+          - Network connectivity to the internet
+          {% endif %}
+      when: prerequisites_failed | bool
+
+- name: Display Skip Prerequisites Warning
+  debug:
+    msg: |
+      WARNING: Prerequisites checks have been skipped.
+      Please ensure your system meets all requirements:
+      - Python 3.10 or higher
+      - Ansible 2.9 or higher
+      - kubectl
+      - helm
+      - Required Python packages (kubernetes, openshift, PyYAML, jinja2)
+      - Network connectivity to the internet
+      - Sufficient system resources
+  when: skip_prerequisites | default(false) | bool 

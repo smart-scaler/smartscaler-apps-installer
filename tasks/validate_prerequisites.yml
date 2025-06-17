@@ -1,4 +1,210 @@
 ---
+# Local prerequisites - These checks run on the machine running the playbook
+- name: Validate Local System Prerequisites
+  block:
+    - name: Check Python version
+      shell: python3 --version | cut -d' ' -f2
+      register: python_version
+      failed_when: python_version.stdout is version('3.10', '<')
+      changed_when: false
+      delegate_to: localhost
+      become: false
+
+    - name: Check Ansible version
+      shell: "ansible --version | grep -oP 'ansible \\[core\\s+\\K[0-9]+\\.[0-9]+(\\.[0-9]+)?'"
+      register: ansible_version
+      failed_when: ansible_version.stdout is version('2.9', '<')
+      changed_when: false
+      become: false
+      delegate_to: localhost
+
+    - name: Check kubectl installation
+      shell: kubectl version --client -o json
+      register: kubectl_version
+      failed_when: false
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Check helm installation
+      shell: helm version --short
+      register: helm_version
+      failed_when: false
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Validate all required tools
+      assert:
+        that:
+          - not python_version.failed | default(false)
+          - not ansible_version.failed | default(false)
+          - not kubectl_version.failed | default(false)
+          - not helm_version.failed | default(false)
+        fail_msg: |
+          Missing required tools on local machine. Please install:
+          {% if python_version.failed | default(false) %}
+          - Python 3.10 or higher (Current: {{ python_version.stdout | default('not installed') }})
+          {% endif %}
+          {% if ansible_version.failed | default(false) %}
+          - Ansible 2.9 or higher (Current: {{ ansible_version.stdout | default('not installed') }})
+          {% endif %}
+          {% if kubectl_version.failed | default(false) %}
+          - kubectl (Current: {{ kubectl_version.stdout | default('not installed') }})
+          {% endif %}
+          {% if helm_version.failed | default(false) %}
+          - helm (Current: {{ helm_version.stdout | default('not installed') }})
+          {% endif %}
+      delegate_to: localhost
+  become: false
+  delegate_to: localhost
+
+- name: Read Python requirements file
+  slurp:
+    src: "{{ playbook_dir }}/requirements.txt"
+  register: requirements_txt
+  delegate_to: localhost
+
+- name: Parse Python requirements
+  set_fact:
+    python_requirements: "{{ (requirements_txt.content | b64decode).split('\n') | select('match', '^[^#].*') | list | reject('equalto', '') | list }}"
+  delegate_to: localhost
+
+- name: Check Required Python Packages
+  pip:
+    name: "{{ item }}"
+    state: present
+    virtualenv: "{{ playbook_dir }}/venv"
+    virtualenv_python: "{{ ansible_python.executable }}"
+  loop: "{{ python_requirements }}"
+  ignore_errors: true
+  register: pip_check
+  delegate_to: localhost
+
+- name: Validate Python Packages
+  fail:
+    msg: |
+      Failed to verify required Python packages on local machine. Please install:
+      {{ pip_check.results | selectattr('failed', 'defined') | selectattr('failed') | map(attribute='item') | list | join('\n') }}
+  when: pip_check.results | selectattr('failed', 'defined') | selectattr('failed') | list | length > 0
+  delegate_to: localhost
+
+- name: Read Ansible collections requirements file
+  slurp:
+    src: "{{ playbook_dir }}/requirements.yml"
+  register: requirements_yml
+  delegate_to: localhost
+
+- name: Parse Ansible collections requirements
+  set_fact:
+    collection_requirements: "{{ ((requirements_yml.content | b64decode) | from_yaml).collections | map(attribute='name') | list }}"
+  delegate_to: localhost
+
+- name: Check Required Ansible Collections
+  shell: "ansible-galaxy collection list | grep -E \"{{ item }}\""
+  loop: "{{ collection_requirements }}"
+  register: collection_check
+  ignore_errors: true
+  changed_when: false
+  become: false
+  delegate_to: localhost
+
+- name: Validate Ansible Collections
+  fail:
+    msg: |
+      Missing required Ansible collections on local machine. Please install:
+      {% for result in collection_check.results %}
+      {% if result.rc != 0 %}
+      - {{ result.item }}
+      {% endif %}
+      {% endfor %}
+      
+      Use: ansible-galaxy collection install <collection-name>
+  when: collection_check.results | selectattr('rc', '!=', 0) | list | length > 0
+  delegate_to: localhost
+
+- name: Check Network Connectivity
+  block:
+    - name: Test Docker registry access
+      shell: |
+        timeout 5 curl -s -S https://registry-1.docker.io/v2/ || exit 1
+        timeout 5 curl -s -S https://quay.io/v2/ || exit 1
+        timeout 5 curl -s -S https://nvcr.io/v2/ || exit 1
+      register: registry_check
+      ignore_errors: true
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Validate registry access
+      fail:
+        msg: |
+          Cannot access required container registries from local machine. Please check:
+          1. Internet connectivity
+          2. Firewall rules
+          3. Registry authentication
+          4. Proxy settings (if applicable)
+          
+          Required registries:
+          - registry-1.docker.io
+          - quay.io
+          - nvcr.io
+      when: registry_check.rc != 0
+      delegate_to: localhost
+
+- name: Check Local System Resources
+  block:
+    - name: Get available memory
+      shell: free -m | awk 'NR==2{print $2}'
+      register: available_memory
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Get available disk space
+      shell: df -m / | awk 'NR==2{print $4}'
+      register: available_disk
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Get CPU cores
+      shell: nproc
+      register: cpu_cores
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Validate system resources
+      assert:
+        that:
+          - available_memory.stdout | int >= 4096
+          - available_disk.stdout | int >= 20480
+          - cpu_cores.stdout | int >= 2
+        fail_msg: |
+          Insufficient system resources on local machine. Minimum requirements:
+          - Memory: 4GB (Available: {{ available_memory.stdout }}MB)
+          - Disk: 20GB (Available: {{ available_disk.stdout }}MB)
+          - CPU: 2 cores (Available: {{ cpu_cores.stdout }})
+      delegate_to: localhost
+
+# Kubernetes cluster checks
+- name: Check kubernetes deployment flag
+  fail:
+    msg: |
+      Error: Kubernetes flag is set to true. 
+      Applications cannot be installed when kubernetes_deployment.enabled is true.
+      Please set kubernetes_deployment.enabled to false in user_input.yml to install applications.
+  when: 
+    - kubernetes_deployment is defined
+    - kubernetes_deployment.enabled | bool
+  delegate_to: localhost
+
+- name: Validate kubernetes deployment settings
+  assert:
+    that:
+      - kubernetes_deployment is defined
+      - not kubernetes_deployment.enabled
+    fail_msg: |
+      Error: Invalid kubernetes deployment configuration.
+      - kubernetes_deployment must be defined in user_input.yml
+      - kubernetes_deployment.enabled must be set to false to install applications
+    success_msg: "Kubernetes deployment check passed - applications can be installed"
+
 - name: Check if helm diff plugin is already installed
   shell: helm plugin list | grep -q "^diff"
   register: helm_diff_check
@@ -65,24 +271,14 @@
 
 - name: Validate kubeconfig settings
   block:
-    - name: Check if kubeconfig file exists
-      stat:
-        path: "{{ global_kubeconfig }}"
-      register: kubeconfig_stat
-      when: global_kubeconfig is defined
-
-    - name: Fail if kubeconfig doesn't exist
-      fail:
-        msg: "Kubeconfig file {{ global_kubeconfig }} does not exist. Please provide a valid kubeconfig file path in user_input.yml (global_kubeconfig)."
-      when: 
-        - global_kubeconfig is defined
-        - not kubeconfig_stat.stat.exists
-
     - name: Get cluster info
       kubernetes.core.k8s_cluster_info:
         kubeconfig: "{{ global_kubeconfig }}"
         context: "{{ global_kubecontext | default(omit) }}"
       register: k8s_cluster_info
+      become: false
+      environment:
+        KUBECONFIG: "{{ global_kubeconfig }}"
 
     - name: Debug cluster info
       debug:
@@ -90,4 +286,50 @@
           Successfully connected to Kubernetes cluster:
           - API Server: {{ k8s_cluster_info.connection.host }}
           - Context: {{ global_kubecontext | default("current-context") }}
-          - Server Version: {{ k8s_cluster_info.version.server.kubernetes.gitVersion }} 
+          - Server Version: {{ k8s_cluster_info.version.server.kubernetes.gitVersion }}
+
+# Include common prerequisites
+- name: Include common prerequisites
+  include_tasks: common_prerequisites.yml
+
+# Application-specific prerequisites
+- name: Validate Application Prerequisites
+  when: not (skip_prerequisites | default(false) | bool)
+  block:
+    - name: Check kubernetes deployment flag
+      fail:
+        msg: |
+          Error: Kubernetes flag is set to true. 
+          Applications cannot be installed when kubernetes_deployment.enabled is true.
+          Please set kubernetes_deployment.enabled to false in user_input.yml to install applications.
+      when: 
+        - kubernetes_deployment is defined
+        - kubernetes_deployment.enabled | bool
+
+    - name: Check Kubernetes cluster access
+      shell: KUBECONFIG={{ global_kubeconfig }} kubectl --context {{ global_kubecontext }} cluster-info
+      register: cluster_info
+      changed_when: false
+      failed_when: false
+      delegate_to: localhost
+
+    - name: Verify cluster access
+      fail:
+        msg: |
+          Cannot access Kubernetes cluster. Please check:
+          1. Kubeconfig file: {{ global_kubeconfig }}
+          2. Context: {{ global_kubecontext }}
+          3. Cluster connectivity
+          
+          Error: {{ cluster_info.stderr }}
+      when: cluster_info.rc != 0 
+
+- name: Display Application Skip Prerequisites Warning
+  debug:
+    msg: |
+      WARNING: Application prerequisites checks have been skipped.
+      Please ensure:
+      - Kubernetes deployment flag is set to false
+      - Kubernetes cluster is accessible
+      - Proper cluster context is set
+  when: skip_prerequisites | default(false) | bool 

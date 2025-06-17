@@ -1,0 +1,14 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ manifest_vars.cluster_name }}
+  namespace: kubeslice-{{ manifest_vars.project_name }}
+spec:
+  clusterProperty:
+    telemetry:
+      enabled: {{ manifest_vars.telemetry.enabled | default(true) }}
+      endpoint: {{ manifest_vars.telemetry.endpoint | default('http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090') }}
+      telemetryProvider: {{ manifest_vars.telemetry.telemetryProvider | default('prometheus') }}
+    geoLocation:
+      cloudProvider: "{{ manifest_vars.geoLocation.cloudProvider | default('') }}"
+      cloudRegion: "{{ manifest_vars.geoLocation.cloudRegion | default('') }}"

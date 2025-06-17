@@ -4,53 +4,146 @@
   set_fact:
     processed_nodes: []
     processed_system_pods: []
+  delegate_to: localhost
+
+- name: Create temporary directory for kubeconfig
+  tempfile:
+    state: directory
+    suffix: kubeconfig
+  register: temp_kubeconfig_dir
+  when: global_kubeconfig is defined
+  delegate_to: localhost
+
+- name: Set temporary directory permissions
+  file:
+    path: "{{ temp_kubeconfig_dir.path }}"
+    mode: '0700'
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
+  when: global_kubeconfig is defined
+  delegate_to: localhost
+
+- name: Read kubeconfig content with elevated privileges
+  slurp:
+    src: "{{ global_kubeconfig }}"
+  register: kubeconfig_content
+  become: true
+  when: global_kubeconfig is defined
+  delegate_to: localhost
+
+- name: Write kubeconfig to temporary location
+  copy:
+    content: "{{ kubeconfig_content.content | b64decode }}"
+    dest: "{{ temp_kubeconfig_dir.path }}/config"
+    mode: '0600'
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
+  when: 
+    - global_kubeconfig is defined
+    - kubeconfig_content is defined
+  delegate_to: localhost
 
 - name: Get cluster nodes
-  kubernetes.core.k8s_info:
-    api_version: v1
-    kind: Node
-    kubeconfig: "{{ global_kubeconfig }}"
-  register: k8s_nodes
+  shell: "kubectl --kubeconfig={{ temp_kubeconfig_dir.path }}/config get nodes -o json"
+  register: k8s_nodes_raw
   ignore_errors: true
   when: global_kubeconfig is defined
+  delegate_to: localhost
+
+- name: Parse nodes output
+  set_fact:
+    k8s_nodes: "{{ k8s_nodes_raw.stdout | from_json }}"
+  when: 
+    - global_kubeconfig is defined
+    - k8s_nodes_raw is defined
+    - k8s_nodes_raw.rc is defined
+    - k8s_nodes_raw.rc == 0
+  delegate_to: localhost
 
 - name: Get system pods status
-  kubernetes.core.k8s_info:
-    api_version: v1
-    kind: Pod
-    namespace: kube-system
-    kubeconfig: "{{ global_kubeconfig }}"
-  register: k8s_system_pods
+  shell: "kubectl --kubeconfig={{ temp_kubeconfig_dir.path }}/config get pods -n kube-system -o json"
+  register: k8s_system_pods_raw
   ignore_errors: true
   when: global_kubeconfig is defined
+  delegate_to: localhost
+
+- name: Parse system pods output
+  set_fact:
+    k8s_system_pods: "{{ k8s_system_pods_raw.stdout | from_json }}"
+  when: 
+    - global_kubeconfig is defined
+    - k8s_system_pods_raw is defined
+    - k8s_system_pods_raw.rc is defined
+    - k8s_system_pods_raw.rc == 0
+  delegate_to: localhost
 
 - name: Get cluster info
-  kubernetes.core.k8s_cluster_info:
-    kubeconfig: "{{ global_kubeconfig }}"
-  register: k8s_cluster_info
+  shell: "kubectl --kubeconfig={{ temp_kubeconfig_dir.path }}/config version -o json"
+  register: k8s_cluster_info_raw
   ignore_errors: true
   when: global_kubeconfig is defined
+  delegate_to: localhost
+
+- name: Parse cluster info output
+  set_fact:
+    k8s_cluster_info: "{{ k8s_cluster_info_raw.stdout | from_json }}"
+  when: 
+    - global_kubeconfig is defined
+    - k8s_cluster_info_raw is defined
+    - k8s_cluster_info_raw.rc is defined
+    - k8s_cluster_info_raw.rc == 0
+  delegate_to: localhost
+
+- name: Get additional cluster info
+  shell: "kubectl --kubeconfig={{ temp_kubeconfig_dir.path }}/config config view -o json"
+  register: k8s_config_info_raw
+  ignore_errors: true
+  when: global_kubeconfig is defined
+  delegate_to: localhost
+
+- name: Parse config info output
+  set_fact:
+    k8s_config_info: "{{ k8s_config_info_raw.stdout | from_json }}"
+  when: 
+    - global_kubeconfig is defined
+    - k8s_config_info_raw is defined
+    - k8s_config_info_raw.rc is defined
+    - k8s_config_info_raw.rc == 0
+  delegate_to: localhost
 
 - name: Check network readiness (CNI)
-  kubernetes.core.k8s_info:
-    api_version: v1
-    kind: Pod
-    namespace: kube-system
-    label_selectors:
-      - "k8s-app=calico-node"
-    kubeconfig: "{{ global_kubeconfig }}"
-  register: network_pods
+  shell: "kubectl --kubeconfig={{ temp_kubeconfig_dir.path }}/config get pods -n kube-system -l k8s-app=calico-node -o json"
+  register: network_pods_raw
   ignore_errors: true
   when: global_kubeconfig is defined
+  delegate_to: localhost
+
+- name: Parse network pods output
+  set_fact:
+    network_pods: "{{ network_pods_raw.stdout | from_json }}"
+  when: 
+    - global_kubeconfig is defined
+    - network_pods_raw is defined
+    - network_pods_raw.rc is defined
+    - network_pods_raw.rc == 0
+  delegate_to: localhost
 
 - name: Check storage readiness
-  kubernetes.core.k8s_info:
-    api_version: storage.k8s.io/v1
-    kind: StorageClass
-    kubeconfig: "{{ global_kubeconfig }}"
-  register: storage_classes
+  shell: "kubectl --kubeconfig={{ temp_kubeconfig_dir.path }}/config get sc -o json"
+  register: storage_classes_raw
   ignore_errors: true
   when: global_kubeconfig is defined
+  delegate_to: localhost
+
+- name: Parse storage classes output
+  set_fact:
+    storage_classes: "{{ storage_classes_raw.stdout | from_json }}"
+  when: 
+    - global_kubeconfig is defined
+    - storage_classes_raw is defined
+    - storage_classes_raw.rc is defined
+    - storage_classes_raw.rc == 0
+  delegate_to: localhost
 
 - name: Process cluster nodes information
   set_fact:
@@ -59,13 +152,10 @@
     node_info:
       name: "{{ item.metadata.name }}"
       status: "{{ item.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('Unknown') }}"
-      role: "{{ 'control-plane' if 'node-role.kubernetes.io/control-plane' in item.metadata.labels else 'worker' }}"
+      role: "{{ 'control-plane' if 'node-role.kubernetes.io/control-plane' in (item.metadata.labels | default({})) else 'worker' }}"
       version: "{{ item.status.nodeInfo.kubeletVersion | default('unknown') }}"
-  loop: "{{ k8s_nodes.resources | default([]) }}"
-  when: 
-    - k8s_nodes is defined 
-    - k8s_nodes.resources is defined
-    - k8s_nodes.resources | length > 0
+  loop: "{{ k8s_nodes | json_query('items[]') | default([]) }}"
+  delegate_to: localhost
 
 - name: Process system pods information
   set_fact:
@@ -76,17 +166,14 @@
       status: "{{ item.status.phase | default('Unknown') }}"
       namespace: "{{ item.metadata.namespace }}"
       ready: "{{ item.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('False') }}"
-  loop: "{{ k8s_system_pods.resources | default([]) }}"
-  when: 
-    - k8s_system_pods is defined 
-    - k8s_system_pods.resources is defined
-    - k8s_system_pods.resources | length > 0
+  loop: "{{ k8s_system_pods | json_query('items[]') | default([]) }}"
+  delegate_to: localhost
 
 - name: Determine cluster status
   set_fact:
     cluster_status: >-
       {%- if processed_nodes | length > 0 -%}
-        {%- set ready_nodes = processed_nodes | selectattr('status', 'equalto', true) | list -%}
+        {%- set ready_nodes = processed_nodes | selectattr('status', 'equalto', 'True') | list -%}
         {%- if ready_nodes | length == processed_nodes | length -%}
           healthy
         {%- elif ready_nodes | length > 0 -%}
@@ -97,25 +184,21 @@
       {%- else -%}
         unknown
       {%- endif -%}
+  delegate_to: localhost
 
 - name: Determine network readiness
   set_fact:
     network_ready: >-
-      {%- if network_pods is defined and network_pods.resources is defined and network_pods.resources | length > 0 -%}
-        {%- set running_pods = network_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list -%}
-        {{ running_pods | length > 0 }}
-      {%- else -%}
-        false
-      {%- endif -%}
+      {%- set running_pods = network_pods | default({}) | json_query('items[?status.phase==`Running`]') | default([]) -%}
+      {{ running_pods | length > 0 }}
+  delegate_to: localhost
 
 - name: Determine storage readiness
   set_fact:
     storage_ready: >-
-      {%- if storage_classes is defined and storage_classes.resources is defined -%}
-        {{ storage_classes.resources | length > 0 }}
-      {%- else -%}
-        false
-      {%- endif -%}
+      {%- set storage_items = storage_classes | json_query('items[]') | default([]) -%}
+      {{ storage_items | length > 0 }}
+  delegate_to: localhost
 
 - name: Update Kubernetes summary data
   set_fact:
@@ -125,10 +208,21 @@
       system_pods: "{{ processed_system_pods | default([]) }}"
       network_ready: "{{ network_ready | bool }}"
       storage_ready: "{{ storage_ready | bool }}"
+      version_info: "{{ k8s_cluster_info | default({}) }}"
+      cluster_config: "{{ k8s_config_info | default({}) }}"
+  delegate_to: localhost
 
 - name: Generate summary report
   include_tasks: "{{ playbook_dir }}/tasks/summary_tracker.yml"
   vars:
     generate_summary_report: true
     generate_k8s_summary_report: true
-    should_save_summary: true 
+    should_save_summary: true
+
+- name: Cleanup temporary kubeconfig directory
+  file:
+    path: "{{ temp_kubeconfig_dir.path }}"
+    state: absent
+  when: temp_kubeconfig_dir is defined
+  ignore_errors: true
+  delegate_to: localhost 

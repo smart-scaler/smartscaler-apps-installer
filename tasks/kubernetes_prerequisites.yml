@@ -1,0 +1,111 @@
+---
+# Include common prerequisites
+- name: Include common prerequisites
+  include_tasks: common_prerequisites.yml
+
+# Kubernetes-specific prerequisites
+- name: Validate Kubernetes Prerequisites
+  when: not (skip_prerequisites | default(false) | bool)
+  block:
+    - name: Check kubectl installation
+      shell: kubectl version --client -o json
+      register: kubectl_version
+      failed_when: false
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Check helm installation
+      shell: helm version --short
+      register: helm_version
+      failed_when: false
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Validate all required tools
+      assert:
+        that:
+          - not python_version.failed | default(false)
+          - not ansible_version.failed | default(false)
+          - not kubectl_version.failed | default(false)
+          - not helm_version.failed | default(false)
+        fail_msg: |
+          Missing required tools on local machine. Please install:
+          {% if python_version.failed | default(false) %}
+          - Python 3.10 or higher
+          {% endif %}
+          {% if ansible_version.failed | default(false) %}
+          - Ansible 2.9 or higher
+          {% endif %}
+          {% if kubectl_version.failed | default(false) %}
+          - kubectl
+          {% endif %}
+          {% if helm_version.failed | default(false) %}
+          - helm
+          {% endif %}
+      delegate_to: localhost
+
+    - name: Check system requirements for Kubernetes
+      shell: |
+        # Check memory
+        total_memory=$(free -m | awk '/^Mem:/{print $2}')
+        if [ $total_memory -lt 8192 ]; then
+          echo "Insufficient memory: ${total_memory}MB (minimum 8GB required)"
+          exit 1
+        fi
+        
+        # Check disk space
+        root_space=$(df -m / | awk 'NR==2{print $4}')
+        if [ $root_space -lt 51200 ]; then
+          echo "Insufficient disk space: ${root_space}MB (minimum 50GB required)"
+          exit 1
+        fi
+        
+        # Check CPU cores
+        cpu_cores=$(nproc)
+        if [ $cpu_cores -lt 2 ]; then
+          echo "Insufficient CPU cores: ${cpu_cores} (minimum 2 required)"
+          exit 1
+        fi
+      register: k8s_requirements
+      failed_when: k8s_requirements.rc != 0
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Validate Kubernetes requirements
+      fail:
+        msg: |
+          Missing required tools or resources for Kubernetes installation:
+          {% if python_version.failed | default(false) %}
+          - Python 3.10 or higher
+          {% endif %}
+          {% if ansible_version.failed | default(false) %}
+          - Ansible 2.9 or higher
+          {% endif %}
+          {% if kubectl_version.failed | default(false) %}
+          - kubectl
+          {% endif %}
+          {% if helm_version.failed | default(false) %}
+          - helm
+          {% endif %}
+          {% if k8s_requirements.failed | default(false) %}
+          {{ k8s_requirements.stdout_lines | join('\n') }}
+          {% endif %}
+      when: >
+        python_version.failed | default(false) or
+        ansible_version.failed | default(false) or
+        kubectl_version.failed | default(false) or
+        helm_version.failed | default(false) or
+        k8s_requirements.failed | default(false)
+      delegate_to: localhost
+
+- name: Display Kubernetes Skip Prerequisites Warning
+  debug:
+    msg: |
+      WARNING: Kubernetes prerequisites checks have been skipped.
+      Please ensure your system meets additional Kubernetes requirements:
+      - kubectl installed and running
+      - helm installed and running
+      - Minimum 8GB RAM
+      - Minimum 50GB disk space
+      - Minimum 2 CPU cores
+  when: skip_prerequisites | default(false) | bool 

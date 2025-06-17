@@ -44,6 +44,12 @@ kubernetes_deployment:
       ansible_become_user: "root"       # Target user for privilege escalation
       private_ip: "PRIVATE_IP"      # Internal/private IP address
                                      # Used for internal cluster communication
+
+
+    # Python Configuration
+  python_config:
+    interpreter_path: "/usr/bin/python3"  # Path to Python interpreter
+                                     # Used for internal cluster communication
   # Kubernetes Network Configuration
   # Defines the network ranges for various Kubernetes components
   network_config:
@@ -77,6 +83,7 @@ kubernetes_deployment:
                                           # Required for GPU support
     configure_containerd: true              # Configure containerd for NVIDIA runtime
     create_runtime_class: true              # Create Kubernetes RuntimeClass for NVIDIA
+    architecture: "amd64"                   # Architecture for NVIDIA container runtime package
 
   # Kubernetes Component Configuration
   # Core Kubernetes infrastructure choices
@@ -99,6 +106,8 @@ kubernetes_deployment:
 # These settings must be configured regardless of deployment type
 ###############################################################################
 
+skip_prerequisites: false
+
 # Validation and Execution Settings
 validate_prerequisites:
   enabled: true                              # Required: Must be enabled for validation
@@ -112,8 +121,8 @@ global_kubecontext: "kubernetes-admin@cluster.local"  # Required: Kubernetes con
 use_global_context: true                     # Required: Use global context
 
 # Required Helm Settings
-use_local_charts: false                      # Required: Use local Helm charts
-local_charts_path: "charts"                  # Required: Path to local charts
+use_local_charts: true                      # Required: Use local Helm charts
+local_charts_path: "files/charts"                  # Required: Path to local charts
 global_chart_repo_url: ""                    # Required: Global Helm repository URL
 global_repo_username: ""                     # Required: Repo username if using private repos
 global_repo_password: ""                     # Required: Repo password if using private repos
@@ -143,6 +152,15 @@ execution_order:
   - create_ngc_secrets
   - verify_ngc_secrets
   - create_avesha_secret
+
+
+  # EGS Application
+  # - kubeslice_controller_egs  # Install EGS controller first
+  # - kubeslice_ui_egs         # Install EGS UI after controller
+  # - egs_project_manifest              # Create EGS project
+  # - egs_cluster_registration_worker_1 # Register worker-1 cluster
+  # - fetch_worker_secret_worker_1 # Fetch worker secret after registration
+  # - kubeslice_worker_egs_worker_1 # Install worker after fetching secret
 
   # NIM 70B Components
   - nim_cache_manifest_70b
@@ -199,14 +217,137 @@ nginx_ingress:
 # Optional Docker Registry Configuration
 global_image_pull_secret:
   repository: "https://index.docker.io/v1/"  # Optional: Docker registry URL
-  username: "<REGISTRY_USERNAME>"            # Optional: Registry username
-  password: "<REGISTRY_PASSWORD>"            # Optional: Registry password
+  username: "{{ avesha_docker_username }}"
+  password: "{{ avesha_docker_password }}"
 
 ###############################################################################
 # HELM CHARTS CONFIGURATION
 ###############################################################################
 
 helm_charts:
+
+  # EGS Controller Chart Configuration
+  kubeslice_controller_egs:
+    release_name: "egs-controller"
+    chart_ref: "./kubeslice-controller-egs"    # Using relative path
+    release_namespace: "kubeslice-controller"
+    create_namespace: true
+    wait: true
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
+    dependencies: []
+    chart_version: "1.14.0"
+    release_values:
+      global:
+        imageRegistry: docker.io/aveshasystems
+        namespaceConfig:
+          labels: {}
+          annotations: {}
+        kubeTally:
+          enabled: false
+          postgresSecretName: kubetally-db-credentials
+          postgresAddr: "kt-postgresql.kt-postgresql.svc.cluster.local"
+          postgresPort: 5432
+          postgresUser: "postgres"
+          postgresPassword: "postgres"
+          postgresDB: "postgres"
+          postgresSslmode: disable
+          prometheusUrl: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+      kubeslice:
+        controller:
+          endpoint: "https://{{ kubernetes_deployment.api_server.host }}:{{ kubernetes_deployment.api_server.port }}"
+      imagePullSecrets:
+        registry: "{{ global_image_pull_secret.repository }}"
+        username: "{{ global_image_pull_secret.username }}"
+        password: "{{ global_image_pull_secret.password }}"
+
+  # EGS UI Chart Configuration
+  kubeslice_ui_egs:
+    release_name: "egs-ui"
+    chart_ref: "./kubeslice-ui-egs"           # Using relative path
+    release_namespace: "kubeslice-controller"
+    create_namespace: true
+    wait: true
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
+    dependencies: []
+    chart_version: "1.14.0"
+    release_values:
+      global:
+        imageRegistry: docker.io/aveshasystems
+      kubeslice:
+        prometheus:
+          url: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+        uiproxy:
+          service:
+            type: NodePort
+          labels:
+            app: kubeslice-ui-proxy
+          annotations: {}
+          ingress:
+            enabled: false
+            servicePort: 443
+            className: ""
+            hosts:
+              - host: ui.kubeslice.com
+                paths:
+                  - path: /
+                    pathType: Prefix
+            tls: []
+            annotations: []
+            extraLabels: {}
+        egsCoreApis:
+          enabled: true
+          service:
+            type: ClusterIP
+      imagePullSecrets:
+        registry: "{{ global_image_pull_secret.repository }}"
+        username: "{{ global_image_pull_secret.username }}"
+        password: "{{ global_image_pull_secret.password }}"
+
+  # Kubeslice Worker Chart Configuration
+  kubeslice_worker_egs_worker_1:
+    release_name: "egs-worker"
+    chart_ref: "./kubeslice-worker-egs"       # Using relative path
+    release_namespace: "kubeslice-system"
+    create_namespace: true
+    wait: true
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
+    dependencies: []
+    chart_version: "1.14.0"
+    values_files:
+      - "output/worker-1-values.yaml"
+    release_values:
+      cluster:
+        name: "worker-1"
+        endpoint: "https://{{ kubernetes_deployment.api_server.host }}:{{ kubernetes_deployment.api_server.port }}"
+      global:
+        imageRegistry: "docker.io/aveshasystems"
+      egs:
+        prometheusEndpoint: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+        grafanaDashboardBaseUrl: "http://<grafana-lb>/d/Oxed_c6Wz"
+      metrics:
+        insecure: true
+      kserve:
+        enabled: false
+        kserve:
+          controller:
+            gateway:
+              domain: "kubeslice.com"
+              ingressGateway:
+                className: "nginx"
+      imagePullSecrets:
+        registry: "{{ global_image_pull_secret.repository }}"
+        username: "{{ global_image_pull_secret.username }}"
+        password: "{{ global_image_pull_secret.password }}"
+
   # MetalLB Chart Configuration
   metallb_chart:
     release_name: "metallb"
@@ -403,7 +544,7 @@ helm_charts:
   # KEDA Chart
   keda_chart:
     release_name: "keda"
-    chart_ref: "keda"
+    chart_ref: "keda/keda"    # Updated path to match actual chart location
     release_namespace: "keda"
     create_namespace: true
     wait: false
@@ -411,9 +552,9 @@ helm_charts:
     force: true
     atomic: false
     skip_diff: true
-    chart_repo_url: "https://kedacore.github.io/charts"
-    chart_version: "2.12.1"
     dependencies: []
+    chart_version: "2.12.1"
+    release_values: {}
 
   # NIM Operator Chart
   nim_operator_chart:
@@ -435,6 +576,56 @@ helm_charts:
 ###############################################################################
 
 manifests:
+
+  # EGS Project Configuration
+  egs_project_manifest:
+    name: "egs-project"
+    manifest_file: "files/egs-project.yaml.j2"
+    namespace: "kubeslice-controller"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 60
+    wait_condition:
+      type: "Available"
+      status: "True"
+    validate: false
+    strict_validation: false
+    dependencies:
+      - kubeslice_controller_egs
+    variables:
+      project_name: "avesha"
+      project_namespace: "kubeslice-controller"
+      admin_user: "admin"
+
+  # EGS Cluster Registration Configuration
+  egs_cluster_registration_worker_1:
+    name: "egs-cluster-registration-worker-1"
+    manifest_file: "files/egs-cluster-registration.yaml.j2"
+    namespace: "kubeslice-avesha"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 60
+    wait_condition:
+      type: "Available"
+      status: "True"
+    validate: false
+    strict_validation: false
+    dependencies:
+      - egs_project_manifest
+    variables:
+      cluster_name: "worker-1"
+      project_name: "avesha"
+      telemetry:
+        enabled: true
+        endpoint: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+        telemetryProvider: "prometheus"
+      geoLocation:
+        cloudProvider: "DATACENTER"
+        cloudRegion: ""
+
+
   # MetalLB IP Pool Configuration
   metallb_ip_pool:
     name: "metallb-ip-pool"
@@ -1414,3 +1605,60 @@ command_exec:
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
             -n nim-load-test create configmap locustfile-70b --from-file="locustfile.py"="files/locust-70b.py"
+
+  - name: "fetch_worker_secret_worker_1"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          # Create output directory if it doesn't exist
+          mkdir -p output
+          
+          # Extract and encode values from the secret to create the values file
+          echo "Generating worker values file..."
+          echo "controllerSecret:" > output/worker-1-values.yaml
+          
+          # Extract namespace
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            get secret kubeslice-rbac-worker-worker-1 -n kubeslice-avesha -o jsonpath='{.data.namespace}' | \
+            echo "  namespace: $(cat -)" >> output/worker-1-values.yaml
+          
+          # Extract endpoint
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            get secret kubeslice-rbac-worker-worker-1 -n kubeslice-avesha -o jsonpath='{.data.controllerEndpoint}' | \
+            echo "  endpoint: $(cat -)" >> output/worker-1-values.yaml
+          
+          # Extract ca.crt
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            get secret kubeslice-rbac-worker-worker-1 -n kubeslice-avesha -o jsonpath='{.data.ca\.crt}' | \
+            echo "  ca.crt: $(cat -)" >> output/worker-1-values.yaml
+          
+          # Extract token
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            get secret kubeslice-rbac-worker-worker-1 -n kubeslice-avesha -o jsonpath='{.data.token}' | \
+            echo "  token: $(cat -)" >> output/worker-1-values.yaml
+          
+          echo "" >> output/worker-1-values.yaml
+          echo "egsAgent:" >> output/worker-1-values.yaml
+          echo "  secretName: egs-agent-access" >> output/worker-1-values.yaml
+          echo "  agentSecret:" >> output/worker-1-values.yaml
+          
+          # Get UI proxy service endpoint
+          UI_PROXY_PORT=$(kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            get svc kubeslice-ui-proxy -n kubeslice-controller -o jsonpath='{.spec.ports[0].port}')
+          
+          echo "    endpoint: http://kubeslice-ui-proxy.kubeslice-controller.svc.cluster.local:${UI_PROXY_PORT}" >> output/worker-1-values.yaml
+          
+          # Get and decode the admin token
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            get secret kubeslice-rbac-rw-admin -n kubeslice-avesha -o jsonpath='{.data.token}' | \
+            base64 -d | \
+            echo "    key: $(cat -)" >> output/worker-1-values.yaml
+          
+          echo "Worker values file generated at output/worker-1-values.yaml"

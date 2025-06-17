@@ -41,6 +41,18 @@
         msg: "Kubernetes deployment is disabled in user_input.yml. Skipping all tasks."
       when: not kubernetes_deployment.enabled | default(false)
 
+    - name: Validate prerequisites
+      include_tasks: "tasks/common_prerequisites.yml"
+      when: 
+        - kubernetes_deployment.enabled | default(false)
+        - not (skip_prerequisites | default(false) | bool)
+
+    - name: Validate Kubernetes-specific prerequisites
+      include_tasks: "tasks/kubernetes_prerequisites.yml"
+      when: 
+        - kubernetes_deployment.enabled | default(false)
+        - not (skip_prerequisites | default(false) | bool)
+
     - name: Ensure inventory directory exists
       file:
         path: "{{ inventory_dir }}"
