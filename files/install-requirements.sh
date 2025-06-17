@@ -22,12 +22,18 @@ VENV_BIN="$VIRTUAL_ENV/bin"
 cat > "$VENV_BIN/ansible" << 'EOF'
 #!/bin/bash
 VIRTUAL_ENV_DISABLE_PROMPT=1 source "$(dirname "$0")/activate"
+# Set locale variables to prevent locale errors
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
 python -m ansible.cli.adhoc "$@"
 EOF
 
 cat > "$VENV_BIN/ansible-playbook" << 'EOF'
 #!/bin/bash
 VIRTUAL_ENV_DISABLE_PROMPT=1 source "$(dirname "$0")/activate"
+# Set locale variables to prevent locale errors
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
 python -m ansible.cli.playbook "$@"
 EOF
 
@@ -38,6 +44,10 @@ chmod +x "$VENV_BIN/ansible" "$VENV_BIN/ansible-playbook"
 if [[ ":$PATH:" != *":$VIRTUAL_ENV/bin:"* ]]; then
     export PATH="$VIRTUAL_ENV/bin:$PATH"
 fi
+
+# Set locale variables for the current session
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
 
 # Verify ansible installation
 echo "Verifying Ansible installation..."
