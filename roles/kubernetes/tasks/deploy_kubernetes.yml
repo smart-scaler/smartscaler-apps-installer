@@ -167,12 +167,32 @@
     state: absent
   when: kubernetes_deployment.enabled | default(false)
 
+- name: Check Kubespray deployment status
+  fail:
+    msg: "Kubespray deployment failed. Please check the logs for more details."
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result.rc is defined and kubespray_result.rc != 0
+
+- name: Wait for kubeconfig file to be created on first control plane node
+  wait_for:
+    path: "/etc/kubernetes/admin.conf"
+    state: present
+    timeout: 300
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result.rc is defined and kubespray_result.rc == 0
+  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+  become: true
+
 - name: Create output directory
   file:
     path: "{{ playbook_dir }}/output"
     state: directory
     mode: '0755'
-  when: kubernetes_deployment.enabled | default(false)
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result.rc is defined and kubespray_result.rc == 0
   delegate_to: localhost
 
 - name: Check if control node is same as master node
@@ -180,7 +200,9 @@
     path: "/etc/kubernetes/admin.conf"
   register: local_kubeconfig
   delegate_to: localhost
-  when: kubernetes_deployment.enabled | default(false)
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result.rc is defined and kubespray_result.rc == 0
 
 - name: Copy kubeconfig locally if control node is master
   copy:
@@ -191,6 +213,7 @@
   become: true
   when: 
     - kubernetes_deployment.enabled | default(false)
+    - kubespray_result.rc is defined and kubespray_result.rc == 0
     - local_kubeconfig.stat.exists | default(false)
   delegate_to: localhost
 
@@ -203,21 +226,43 @@
   become: true
   when: 
     - kubernetes_deployment.enabled | default(false)
+    - kubespray_result.rc is defined and kubespray_result.rc == 0
     - local_kubeconfig.stat.exists | default(false)
   delegate_to: localhost
+
+- name: Ensure readable permissions on kubeconfig for fetch
+  file:
+    path: "/etc/kubernetes/admin.conf"
+    mode: '0644'
+  become: true
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result.rc is defined and kubespray_result.rc == 0
+  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
 
 - name: Fetch kubeconfig from remote if control node is different
   fetch:
     src: "/etc/kubernetes/admin.conf"
     dest: "{{ playbook_dir }}/output/kubeconfig"
     flat: yes
+  become: true
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubespray_result.rc is defined and kubespray_result.rc == 0
+    - not local_kubeconfig.stat.exists | default(true)
+  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
+
+- name: Restore secure permissions on remote kubeconfig
+  file:
+    path: "/etc/kubernetes/admin.conf"
     mode: '0600'
   become: true
   when: 
     - kubernetes_deployment.enabled | default(false)
-    - not local_kubeconfig.stat.exists | default(true)
+    - kubespray_result.rc is defined and kubespray_result.rc == 0
+  delegate_to: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
 
-- name: Fix kubeconfig ownership for fetched file
+- name: Fix kubeconfig ownership and permissions locally
   file:
     path: "{{ playbook_dir }}/output/kubeconfig"
     owner: "{{ ansible_user_id }}"
@@ -226,7 +271,7 @@
   become: true
   when: 
     - kubernetes_deployment.enabled | default(false)
-    - not local_kubeconfig.stat.exists | default(true)
+    - kubespray_result.rc is defined and kubespray_result.rc == 0
   delegate_to: localhost
 
 - name: Set global kubeconfig path
