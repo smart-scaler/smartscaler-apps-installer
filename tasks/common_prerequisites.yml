@@ -7,19 +7,22 @@
   become: false
 
 - name: Check Python version
-  shell: |
-    python3 -c "import sys; print('.'.join(map(str, sys.version_info[:3])))"
-  args:
-    executable: /bin/bash
-  register: python_version
+  command: python3 --version
+  register: python_version_raw
   changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Set Python version
+  set_fact:
+    python_version: "{{ python_version_raw.stdout.split()[1] }}"
   delegate_to: localhost
   become: false
 
 - name: Fail if Python version is too low
   fail:
-    msg: "Python version must be 3.10 or higher. Current version: {{ python_version.stdout }}"
-  when: python_version.stdout is version('3.10', '<')
+    msg: "Python version must be 3.10 or higher. Current version: {{ python_version }}"
+  when: python_version is version('3.10', '<')
   delegate_to: localhost
   become: false
 
