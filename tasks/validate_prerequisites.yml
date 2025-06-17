@@ -8,6 +8,7 @@
       failed_when: python_version.stdout is version('3.10', '<')
       changed_when: false
       delegate_to: localhost
+      become: false
 
     - name: Check Ansible version
       shell: "ansible --version | grep -oP 'ansible \\[core\\s+\\K[0-9]+\\.[0-9]+(\\.[0-9]+)?'"
@@ -53,6 +54,8 @@
           - helm (Current: {{ helm_version.stdout | default('not installed') }})
           {% endif %}
       delegate_to: localhost
+  become: false
+  delegate_to: localhost
 
 - name: Read Python requirements file
   slurp:
