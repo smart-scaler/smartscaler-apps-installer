@@ -284,11 +284,23 @@
         - global_kubeconfig is defined
         - not kubeconfig_stat.stat.exists
 
+    - name: Ensure output directory exists with proper permissions
+      file:
+        path: "{{ playbook_dir }}/output"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+      delegate_to: localhost
+
     - name: Get cluster info
       kubernetes.core.k8s_cluster_info:
         kubeconfig: "{{ global_kubeconfig }}"
         context: "{{ global_kubecontext | default(omit) }}"
       register: k8s_cluster_info
+      become: false
+      environment:
+        KUBECONFIG: "{{ global_kubeconfig }}"
 
     - name: Debug cluster info
       debug:
