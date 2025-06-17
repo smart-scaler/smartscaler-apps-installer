@@ -229,7 +229,7 @@ You can quickly replace the placeholder values in your `user_input.yml` configur
 ```bash
 sed -i \
    -e '/kubernetes_deployment:/,/^[^ ]/ s/enabled: true/enabled: false/' \
-  path/to/your/user_input.yml
+  user_input.yml
 ```
 ---
 
