@@ -28,9 +28,13 @@ kubernetes_deployment:
   default_ansible_user: "REPLACE_SSH_USER"         # Default SSH user for all nodes
                                            # Common values: ubuntu (Ubuntu), ec2-user (AWS)
   # Ansible Sudo Password Configuration
-  # Optional: Can be set here, via ANSIBLE_SUDO_PASS environment variable,
-  # or will prompt if neither is set
-  ansible_sudo_pass: ""  # Leave empty to use environment variable or prompt
+  # Required only if sudo on target nodes needs a password
+  # Can be configured in three ways (in order of precedence):
+  # 1. Set directly here as ansible_sudo_pass
+  # 2. Set via ANSIBLE_BECOME_PASS environment variable
+  # 3. Leave empty if using passwordless sudo
+  # Note: For security in production, prefer using environment variable over setting it here
+  ansible_sudo_pass: "{{ lookup('env', 'ANSIBLE_BECOME_PASS') | default('') }}"  # Use environment variable for sudo password
 
   # Control Plane Node Configuration
   # Defines the master nodes that will run the Kubernetes control plane
