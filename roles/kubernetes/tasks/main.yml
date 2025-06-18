@@ -59,22 +59,22 @@
     mode: '0755'
   when: kubernetes_deployment.enabled | default(false)
 
-- name: Copy Kubespray sample inventory directory
-  synchronize:
-    src: "{{ kubespray_dir }}/inventory/sample/"
-    dest: "{{ inventory_dir }}/kubespray"
-    delete: no
-    recursive: yes
-  when: kubernetes_deployment.enabled | default(false)
+# - name: Copy Kubespray sample inventory directory
+#   synchronize:
+#     src: "{{ kubespray_dir }}/inventory/sample/"
+#     dest: "{{ inventory_dir }}/kubespray"
+#     delete: no
+#     recursive: yes
+#   when: kubernetes_deployment.enabled | default(false)
 
-- name: Generate Kubespray inventory
-  template:
-    src: inventory.ini.j2
-    dest: "{{ inventory_dir }}/kubespray/inventory.ini"
-  vars:
-    k8s_masters: "{{ kubernetes_deployment.control_plane_nodes | default([]) }}"
-    k8s_workers: "{{ kubernetes_deployment.worker_nodes | default([]) }}"
-  when: kubernetes_deployment.enabled | default(false)
+# - name: Generate Kubespray inventory
+#   template:
+#     src: inventory.ini.j2
+#     dest: "{{ inventory_dir }}/kubespray/inventory.ini"
+#   vars:
+#     k8s_masters: "{{ kubernetes_deployment.control_plane_nodes | default([]) }}"
+#     k8s_workers: "{{ kubernetes_deployment.worker_nodes | default([]) }}"
+#   when: kubernetes_deployment.enabled | default(false)
 
 - name: Ensure group_vars directory exists
   file:

@@ -133,15 +133,12 @@
     -e "kube_apiserver_bind_address={{ first_control_plane_ip }}" \
     -e "kube_apiserver_advertise_address={{ first_control_plane_ip }}" \
     -e "kubernetes_deployment={{ kubernetes_deployment }}" \
-    --become \
-    --become-method={{ kubespray_become_method }} \
-    --become-user={{ kubespray_become_user }} \
     -e ansible_ssh_private_key_file={{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} \
     -e ansible_user={{ kubernetes_deployment.default_ansible_user | default("root") }} \
-    -e ansible_become_pass="" \
+    -e ansible_become_pass="{{ kubernetes_deployment.ansible_sudo_pass }}" \
     -e "ANSIBLE_TIMEOUT={{ kubespray_async_timeout }}" \
     -e "ANSIBLE_INTERNAL_POLL_INTERVAL={{ kubespray_poll_interval }}" \
-    --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+    --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 -o ServerAliveCountMax=10" \
     -vvvv'
   args:
     executable: /bin/bash
@@ -210,7 +207,7 @@
 
 - name: Check kubeconfig with direct SSH command
   shell: |
-    ssh -i {{ kubernetes_deployment.ssh_key_path }} -o StrictHostKeyChecking=no {{ kubernetes_deployment.default_ansible_user }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }} "sudo test -f /etc/kubernetes/admin.conf && echo 'exists' || echo 'not found'"
+    ssh -i {{ kubernetes_deployment.ssh_key_path }} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 {{ kubernetes_deployment.default_ansible_user }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }} "sudo test -f /etc/kubernetes/admin.conf && echo 'exists' || echo 'not found'"
   register: kubeconfig_check
   delegate_to: localhost
   when: 
@@ -229,7 +226,7 @@
 - name: Copy kubeconfig from remote host
   shell: |
     mkdir -p {{ playbook_dir }}/output
-    ssh -i {{ kubernetes_deployment.ssh_key_path }} -o StrictHostKeyChecking=no {{ kubernetes_deployment.default_ansible_user }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }} "sudo cat /etc/kubernetes/admin.conf" > {{ playbook_dir }}/output/kubeconfig
+    ssh -i {{ kubernetes_deployment.ssh_key_path }} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 {{ kubernetes_deployment.default_ansible_user }}@{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }} "sudo cat /etc/kubernetes/admin.conf" > {{ playbook_dir }}/output/kubeconfig
     chmod 600 {{ playbook_dir }}/output/kubeconfig
     chown {{ ansible_user_id }}:{{ ansible_user_id }} {{ playbook_dir }}/output/kubeconfig
   delegate_to: localhost
