@@ -122,29 +122,74 @@ kubernetes_deployment:
 
 The installer supports three ways to handle sudo passwords for node access:
 
-1. **Passwordless Sudo (Recommended for Production)**
-   - Configure nodes to allow sudo without password
-   - Leave `ansible_sudo_pass` empty in `user_input.yml`
-   - Most secure option for production environments
+1. **Environment Variable (Recommended)**
+   ```bash
+   # Set before running setup_kubernetes.sh
+   export ANSIBLE_BECOME_PASS="your_sudo_password"
+   ```
+   - Most secure option for development and testing
+   - Password not stored in files
+   - Automatically picked up by the installer
+   - Clears when terminal session ends
 
-2. **Environment Variable (Recommended for Development)**
-   - Set password via environment variable:
+2. **Passwordless Sudo (Production Recommended)**
+   ```bash
+   # On each target node, add to /etc/sudoers.d/k8s-setup
+   your_user ALL=(ALL) NOPASSWD: ALL
+   ```
+   - Best for production environments
+   - No password management needed
+   - Most secure for automated deployments
+   - Requires initial sudo setup on nodes
+
+3. **Configuration File (Not Recommended)**
+   ```yaml
+   # In user_input.yml
+   ansible_sudo_pass: "your_sudo_password"
+   ```
+   - Only for quick testing
+   - Not secure for production
+   - Password stored in plain text
+   - Risk of accidental commits
+
+#### 🔍 Troubleshooting Sudo Issues
+
+If you encounter sudo-related errors:
+
+1. **Terminal Required Error**
+   ```
+   sudo: a terminal is required to read the password
+   ```
+   - Use environment variable method
+   - Check SSH key permissions (should be 600)
+   - Verify target user has sudo rights
+
+2. **Password Prompt Loops**
+   ```
+   BECOME password: BECOME password: BECOME password:
+   ```
+   - Clear any existing SSH multiplexing:
      ```bash
-     export ANSIBLE_SUDO_PASS="your_sudo_password"
+     rm -f /tmp/ansible-ssh-*
      ```
-   - Leave `ansible_sudo_pass` empty in `user_input.yml`
-   - Good balance of security and convenience
-
-3. **Configuration File (Quick Setup)**
-   - Set password directly in `user_input.yml`:
-     ```yaml
-     ansible_sudo_pass: "your_sudo_password"
+   - Try without SSH pipelining:
+     ```bash
+     export ANSIBLE_SSH_PIPELINING=False
      ```
-   - Least secure option, best for testing
-   - Not recommended for production use
 
-> ⚠️ **Security Note:**
-> For production environments, always prefer passwordless sudo or environment variables over storing passwords in configuration files.
+3. **Authentication Failure**
+   ```
+   FAILED! => {"msg": "Incorrect sudo password"}
+   ```
+   - Verify password is correct
+   - Check sudo privileges on target
+   - Try running a test sudo command directly
+
+> ⚠️ **Security Best Practices:**
+> - Never commit files containing passwords
+> - Use environment variables in CI/CD
+> - Regularly rotate sudo passwords
+> - Audit sudo access periodically
 
 #### ⚙️ For Single Node: Quick Configuration Update (Command-Line Shortcut)
 
