@@ -168,7 +168,6 @@
     {% endif %}
     -e "ANSIBLE_TIMEOUT={{ kubespray_async_timeout }}" \
     -e "ANSIBLE_INTERNAL_POLL_INTERVAL={{ kubespray_poll_interval }}" \
-    -K \
     -vvvv'
   args:
     executable: /bin/bash
@@ -183,6 +182,7 @@
     ANSIBLE_TIMEOUT: "{{ kubespray_async_timeout }}"
     ANSIBLE_INTERNAL_POLL_INTERVAL: "{{ kubespray_poll_interval }}"
     ANSIBLE_SSH_PIPELINING: "False"
+    ANSIBLE_BECOME_ASK_PASS: "False"  # Never prompt for password
   register: kubespray_result
   async: "{{ kubernetes_deployment.async_config.timeout | default(3600) }}"
   poll: "{{ kubernetes_deployment.async_config.poll_interval | default(5) }}"
