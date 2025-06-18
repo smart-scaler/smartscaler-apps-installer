@@ -162,13 +162,13 @@
     -e "supplementary_addresses_in_ssl_keys=[\\\"{{ kubernetes_deployment.api_server.host }}\\\"] + {{ control_plane_ips | to_json }} + {{ worker_node_ips | to_json }}" \
     -e "kube_apiserver_bind_address={{ first_control_plane_ip }}" \
     -e "kube_apiserver_advertise_address={{ first_control_plane_ip }}" \
-    -e "kubernetes_deployment={{ kubernetes_deployment | combine({'ansible_sudo_pass': lookup('env', 'ANSIBLE_BECOME_PASS') | default('')}) | to_json | quote }}" \
+    -e "kubernetes_deployment={{ kubernetes_deployment | combine({'ansible_sudo_pass': ''}) | to_json | quote }}" \
     -e ansible_ssh_private_key_file={{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} \
     -e ansible_user={{ kubernetes_deployment.default_ansible_user | default("root") }} \
     -e ansible_become=true \
     -e ansible_become_method=sudo \
     {% if sudo_pass | length > 0 %}
-    -e ansible_become_pass="{{ sudo_pass }}" \
+    -e "ansible_become_pass={{ sudo_pass | quote }}" \
     {% endif %}
     -e "ANSIBLE_TIMEOUT={{ kubespray_async_timeout }}" \
     -e "ANSIBLE_INTERNAL_POLL_INTERVAL={{ kubespray_poll_interval }}" \
@@ -191,6 +191,11 @@
   async: "{{ kubernetes_deployment.async_config.timeout | default(3600) }}"
   poll: "{{ kubernetes_deployment.async_config.poll_interval | default(5) }}"
   ignore_errors: true
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Debug - Show Kubespray command
+  debug:
+    msg: "Command that will be executed:\n{{ kubespray_result.cmd | default('Command not available') }}"
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Display warning if async timeout occurred
