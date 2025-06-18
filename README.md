@@ -105,7 +105,6 @@ kubernetes_deployment:
 
   ssh_key_path: "/absolute/path/to/.ssh/k8s_rsa"     # SSH private key path
   default_ansible_user: "REPLACE_SSH_USER"           # SSH user (e.g., ubuntu, ec2-user)
-  ansible_sudo_pass: ""                              # Optional: sudo password
 
   control_plane_nodes:
     - name: "master-1"
