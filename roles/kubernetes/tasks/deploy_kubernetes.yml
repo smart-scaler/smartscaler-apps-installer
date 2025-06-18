@@ -33,6 +33,29 @@
       port: "{{ kubernetes_deployment.api_server.port }}"
   when: kubernetes_deployment.enabled | default(false)
 
+- name: Check sudo password requirement
+  command: sudo -n true
+  register: sudo_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Set sudo configuration facts
+  set_fact:
+    needs_sudo_pass: "{{ sudo_check.rc != 0 }}"
+    sudo_pass: "{{ lookup('env', 'ANSIBLE_BECOME_PASS') | default(kubernetes_deployment.ansible_sudo_pass | default('')) }}"
+
+- name: Fail if sudo password is required but not provided
+  fail:
+    msg: |
+      Sudo password is required but not provided. Please either:
+      1. Configure passwordless sudo on target nodes
+      2. Set ANSIBLE_BECOME_PASS environment variable
+      3. Set ansible_sudo_pass in user_input.yml
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - needs_sudo_pass | bool
+    - not sudo_pass
+
 - name: Generate inventory content
   template:
     src: "{{ playbook_dir }}/templates/inventory.ini.j2"
@@ -43,6 +66,7 @@
     ssh_key_path: "{{ kubernetes_deployment.ssh_key_path | default('~/.ssh/k8s_rsa') }}"
     default_ansible_user: "{{ kubernetes_deployment.default_ansible_user | default('root') }}"
     kube_apiserver_ip: "{{ kubernetes_deployment.api_server.host }}"
+    ansible_become_pass: "{{ sudo_pass if needs_sudo_pass else omit }}"
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Show generated inventory file contents
@@ -139,6 +163,9 @@
     -e ansible_user={{ kubernetes_deployment.default_ansible_user | default("root") }} \
     -e ansible_become=true \
     -e ansible_become_method=sudo \
+    {% if needs_sudo_pass %}
+    -e ansible_become_pass="{{ sudo_pass }}" \
+    {% endif %}
     -e "ANSIBLE_TIMEOUT={{ kubespray_async_timeout }}" \
     -e "ANSIBLE_INTERNAL_POLL_INTERVAL={{ kubespray_poll_interval }}" \
     -vvvv'
@@ -155,6 +182,7 @@
     ANSIBLE_TIMEOUT: "{{ kubespray_async_timeout }}"
     ANSIBLE_INTERNAL_POLL_INTERVAL: "{{ kubespray_poll_interval }}"
     ANSIBLE_SSH_PIPELINING: "False"
+    ANSIBLE_BECOME_ASK_PASS: "False"  # Never prompt, use provided password or fail
   register: kubespray_result
   async: "{{ kubernetes_deployment.async_config.timeout | default(3600) }}"
   poll: "{{ kubernetes_deployment.async_config.poll_interval | default(5) }}"
