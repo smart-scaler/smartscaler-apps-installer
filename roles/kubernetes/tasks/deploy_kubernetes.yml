@@ -139,12 +139,8 @@
     -e ansible_user={{ kubernetes_deployment.default_ansible_user | default("root") }} \
     -e ansible_become=true \
     -e ansible_become_method=sudo \
-    {% if kubernetes_deployment.ansible_sudo_pass | default('') %}
-    -e ansible_become_pass="{{ kubernetes_deployment.ansible_sudo_pass }}" \
-    {% endif %}
     -e "ANSIBLE_TIMEOUT={{ kubespray_async_timeout }}" \
     -e "ANSIBLE_INTERNAL_POLL_INTERVAL={{ kubespray_poll_interval }}" \
-    -K \
     -vvvv'
   args:
     executable: /bin/bash
