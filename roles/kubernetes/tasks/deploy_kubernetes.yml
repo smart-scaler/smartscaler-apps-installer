@@ -135,7 +135,9 @@
     -e "kubernetes_deployment={{ kubernetes_deployment }}" \
     -e ansible_ssh_private_key_file={{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} \
     -e ansible_user={{ kubernetes_deployment.default_ansible_user | default("root") }} \
+    {% if kubernetes_deployment.ansible_sudo_pass | default('') %}
     -e ansible_become_pass="{{ kubernetes_deployment.ansible_sudo_pass }}" \
+    {% endif %}
     -e "ANSIBLE_TIMEOUT={{ kubespray_async_timeout }}" \
     -e "ANSIBLE_INTERNAL_POLL_INTERVAL={{ kubespray_poll_interval }}" \
     --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 -o ServerAliveCountMax=10" \

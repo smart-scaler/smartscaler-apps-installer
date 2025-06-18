@@ -118,6 +118,34 @@ kubernetes_deployment:
 
 ```
 
+#### 🔐 Sudo Password Configuration
+
+The installer supports three ways to handle sudo passwords for node access:
+
+1. **Passwordless Sudo (Recommended for Production)**
+   - Configure nodes to allow sudo without password
+   - Leave `ansible_sudo_pass` empty in `user_input.yml`
+   - Most secure option for production environments
+
+2. **Environment Variable (Recommended for Development)**
+   - Set password via environment variable:
+     ```bash
+     export ANSIBLE_SUDO_PASS="your_sudo_password"
+     ```
+   - Leave `ansible_sudo_pass` empty in `user_input.yml`
+   - Good balance of security and convenience
+
+3. **Configuration File (Quick Setup)**
+   - Set password directly in `user_input.yml`:
+     ```yaml
+     ansible_sudo_pass: "your_sudo_password"
+     ```
+   - Least secure option, best for testing
+   - Not recommended for production use
+
+> ⚠️ **Security Note:**
+> For production environments, always prefer passwordless sudo or environment variables over storing passwords in configuration files.
+
 #### ⚙️ For Single Node: Quick Configuration Update (Command-Line Shortcut)
 
 You can quickly update your `user_input.yml` by replacing only the **values** in this command based on your environment.
@@ -324,7 +352,7 @@ locust-load-54748fd47d-tndsr   1/1     Running   0          97m
 
 ### Step 4: Accessing Prometheus & Grafana via NodePort
 
-After deploying the application stack, Prometheus and Grafana can be accessed through the exposed NodePort services using your node’s IP address.
+After deploying the application stack, Prometheus and Grafana can be accessed through the exposed NodePort services using your node's IP address.
 
 ### 🧾 Check Service Ports
 
