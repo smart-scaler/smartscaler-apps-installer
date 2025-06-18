@@ -41,8 +41,13 @@
 
 - name: Set sudo configuration facts
   set_fact:
-    needs_sudo_pass: "{{ sudo_check.rc != 0 }}"
-    sudo_pass: "{{ lookup('env', 'ANSIBLE_BECOME_PASS') | default(kubernetes_deployment.ansible_sudo_pass | default('')) }}"
+    sudo_pass: "{{ lookup('env', 'ANSIBLE_BECOME_PASS') | default(lookup('env', 'ANSIBLE_SUDO_PASS'), true) | default(kubernetes_deployment.ansible_sudo_pass, true) | default('') }}"
+
+- name: Display sudo configuration
+  debug:
+    msg: |
+      Sudo configuration:
+      - Using sudo password: {{ 'Yes' if sudo_pass | length > 0 else 'No (using passwordless sudo)' }}
 
 - name: Fail if sudo password is required but not provided
   fail:
@@ -53,7 +58,6 @@
       3. Set ansible_sudo_pass in user_input.yml
   when: 
     - kubernetes_deployment.enabled | default(false)
-    - needs_sudo_pass | bool
     - not sudo_pass
 
 - name: Generate inventory content
@@ -66,7 +70,7 @@
     ssh_key_path: "{{ kubernetes_deployment.ssh_key_path | default('~/.ssh/k8s_rsa') }}"
     default_ansible_user: "{{ kubernetes_deployment.default_ansible_user | default('root') }}"
     kube_apiserver_ip: "{{ kubernetes_deployment.api_server.host }}"
-    ansible_become_pass: "{{ sudo_pass if needs_sudo_pass else omit }}"
+    ansible_become_pass: "{{ sudo_pass if sudo_pass | length > 0 else omit }}"
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Show generated inventory file contents
@@ -163,8 +167,8 @@
     -e ansible_user={{ kubernetes_deployment.default_ansible_user | default("root") }} \
     -e ansible_become=true \
     -e ansible_become_method=sudo \
-    {% if kubernetes_deployment.ansible_sudo_pass | default('') %}
-    -e ansible_become_pass="{{ kubernetes_deployment.ansible_sudo_pass }}" \
+    {% if sudo_pass | length > 0 %}
+    -e ansible_become_pass="{{ sudo_pass }}" \
     {% endif %}
     -e "ANSIBLE_TIMEOUT={{ kubespray_async_timeout }}" \
     -e "ANSIBLE_INTERNAL_POLL_INTERVAL={{ kubespray_poll_interval }}" \

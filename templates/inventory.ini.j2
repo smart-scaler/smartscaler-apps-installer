@@ -14,7 +14,7 @@ ansible_ssh_extra_args="-o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o
 ansible_become=true
 ansible_become_method=sudo
 ansible_become_user=root
-{% if ansible_become_pass %}
+{% if ansible_become_pass and ansible_become_pass | length > 0 %}
 ansible_become_pass={{ ansible_become_pass | replace('"', '\\"') }}
 {% endif %}
 
