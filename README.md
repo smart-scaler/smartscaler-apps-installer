@@ -53,7 +53,7 @@ Ansible-based installer for Smart Scaler components and Kubernetes cluster deplo
 
 ## 2. Installation Steps for Deploying K8s Cluster
 
-### Step 1: Clone Repository and Setup Environment
+### Step 2.1: Clone Repository and Setup Environment
 
 ```bash
 # Clone the repository
@@ -76,7 +76,7 @@ chmod +x files/install-requirements.sh
 LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ansible-galaxy collection install -r requirements.yml --force
 ```
 
-### Step 2: Generate SSH Keys
+### Step 2.2: Generate SSH Keys
 
 ```bash
 # Generate SSH key for cluster access
@@ -86,7 +86,7 @@ ssh-keygen -t rsa -b 4096 -f ~/.ssh/k8s_rsa -N ""
 ssh-copy-id -i ~/.ssh/k8s_rsa.pub user@node-ip
 ```
 
-### Step 3: Configure user_input.yml
+### Step 2.3: Configure user_input.yml
 
 Edit `user_input.yml` with your cluster configuration:
 
@@ -151,7 +151,7 @@ If you're deploying on a **single node** and running the command from the **same
 
 ---
 
-### Step 4: Deploy Kubernetes Cluster
+### Step 2.4: Deploy Kubernetes Cluster
 
 ```bash
 # Make the script executable
@@ -161,7 +161,7 @@ chmod +x setup_kubernetes.sh
  ./setup_kubernetes.sh
 ```
 
-### Step 5 Change ownership of the smartscaler working directory
+### Step 2.5 Change ownership of the smartscaler working directory
 
 ```bash
 sudo chown $(whoami):$(whoami) -R .
@@ -173,7 +173,7 @@ export KUBECONFIG=output/kubeconfig
 kubectl get nodes
 ```
 
-### Step 6: Verify Installation
+### Step 2.6: Verify Installation
 
 ```bash
 # Check cluster status
@@ -235,7 +235,7 @@ sed -i \
 
 ## 4. Instructions to Deploy SmartScaler Apps
 
-### Step 1: Verify Prerequisites
+### Step 4.1: Verify Prerequisites
 
 ```bash
 # Verify cluster access
@@ -253,7 +253,7 @@ echo $AVESHA_DOCKER_USERNAME
 echo $AVESHA_DOCKER_PASSWORD
 ```
 
-### Step 2: Deploy Applications
+### Step 4.2: Deploy Applications
 
 ```bash
 # Deploy with explicit credentials
@@ -265,7 +265,7 @@ echo $AVESHA_DOCKER_PASSWORD
   -vvvv
 ```
 
-### Step 3: Verify Deployment
+### Step 4.3: Verify Deployment
 
 ```bash
 # Check all namespaces
@@ -322,7 +322,7 @@ smart-scaler-llm-inf-5f4bf754dd-6qbm9   1/1     Running   0          98m
 locust-load-54748fd47d-tndsr   1/1     Running   0          97m
 ```
 
-### Step 4: Accessing Prometheus & Grafana via NodePort
+### Step 4.4: Accessing Prometheus & Grafana via NodePort
 
 After deploying the application stack, Prometheus and Grafana can be accessed through the exposed NodePort services using your node’s IP address.
 
