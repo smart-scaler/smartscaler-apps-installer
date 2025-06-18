@@ -118,6 +118,39 @@ kubernetes_deployment:
 
 ```
 
+
+
+#### ⚙️ For Single Node: Quick Configuration Update (Command-Line Shortcut)
+
+You can quickly update your `user_input.yml` by replacing only the **values** in this command based on your environment.
+**Keep the placeholder keywords (`PUBLIC_IP`, `PRIVATE_IP`, etc.) on the left side exactly as-is.**
+
+> ⚠️ **Warning:**
+> Replace **only** the values on the right-hand side (`192.168.1.100`, `root`, etc.) with your actual environment details.
+> **Do not modify** the placeholder keywords (`PUBLIC_IP`, `PRIVATE_IP`, etc.) — they are required for matching.
+
+#### 🧪 Example Command
+
+```bash
+sed -i \
+  -e 's|PUBLIC_IP|192.168.1.100|g' \
+  -e 's|PRIVATE_IP|192.168.1.100|g' \
+  -e 's|REPLACE_SSH_USER|root|g' \
+  -e 's|/absolute/path/to/.ssh/k8s_rsa|/root/.ssh/k8s_rsa|g' \
+  -e '/kubernetes_deployment:/,/^[^ ]/ s/enabled: false/enabled: true/' \
+  user_input.yml
+```
+
+> ✅ This command will:
+>
+> * Replace `PUBLIC_IP` and `PRIVATE_IP` placeholders with your node IP
+> * Set the correct SSH user and key path
+> * Enable Kubernetes deployment by updating `enabled: false` → `enabled: true`
+
+#### 📌 Note:
+
+If you're deploying on a **single node** and running the command from the **same server**, you can use the **same IP address** for both `PUBLIC_IP` and `PRIVATE_IP`.
+
 #### 🔐 Sudo Password Configuration
 
 The installer supports three ways to handle sudo passwords for node access:
@@ -152,75 +185,6 @@ The installer supports three ways to handle sudo passwords for node access:
    - Password stored in plain text
    - Risk of accidental commits
 
-#### 🔍 Troubleshooting Sudo Issues
-
-If you encounter sudo-related errors:
-
-1. **Terminal Required Error**
-   ```
-   sudo: a terminal is required to read the password
-   ```
-   - Use environment variable method
-   - Check SSH key permissions (should be 600)
-   - Verify target user has sudo rights
-
-2. **Password Prompt Loops**
-   ```
-   BECOME password: BECOME password: BECOME password:
-   ```
-   - Clear any existing SSH multiplexing:
-     ```bash
-     rm -f /tmp/ansible-ssh-*
-     ```
-   - Try without SSH pipelining:
-     ```bash
-     export ANSIBLE_SSH_PIPELINING=False
-     ```
-
-3. **Authentication Failure**
-   ```
-   FAILED! => {"msg": "Incorrect sudo password"}
-   ```
-   - Verify password is correct
-   - Check sudo privileges on target
-   - Try running a test sudo command directly
-
-> ⚠️ **Security Best Practices:**
-> - Never commit files containing passwords
-> - Use environment variables in CI/CD
-> - Regularly rotate sudo passwords
-> - Audit sudo access periodically
-
-#### ⚙️ For Single Node: Quick Configuration Update (Command-Line Shortcut)
-
-You can quickly update your `user_input.yml` by replacing only the **values** in this command based on your environment.
-**Keep the placeholder keywords (`PUBLIC_IP`, `PRIVATE_IP`, etc.) on the left side exactly as-is.**
-
-> ⚠️ **Warning:**
-> Replace **only** the values on the right-hand side (`192.168.1.100`, `root`, etc.) with your actual environment details.
-> **Do not modify** the placeholder keywords (`PUBLIC_IP`, `PRIVATE_IP`, etc.) — they are required for matching.
-
-#### 🧪 Example Command
-
-```bash
-sed -i \
-  -e 's|PUBLIC_IP|192.168.1.100|g' \
-  -e 's|PRIVATE_IP|192.168.1.100|g' \
-  -e 's|REPLACE_SSH_USER|root|g' \
-  -e 's|/absolute/path/to/.ssh/k8s_rsa|/root/.ssh/k8s_rsa|g' \
-  -e '/kubernetes_deployment:/,/^[^ ]/ s/enabled: false/enabled: true/' \
-  user_input.yml
-```
-
-> ✅ This command will:
->
-> * Replace `PUBLIC_IP` and `PRIVATE_IP` placeholders with your node IP
-> * Set the correct SSH user and key path
-> * Enable Kubernetes deployment by updating `enabled: false` → `enabled: true`
-
-#### 📌 Note:
-
-If you're deploying on a **single node** and running the command from the **same server**, you can use the **same IP address** for both `PUBLIC_IP` and `PRIVATE_IP`.
 
 ---
 
@@ -483,6 +447,43 @@ Assuming your node IP is `192.168.100.10`:
    - Verify NVIDIA drivers are installed on nodes
    - Check `nvidia_runtime.enabled` is set to `true`
    - Review GPU operator pod status
+
+If you encounter sudo-related errors:
+
+1. **Terminal Required Error**
+   ```
+   sudo: a terminal is required to read the password
+   ```
+   - Use environment variable method
+   - Check SSH key permissions (should be 600)
+   - Verify target user has sudo rights
+
+2. **Password Prompt Loops**
+   ```
+   BECOME password: BECOME password: BECOME password:
+   ```
+   - Clear any existing SSH multiplexing:
+     ```bash
+     rm -f /tmp/ansible-ssh-*
+     ```
+   - Try without SSH pipelining:
+     ```bash
+     export ANSIBLE_SSH_PIPELINING=False
+     ```
+
+3. **Authentication Failure**
+   ```
+   FAILED! => {"msg": "Incorrect sudo password"}
+   ```
+   - Verify password is correct
+   - Check sudo privileges on target
+   - Try running a test sudo command directly
+
+> ⚠️ **Security Best Practices:**
+> - Never commit files containing passwords
+> - Use environment variables in CI/CD
+> - Regularly rotate sudo passwords
+> - Audit sudo access periodically
 
 ### Debug Commands
 
