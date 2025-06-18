@@ -150,32 +150,19 @@
 - name: Run Kubespray cluster deployment
   shell: |
     timeout {{ kubernetes_deployment.async_config.timeout | default(3600) }} bash -c '. {{ venv_path }}/bin/activate && \
-    ANSIBLE_SSH_PIPELINING=False \
-    ANSIBLE_SSH_ARGS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 -o ServerAliveCountMax=10" \
-    {{ venv_path }}/bin/ansible-playbook -i {{ inventory_dir }}/kubespray/inventory.ini \
+    {{ venv_path }}/bin/ansible-playbook \
+    -i {{ inventory_dir }}/kubespray/inventory.ini \
     {{ kubespray_dir }}/cluster.yml \
     -e @{{ inventory_dir }}/kubespray/group_vars/all/all.yml \
     -e @{{ inventory_dir }}/kubespray/group_vars/k8s_cluster/addons.yml \
-    -e "kube_apiserver_ip={{ kubernetes_deployment.api_server.host }}" \
-    -e "loadbalancer_apiserver={address: \\\"{{ kubernetes_deployment.api_server.host }}\\\", port: {{ kubernetes_deployment.api_server.port }}}" \
-    -e "apiserver_loadbalancer_domain_name={{ kubernetes_deployment.api_server.host }}" \
-    -e "supplementary_addresses_in_ssl_keys=[\\\"{{ kubernetes_deployment.api_server.host }}\\\"] + {{ control_plane_ips | to_json }} + {{ worker_node_ips | to_json }}" \
-    -e "kube_apiserver_bind_address={{ first_control_plane_ip }}" \
-    -e "kube_apiserver_advertise_address={{ first_control_plane_ip }}" \
-    -e "kubernetes_deployment={{ kubernetes_deployment | combine({'ansible_sudo_pass': ''}) | to_json | quote }}" \
-    -e ansible_ssh_private_key_file={{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} \
-    -e ansible_user={{ kubernetes_deployment.default_ansible_user | default("root") }} \
-    -e ansible_become=true \
-    -e ansible_become_method=sudo \
-    {% if sudo_pass | length > 0 %}
-    -e "ansible_become_pass={{ sudo_pass | quote }}" \
-    {% endif %}
-    -e "ANSIBLE_TIMEOUT={{ kubespray_async_timeout }}" \
-    -e "ANSIBLE_INTERNAL_POLL_INTERVAL={{ kubespray_poll_interval }}" \
     -vvvv'
   args:
     executable: /bin/bash
   environment:
+    ANSIBLE_SSH_PIPELINING: "False"
+    ANSIBLE_SSH_ARGS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+    ANSIBLE_TIMEOUT: "{{ kubespray_async_timeout }}"
+    ANSIBLE_INTERNAL_POLL_INTERVAL: "{{ kubespray_poll_interval }}"
     ANSIBLE_ASYNC_DIR: "/tmp/.ansible_async"
     ANSIBLE_LOCAL_TEMP: "/tmp/.ansible/tmp"
     ANSIBLE_REMOTE_TEMP: "/tmp/.ansible/tmp"
@@ -183,10 +170,7 @@
     PATH: "{{ system_path }}:{{ venv_path }}/bin"
     VIRTUAL_ENV: "{{ venv_path }}"
     PYTHONPATH: "{{ venv_python_path }}"
-    ANSIBLE_TIMEOUT: "{{ kubespray_async_timeout }}"
-    ANSIBLE_INTERNAL_POLL_INTERVAL: "{{ kubespray_poll_interval }}"
-    ANSIBLE_SSH_PIPELINING: "False"
-    ANSIBLE_BECOME_ASK_PASS: "False"  # Never prompt for password
+    ANSIBLE_BECOME_ASK_PASS: "False"
   register: kubespray_result
   async: "{{ kubernetes_deployment.async_config.timeout | default(3600) }}"
   poll: "{{ kubernetes_deployment.async_config.poll_interval | default(5) }}"
