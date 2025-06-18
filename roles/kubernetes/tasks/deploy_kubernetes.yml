@@ -162,7 +162,7 @@
     -e "supplementary_addresses_in_ssl_keys=[\\\"{{ kubernetes_deployment.api_server.host }}\\\"] + {{ control_plane_ips | to_json }} + {{ worker_node_ips | to_json }}" \
     -e "kube_apiserver_bind_address={{ first_control_plane_ip }}" \
     -e "kube_apiserver_advertise_address={{ first_control_plane_ip }}" \
-    -e "kubernetes_deployment={{ kubernetes_deployment | to_json | quote }}" \
+    -e "kubernetes_deployment={{ kubernetes_deployment | combine({'ansible_sudo_pass': lookup('env', 'ANSIBLE_BECOME_PASS') | default('')}) | to_json | quote }}" \
     -e ansible_ssh_private_key_file={{ kubernetes_deployment.ssh_key_path | expanduser | realpath }} \
     -e ansible_user={{ kubernetes_deployment.default_ansible_user | default("root") }} \
     -e ansible_become=true \
