@@ -8,6 +8,10 @@
   become: true
   become_flags: -H -S
   delegate_to: "{{ current_host.ansible_host }}"
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ current_host.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    ansible_become_pass: "{{ lookup('env', 'ANSIBLE_BECOME_PASS') | default(lookup('env', 'ANSIBLE_SUDO_PASS'), true) | default(kubernetes_deployment.ansible_sudo_pass, true) | default('') }}"
   loop:
     - port: '22'
       proto: tcp

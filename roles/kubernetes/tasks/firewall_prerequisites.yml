@@ -20,7 +20,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
-    ansible_become_pass: "{{ kubernetes_deployment.ansible_sudo_pass }}"
+    ansible_become_pass: "{{ lookup('env', 'ANSIBLE_BECOME_PASS') | default(lookup('env', 'ANSIBLE_SUDO_PASS'), true) | default(kubernetes_deployment.ansible_sudo_pass, true) | default('') }}"
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8
@@ -40,7 +40,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
-    ansible_become_pass: "{{ kubernetes_deployment.ansible_sudo_pass }}"
+    ansible_become_pass: "{{ lookup('env', 'ANSIBLE_BECOME_PASS') | default(lookup('env', 'ANSIBLE_SUDO_PASS'), true) | default(kubernetes_deployment.ansible_sudo_pass, true) | default('') }}"
   environment:
     DEBIAN_FRONTEND: noninteractive
     LC_ALL: C.UTF-8
@@ -58,7 +58,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
-    ansible_become_pass: "{{ kubernetes_deployment.ansible_sudo_pass }}"
+    ansible_become_pass: "{{ lookup('env', 'ANSIBLE_BECOME_PASS') | default(lookup('env', 'ANSIBLE_SUDO_PASS'), true) | default(kubernetes_deployment.ansible_sudo_pass, true) | default('') }}"
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8
@@ -69,10 +69,6 @@
   loop_control:
     loop_var: current_host
   when: kubernetes_deployment.enabled | default(false)
-  vars:
-    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
-    ansible_user: "{{ current_host.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
-    ansible_become_pass: "{{ kubernetes_deployment.ansible_sudo_pass }}"
 
 - name: Enable UFW
   ufw:
@@ -86,7 +82,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
-    ansible_become_pass: "{{ kubernetes_deployment.ansible_sudo_pass }}"
+    ansible_become_pass: "{{ lookup('env', 'ANSIBLE_BECOME_PASS') | default(lookup('env', 'ANSIBLE_SUDO_PASS'), true) | default(kubernetes_deployment.ansible_sudo_pass, true) | default('') }}"
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8
@@ -102,7 +98,7 @@
   vars:
     ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
-    ansible_become_pass: "{{ kubernetes_deployment.ansible_sudo_pass }}"
+    ansible_become_pass: "{{ lookup('env', 'ANSIBLE_BECOME_PASS') | default(lookup('env', 'ANSIBLE_SUDO_PASS'), true) | default(kubernetes_deployment.ansible_sudo_pass, true) | default('') }}"
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8 

@@ -101,6 +101,28 @@ fi
 
 echo "Starting Kubernetes deployment setup..."
 
+# Check for sudo password
+if [ -z "${ANSIBLE_SUDO_PASS}" ]; then
+    # Read from user_input.yml
+    ANSIBLE_SUDO_PASS=$(python3 -c '
+import yaml
+try:
+    with open("user_input.yml", "r") as f:
+        data = yaml.safe_load(f)
+        print(data.get("kubernetes_deployment", {}).get("ansible_sudo_pass", ""))
+except:
+    print("")
+    ')
+fi
+
+# Export sudo password for Ansible if set
+if [ -n "${ANSIBLE_SUDO_PASS}" ]; then
+    export ANSIBLE_BECOME_PASS="${ANSIBLE_SUDO_PASS}"
+    echo "Using sudo password from configuration"
+else
+    echo "No sudo password provided - assuming passwordless sudo is configured"
+fi
+
 # Create necessary directories
 mkdir -p inventory/kubespray
 
@@ -148,13 +170,32 @@ try:
     control_plane_nodes = process_nodes(control_plane_nodes)
     worker_nodes = process_nodes(worker_nodes)
 
+    # Get sudo password with priority:
+    # 1. user_input.yml
+    # 2. ANSIBLE_SUDO_PASS environment variable
+    # 3. None (for passwordless sudo)
+    sudo_pass = user_input['kubernetes_deployment'].get('ansible_sudo_pass', '')
+    if not sudo_pass:
+        sudo_pass = os.environ.get('ANSIBLE_SUDO_PASS', '')
+        if sudo_pass:
+            print("\nUsing sudo password from ANSIBLE_SUDO_PASS environment variable")
+        else:
+            print("\nNo sudo password provided - assuming passwordless sudo is configured")
+
+    # Also check ANSIBLE_BECOME_PASS as it takes precedence
+    become_pass = os.environ.get('ANSIBLE_BECOME_PASS', '')
+    if become_pass:
+        sudo_pass = become_pass
+        print("\nUsing sudo password from ANSIBLE_BECOME_PASS environment variable")
+
     # Prepare template variables
     template_vars = {
         'control_plane_nodes': control_plane_nodes,
         'worker_nodes': worker_nodes,
         'ssh_key_path': os.path.expanduser(user_input['kubernetes_deployment']['ssh_key_path']),
         'default_ansible_user': user_input['kubernetes_deployment']['default_ansible_user'],
-        'kubernetes_deployment': user_input['kubernetes_deployment']
+        'kubernetes_deployment': user_input['kubernetes_deployment'],
+        'ansible_become_pass': sudo_pass if sudo_pass else None
     }
 
     # Write inventory file
@@ -193,6 +234,7 @@ try:
             missing_configs.append("install_toolkit should be true for NVIDIA support")
         if not nvidia_config.get('configure_containerd'):
             missing_configs.append("configure_containerd should be true for NVIDIA support")
+        
         if missing_configs:
             print("\nWarning: Potential NVIDIA configuration issues:")
             for issue in missing_configs:
@@ -333,6 +375,12 @@ echo -e "\nStarting Kubernetes deployment..."
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 export LC_CTYPE=en_US.UTF-8
+
+# Ensure Ansible uses our config file
+export ANSIBLE_CONFIG="$(pwd)/ansible.cfg"
+
+# Create output directory if it doesn't exist
+mkdir -p output
 
 ansible-playbook kubernetes.yml -i inventory/kubespray/inventory.ini -e @user_input.yml -vv
 
