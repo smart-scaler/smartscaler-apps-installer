@@ -9,7 +9,7 @@ metadata:
 spec:
   selector:
     matchExpressions:
-    - key: run.ai/inferenceworkload
+    - key: smart.ai/inferenceworkload
       operator: Exists
   podMetricsEndpoints:
   - port: user-port
