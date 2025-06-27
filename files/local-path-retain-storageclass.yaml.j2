@@ -1,0 +1,21 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ storage_class_name | default('local-path-retain') }}
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: {{ provisioner | default('rancher.io/local-path') }}
+reclaimPolicy: {{ reclaim_policy | default('Retain') }}
+volumeBindingMode: {{ volume_binding_mode | default('WaitForFirstConsumer') }}
+allowVolumeExpansion: {{ allow_volume_expansion | default(true) | lower }}
+parameters:
+  # Add any specific parameters for your local-path provisioner
+  
+  # Set directory permissions (775 = rwxrwxr-x)
+  dirMode: "{{ dir_mode | default('0775') }}"
+  # Set file permissions (664 = rw-rw-r--)
+  fileMode: "{{ file_mode | default('0664') }}"
+mountOptions:
+{% for option in mount_options | default(['rw', 'exec']) %}
+  - {{ option }}
+{% endfor %} 
