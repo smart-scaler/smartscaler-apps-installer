@@ -150,8 +150,6 @@ execution_order:
   # - nginx_ingress_config         
   # - nginx_ingress_chart   
 
-
-
   # Base Applications
   - gpu_operator_chart
   - prometheus_stack
@@ -164,19 +162,16 @@ execution_order:
 
 
   # SmartAI Infrastructure
-  - cert_manager                  # Install cert-manager first
-  - create_cert_manager_issuers   # Create cert-manager issuers and certificates
-  - create_smartai_namespaces_and_certificates  # Create smartai namespaces and certificates
-  - verify_certificates_and_create_ca_secrets  # Verify certificates and create CA secrets
-  - patch_nodelocaldns_config     # Patch nodelocaldns for custom DNS entries
-  - local_path_retain_storageclass  # Create local-path-retain StorageClass
-  - apply_knative_serving_crds    # Install Knative serving CRDs via kubectl
-  - apply_knative_serving_core    # Install Knative serving core components via kubectl
-  - apply_knative_serving_hpa     # Install Knative serving HPA via kubectl
-  - apply_knative_monitor         # Install Knative monitor components via kubectl       
-
-
-
+  # - cert_manager                  # Install cert-manager first
+  # - create_cert_manager_issuers   # Create cert-manager issuers and certificates
+  # - create_smartai_namespaces_and_certificates  # Create smartai namespaces and certificates
+  # - verify_certificates_and_create_ca_secrets  # Verify certificates and create CA secrets
+  # - patch_nodelocaldns_config     # Patch nodelocaldns for custom DNS entries
+  # - local_path_retain_storageclass  # Create local-path-retain StorageClass
+  # - apply_knative_serving_crds    # Install Knative serving CRDs via kubectl
+  # - apply_knative_serving_core    # Install Knative serving core components via kubectl
+  # - apply_knative_serving_hpa     # Install Knative serving HPA via kubectl
+  # - apply_knative_monitor         # Install Knative monitor components via kubectl       
 
   # EGS Application
   # - kubeslice_controller_egs  # Install EGS controller first
@@ -187,16 +182,16 @@ execution_order:
   # - kubeslice_worker_egs_worker_1 # Install worker after fetching secret
 
   # NIM 70B Components
-  # - nim_cache_manifest_70b
-  # - wait_for_nim_cache_70b
-  # - nim_cache_wait_job_70b
-  # - nim_service_manifest_70b
-  # - keda_scaled_object_manifest_70b
-  # - create_inference_pod_configmap_70b
-  # - smart_scaler_inference_70b
-  # - create_locust_configmap_70b
-  # - locust_manifest_70b
-  # - smart_scaler_mcp_server_manifest
+  - nim_cache_manifest_70b
+  - wait_for_nim_cache_70b
+  - nim_cache_wait_job_70b
+  - nim_service_manifest_70b
+  - keda_scaled_object_manifest_70b
+  - create_inference_pod_configmap_70b
+  - smart_scaler_inference_70b
+  - create_locust_configmap_70b
+  - locust_manifest_70b
+  - smart_scaler_mcp_server_manifest
 
   #   # NIM 1B Components
   # - nim_cache_manifest_1b
