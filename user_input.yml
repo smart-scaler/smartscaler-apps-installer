@@ -1,7 +1,7 @@
 ---
 ################################################################################
 # USER INPUT CONFIGURATION
-# Last updated: JUNE 3, 2025
+# Last updated: JUNE 27, 2025
 ################################################################################
 
 ###############################################################################
@@ -148,9 +148,9 @@ execution_order:
   # - metallb_l2_config            
   # - metallb_ip_pool              
   # - nginx_ingress_config         
-  # - nginx_ingress_chart          
+  # - nginx_ingress_chart   
 
-  # Existing Applications
+  # Base Applications
   - gpu_operator_chart
   - prometheus_stack
   - pushgateway_manifest
@@ -160,6 +160,18 @@ execution_order:
   - verify_ngc_secrets
   - create_avesha_secret
 
+
+  # SmartAI Infrastructure
+  # - cert_manager                  # Install cert-manager first
+  # - create_cert_manager_issuers   # Create cert-manager issuers and certificates
+  # - create_smartai_namespaces_and_certificates  # Create smartai namespaces and certificates
+  # - verify_certificates_and_create_ca_secrets  # Verify certificates and create CA secrets
+  # - patch_nodelocaldns_config     # Patch nodelocaldns for custom DNS entries
+  # - local_path_retain_storageclass  # Create local-path-retain StorageClass
+  # - apply_knative_serving_crds    # Install Knative serving CRDs via kubectl
+  # - apply_knative_serving_core    # Install Knative serving core components via kubectl
+  # - apply_knative_serving_hpa     # Install Knative serving HPA via kubectl
+  # - apply_knative_monitor         # Install Knative monitor components via kubectl       
 
   # EGS Application
   # - kubeslice_controller_egs  # Install EGS controller first
@@ -232,6 +244,30 @@ global_image_pull_secret:
 ###############################################################################
 
 helm_charts:
+
+  # Cert Manager Chart Configuration
+  cert_manager:
+    release_name: "cert-manager"
+    chart_ref: "./cert-manager"
+    release_namespace: "cert-manager"
+    create_namespace: true
+    wait: true
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
+    dependencies: []
+    chart_version: "v1.13.3"
+    release_values:
+      installCRDs: true
+      global:
+        logLevel: 2
+      prometheus:
+        enabled: false
+        servicemonitor:
+          enabled: false
+      webhook:
+        timeoutSeconds: 30
 
   # EGS Controller Chart Configuration
   kubeslice_controller_egs:
@@ -583,6 +619,35 @@ helm_charts:
 ###############################################################################
 
 manifests:
+
+  # Local Path Retain StorageClass
+  local_path_retain_storageclass:
+    name: "local-path-retain-storageclass"
+    manifest_file: "files/local-path-retain-storageclass.yaml.j2"
+    namespace: ""  # StorageClass is cluster-scoped
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 60
+    wait_condition:
+      type: "Available"
+      status: "True"
+    validate: false
+    strict_validation: false
+    dependencies: []
+    variables:
+      storage_class_name: "local-path-retain"
+      provisioner: "rancher.io/local-path"
+      reclaim_policy: "Retain"
+      volume_binding_mode: "WaitForFirstConsumer"
+      allow_volume_expansion: true
+      dir_mode: "0775"
+      file_mode: "0664"
+      mount_options:
+        - "rw"
+        - "exec"
+
+
 
   # EGS Project Configuration
   egs_project_manifest:
@@ -1339,6 +1404,321 @@ manifests:
 ###############################################################################
 
 command_exec:
+  - name: "create_cert_manager_issuers"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          echo "Creating cert-manager ClusterIssuer and Certificate resources..."
+          cat <<EOF | kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f -
+          apiVersion: cert-manager.io/v1
+          kind: ClusterIssuer
+          metadata:
+            name: selfsigned-issuer
+          spec:
+            selfSigned: {}
+          ---
+          apiVersion: cert-manager.io/v1
+          kind: Certificate
+          metadata:
+            name: my-selfsigned-ca
+            namespace: cert-manager
+          spec:
+            isCA: true
+            commonName: "avesha Labs Root CA"
+            subject:
+              organizationalUnits:
+                - "IT Department"
+              organizations:
+                - "avesha Labs"
+              countries:
+                - "US"
+            secretName: root-secret
+            privateKey:
+              algorithm: RSA
+              size: 4096
+            issuerRef:
+              name: selfsigned-issuer
+              kind: ClusterIssuer
+              group: cert-manager.io
+            duration: 8760h # 1 year
+          ---
+          apiVersion: cert-manager.io/v1
+          kind: ClusterIssuer
+          metadata:
+            name: my-ca-issuer
+          spec:
+            ca:
+              secretName: root-secret
+          EOF
+          echo "Cert-manager issuers and certificate created successfully!"
+        env:
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
+        ignore_errors: false
+
+  - name: "create_smartai_namespaces_and_certificates"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          echo "Creating smartai namespaces..."
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            create namespace smartai-backend --dry-run=client -o yaml | \
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f -
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            create namespace smartai --dry-run=client -o yaml | \
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f -
+          echo "smartai namespaces created successfully!"
+        env:
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
+        ignore_errors: false
+      - cmd: |
+          echo "Creating smartai certificates..."
+          cat <<EOF | kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f -
+          apiVersion: cert-manager.io/v1
+          kind: Certificate
+          metadata:
+            name: apps-dev-aveshalabs-io-tls
+            namespace: smartai-backend
+          spec:
+            secretName: smartai-backend-tls
+            issuerRef:
+              name: my-ca-issuer
+              kind: ClusterIssuer
+              group: cert-manager.io
+            commonName: smartai.avesha.lab
+            dnsNames:
+            - smartai.avesha.lab
+            duration: 8760h # 1 year
+            renewBefore: 720h # 30 days before expiry
+            privateKey:
+              algorithm: RSA
+              size: 4096
+          ---
+          apiVersion: cert-manager.io/v1
+          kind: Certificate
+          metadata:
+            name: apps-dev-aveshalabs-io-tls-smartai
+            namespace: smartai
+          spec:
+            secretName: smartai-cluster-domain-tls-secret
+            issuerRef:
+              name: my-ca-issuer
+              kind: ClusterIssuer
+              group: cert-manager.io
+            commonName: smartai.avesha.lab
+            dnsNames:
+            - smartai.avesha.lab
+            duration: 8760h # 1 year
+            renewBefore: 720h # 30 days before expiry
+            privateKey:
+              algorithm: RSA
+              size: 4096
+          EOF
+          echo "smartai certificates created successfully!"
+        env:
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
+        ignore_errors: false
+
+  - name: "verify_certificates_and_create_ca_secrets"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          echo "Extracting CA certificate and creating CA secrets..."
+          # Extract CA certificate from root-secret
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            get secret root-secret -n cert-manager -o jsonpath='{.data.tls\.crt}' | \
+            base64 -d > avesha-labs-ca.crt
+          
+          # Create CA secret in smartai-backend namespace
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            -n smartai-backend create secret generic smartai-ca-cert \
+            --from-file=smartai-ca.pem=avesha-labs-ca.crt \
+            --dry-run=client -o yaml | \
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f -
+          
+          echo "CA certificate saved as: avesha-labs-ca.crt"
+          echo "Distribute this file to clients that need to trust your certificates"
+        env:
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
+        ignore_errors: false
+      - cmd: |
+          echo "Waiting for certificates to be issued by cert-manager..."
+          # Wait a bit for certificates to be issued
+          sleep 15
+          
+          # Check if certificates are ready
+          echo "Checking certificate status..."
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            get certificate -n smartai-backend apps-dev-aveshalabs-io-tls -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Certificate status not available yet"
+          
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            get certificate -n smartai apps-dev-aveshalabs-io-tls-smartai -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Certificate status not available yet"
+          
+          echo "Certificate verification completed (OpenSSL not required)"
+        env:
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
+        ignore_errors: true
+      - cmd: |
+          echo "Creating Run:AI CA secret with proper labels..."
+          # Create the CA certificate secret in the smartai namespace
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            -n smartai create secret generic smartai-ca-cert \
+            --from-file=smartai-ca.pem=avesha-labs-ca.crt \
+            --dry-run=client -o yaml | \
+            kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f -
+          
+          # Label the secret for Run:AI recognition
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            label secret smartai-ca-cert -n smartai \
+            run.ai/cluster-wide=true run.ai/name=smartai-ca-cert --overwrite
+          
+          echo "Run:AI CA secrets created and labeled successfully!"
+        env:
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
+        ignore_errors: false
+
+  - name: "apply_knative_serving_crds"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          echo "Applying Knative Serving CRDs using kubectl..."
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f files/serving-crds.yaml --timeout=30s
+          
+          echo "Waiting for CRDs to be established..."
+          sleep 10
+          
+          echo "Knative Serving CRDs applied successfully!"
+        env:
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
+        ignore_errors: false
+
+  - name: "apply_knative_serving_core"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          echo "Applying Knative Serving Core components using kubectl..."
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f files/serving-core.yaml --timeout=60s
+          
+          echo "Waiting for Knative Serving deployments to be ready..."
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            wait --for=condition=Available deployment/activator \
+            -n knative-serving --timeout=60s || true
+          
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            wait --for=condition=Available deployment/autoscaler \
+            -n knative-serving --timeout=60s || true
+          
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            wait --for=condition=Available deployment/controller \
+            -n knative-serving --timeout=60s || true
+          
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            wait --for=condition=Available deployment/webhook \
+            -n knative-serving --timeout=60s || true
+          
+          echo "Knative Serving Core applied successfully!"
+        env:
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
+        ignore_errors: false
+
+  - name: "apply_knative_serving_hpa"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          echo "Applying Knative Serving HPA components using kubectl..."
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f files/serving-hpa.yaml --timeout=30s
+          
+          echo "Waiting for HPA to be ready..."
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            wait --for=condition=Ready hpa/activator \
+            -n knative-serving --timeout=30s || true
+          
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            wait --for=condition=Ready hpa/webhook \
+            -n knative-serving --timeout=30s || true
+          
+          echo "Knative Serving HPA applied successfully!"
+        env:
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
+        ignore_errors: false
+
+  - name: "apply_knative_monitor"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          echo "Applying Knative Monitor components using kubectl..."
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            apply -f files/knative-monitor.yaml --timeout=60s
+          
+          echo "Waiting for Knative Monitor deployments to be ready..."
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            wait --for=condition=Available deployment \
+            -l app.kubernetes.io/part-of=knative-serving \
+            -n knative-serving --timeout=120s || true
+          
+          echo "Knative Monitor applied successfully!"
+        env:
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
+        ignore_errors: false
+
+  - name: "patch_nodelocaldns_config"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    commands:
+      - cmd: |
+          echo "Patching nodelocaldns configmap to add custom DNS entries..."
+          kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
+            --context={{ kubecontext | default(global_kubecontext) }} \
+            patch configmap -n kube-system nodelocaldns --patch '{
+              "data": {
+                "Corefile": "cluster.local:53 {\n    errors\n    cache {\n        success 9984 30\n        denial 9984 5\n    }\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n    health 169.254.25.10:9254\n}\nin-addr.arpa:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n}\nip6.arpa:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n}\n.:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    hosts {\n        PUBLIC_IP smartai.avesha.lab\n        fallthrough\n    }\n    forward . /etc/resolv.conf\n    prometheus :9253\n}"
+              }
+            }'
+          echo "NodeLocalDNS configmap patched successfully!"
+        env:
+          KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
+        ignore_errors: false
+
   - name: "wait_for_nim_cache_70b"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"

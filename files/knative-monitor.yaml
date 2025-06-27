@@ -1,0 +1,222 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: inference-workload-monitor
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchExpressions:
+    - key: smart.ai/inferenceworkload
+      operator: Exists
+  podMetricsEndpoints:
+  - port: user-port
+    targetPort: 8000
+    path: /v1/metrics
+    interval: 30s
+  namespaceSelector:
+    any: true
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: controller
+    release: prometheus
+  name: controller
+  namespace: monitoring
+spec:
+  endpoints:
+  - honorLabels: true
+    interval: 30s
+    path: /metrics
+    port: http-metrics
+  namespaceSelector:
+    matchNames:
+    - knative-serving
+  selector:
+    matchLabels:
+      app: controller
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: autoscaler
+    release: prometheus
+  name: autoscaler
+  namespace: monitoring
+spec:
+  endpoints:
+  - honorLabels: true
+    interval: 30s
+    path: /metrics
+    port: http-metrics
+  namespaceSelector:
+    matchNames:
+    - knative-serving
+  selector:
+    matchLabels:
+      app: autoscaler
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: activator
+    release: prometheus
+  name: activator
+  namespace: monitoring
+spec:
+  endpoints:
+  - honorLabels: true
+    interval: 30s
+    path: /metrics
+    port: http-metrics
+  namespaceSelector:
+    matchNames:
+    - knative-serving
+  selector:
+    matchLabels:
+      app: activator
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: webhook
+    release: prometheus
+  name: webhook
+  namespace: monitoring
+spec:
+  endpoints:
+  - honorLabels: true
+    interval: 30s
+    path: /metrics
+    port: http-metrics
+  namespaceSelector:
+    matchNames:
+    - knative-serving
+  selector:
+    matchLabels:
+      app: webhook
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: broker-filter
+    release: prometheus
+  name: broker-filter
+  namespace: monitoring
+spec:
+  endpoints:
+  - honorLabels: true
+    interval: 30s
+    path: /metrics
+    port: http-metrics
+  namespaceSelector:
+    matchNames:
+    - knative-eventing
+  selector:
+    matchLabels:
+      eventing.knative.dev/brokerRole: filter
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: broker-ingress
+    release: prometheus
+  name: broker-ingress
+  namespace: monitoring
+spec:
+  endpoints:
+  - honorLabels: true
+    interval: 30s
+    path: /metrics
+    port: http-metrics
+  namespaceSelector:
+    matchNames:
+    - knative-eventing
+  selector:
+    matchLabels:
+      eventing.knative.dev/brokerRole: ingress
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: eventing-controller
+  labels:
+    app: eventing-controller
+    release: prometheus
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: eventing-controller
+  namespaceSelector:
+    matchNames:
+    - knative-eventing
+  podMetricsEndpoints:
+  - honorLabels: true
+    path: /metrics
+    port: metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: imc-controller
+  labels:
+    release: prometheus
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      messaging.knative.dev/role: controller
+  namespaceSelector:
+    matchNames:
+    - knative-eventing
+  podMetricsEndpoints:
+  - honorLabels: true
+    path: /metrics
+    port: metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: ping-source
+  labels:
+    release: prometheus
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      eventing.knative.dev/source: ping-source-controller
+  namespaceSelector:
+    matchNames:
+    - knative-eventing
+  podMetricsEndpoints:
+  - honorLabels: true
+    path: /metrics
+    port: metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: apiserver-source
+  labels:
+    release: prometheus
+  namespace: monitoring
+spec:
+  namespaceSelector:
+    any: true
+  selector:
+    matchLabels:
+      eventing.knative.dev/source: apiserver-source-controller
+  podMetricsEndpoints:
+  - honorLabels: true
+    path: /metrics
+    port: metrics
