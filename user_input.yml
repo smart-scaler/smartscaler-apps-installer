@@ -95,6 +95,13 @@ kubernetes_deployment:
   
   dns_mode: "coredns"                      # DNS service for the cluster
                                          # CoreDNS is the default since Kubernetes 1.13
+                                         
+  # Kubelet Configuration
+  # Controls node-level settings for the Kubernetes node agent
+  kubelet_config:
+    max_pods: 256                          # Maximum number of pods per node
+                                         # Default is 110, can be increased for high-density nodes
+                                         # Consider network and resource constraints when increasing
   # Async Execution Configuration
   # Controls timeout and polling for long-running tasks
   async_config:
