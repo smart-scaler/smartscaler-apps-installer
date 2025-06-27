@@ -33,23 +33,23 @@
       port: "{{ kubernetes_deployment.api_server.port }}"
   when: kubernetes_deployment.enabled | default(false)
 
-- name: Generate inventory content
-  template:
-    src: "{{ playbook_dir }}/templates/inventory.ini.j2"
-    dest: "{{ inventory_dir }}/kubespray/inventory.ini"
-  vars:
-    control_plane_nodes: "{{ kubernetes_deployment.control_plane_nodes }}"
-    worker_nodes: "{{ kubernetes_deployment.worker_nodes | default([]) }}"
-    ssh_key_path: "{{ kubernetes_deployment.ssh_key_path | default('~/.ssh/k8s_rsa') }}"
-    default_ansible_user: "{{ kubernetes_deployment.default_ansible_user | default('root') }}"
-    kube_apiserver_ip: "{{ kubernetes_deployment.api_server.host }}"
-  when: kubernetes_deployment.enabled | default(false)
+# - name: Generate inventory content
+#   template:
+#     src: "{{ playbook_dir }}/templates/inventory.ini.j2"
+#     dest: "{{ inventory_dir }}/kubespray/inventory.ini"
+#   vars:
+#     control_plane_nodes: "{{ kubernetes_deployment.control_plane_nodes }}"
+#     worker_nodes: "{{ kubernetes_deployment.worker_nodes | default([]) }}"
+#     ssh_key_path: "{{ kubernetes_deployment.ssh_key_path | default('~/.ssh/k8s_rsa') }}"
+#     default_ansible_user: "{{ kubernetes_deployment.default_ansible_user | default('root') }}"
+#     kube_apiserver_ip: "{{ kubernetes_deployment.api_server.host }}"
+#   when: kubernetes_deployment.enabled | default(false)
 
-- name: Show generated inventory file contents
-  command: cat {{ inventory_dir }}/kubespray/inventory.ini
-  register: inventory_contents
-  changed_when: false
-  when: kubernetes_deployment.enabled | default(false)
+# - name: Show generated inventory file contents
+#   command: cat {{ inventory_dir }}/kubespray/inventory.ini
+#   register: inventory_contents
+#   changed_when: false
+#   when: kubernetes_deployment.enabled | default(false)
 
 - name: Display debug information
   debug:
@@ -133,6 +133,7 @@
     -e "kube_apiserver_bind_address={{ first_control_plane_ip }}" \
     -e "kube_apiserver_advertise_address={{ first_control_plane_ip }}" \
     -e "kubernetes_deployment={{ kubernetes_deployment }}" \
+    -e "kubelet_max_pods={{ kubernetes_deployment.kubelet_config.max_pods | default(110) }}" \
     --become \
     --become-method={{ kubespray_become_method }} \
     --become-user={{ kubespray_become_user }} \
