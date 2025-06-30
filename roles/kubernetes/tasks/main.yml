@@ -59,21 +59,49 @@
     mode: '0755'
   when: kubernetes_deployment.enabled | default(false)
 
-- name: Copy Kubespray sample inventory directory
+- name: Copy Kubespray sample inventory directory (excluding inventory.ini)
   synchronize:
     src: "{{ kubespray_dir }}/inventory/sample/"
     dest: "{{ inventory_dir }}/kubespray"
     delete: no
     recursive: yes
+    rsync_opts:
+      - "--exclude=inventory.ini"
   when: kubernetes_deployment.enabled | default(false)
 
-- name: Generate Kubespray inventory
-  template:
-    src: inventory.ini.j2
-    dest: "{{ inventory_dir }}/kubespray/inventory.ini"
-  vars:
-    k8s_masters: "{{ kubernetes_deployment.control_plane_nodes | default([]) }}"
-    k8s_workers: "{{ kubernetes_deployment.worker_nodes | default([]) }}"
+# - name: Generate Kubespray inventory (DISABLED - using pre-generated inventory from setup_kubernetes.sh)
+#   template:
+#     src: inventory.ini.j2
+#     dest: "{{ inventory_dir }}/kubespray/inventory.ini"
+#   vars:
+#     k8s_masters: "{{ kubernetes_deployment.control_plane_nodes | default([]) }}"
+#     k8s_workers: "{{ kubernetes_deployment.worker_nodes | default([]) }}"
+#   when: kubernetes_deployment.enabled | default(false)
+
+- name: Verify pre-generated inventory file exists
+  stat:
+    path: "{{ inventory_dir }}/kubespray/inventory.ini"
+  register: inventory_file_check
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Fail if inventory file not found
+  fail:
+    msg: "Inventory file not found at {{ inventory_dir }}/kubespray/inventory.ini. Please run setup_kubernetes.sh first to generate the inventory."
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - not inventory_file_check.stat.exists
+
+- name: Verify inventory file contents (should show generated nodes, not sample)
+  command: head -15 {{ inventory_dir }}/kubespray/inventory.ini
+  register: final_inventory_contents
+  changed_when: false
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Display final inventory being used
+  debug:
+    msg: |
+      Final inventory content being used for deployment:
+      {{ final_inventory_contents.stdout }}
   when: kubernetes_deployment.enabled | default(false)
 
 - name: Ensure group_vars directory exists
@@ -83,7 +111,7 @@
     mode: '0755'
   when: kubernetes_deployment.enabled | default(false)
 
-- name: Copy group_vars from Kubespray
+- name: Copy group_vars from Kubespray (only if not exists)
   command: "cp -rf {{ kubespray_dir }}/inventory/sample/group_vars {{ inventory_dir }}/kubespray/"
   args:
     creates: "{{ inventory_dir }}/kubespray/group_vars/all"

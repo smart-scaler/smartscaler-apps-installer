@@ -101,6 +101,58 @@
     kubespray_poll_interval: "{{ kubernetes_deployment.async_config.poll_interval | default(5) }}"
   when: kubernetes_deployment.enabled | default(false)
 
+- name: Build supplementary addresses list
+  set_fact:
+    ssl_addresses: >-
+      {{
+        [kubernetes_deployment.api_server.host] +
+        (kubernetes_deployment.control_plane_nodes | map(attribute='ansible_host') | list) +
+        (kubernetes_deployment.control_plane_nodes | map(attribute='private_ip') | list) +
+        (kubernetes_deployment.worker_nodes | default([]) | map(attribute='ansible_host') | list) +
+        (kubernetes_deployment.worker_nodes | default([]) | map(attribute='private_ip') | list)
+      }}
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Remove duplicate IPs from supplementary addresses
+  set_fact:
+    ssl_addresses_unique: "{{ ssl_addresses | unique | list }}"
+    supplementary_addresses_in_ssl_keys: "{{ ssl_addresses | unique | list }}"
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Create temporary variables file for Kubespray
+  copy:
+    content: |
+      supplementary_addresses_in_ssl_keys:
+      {% for addr in ssl_addresses_unique %}
+        - "{{ addr }}"
+      {% endfor %}
+    dest: "{{ inventory_dir }}/kubespray/temp_ssl_vars.yml"
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Debug - Show temporary SSL variables file content
+  debug:
+    msg: |
+      Temporary SSL variables file content:
+      supplementary_addresses_in_ssl_keys:
+      {% for addr in ssl_addresses_unique %}
+        - "{{ addr }}"
+      {% endfor %}
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Display certificate addresses configuration
+  debug:
+    msg: |
+      Configured supplementary_addresses_in_ssl_keys with {{ ssl_addresses_unique | length }} unique addresses:
+      {% for addr in ssl_addresses_unique %}
+      - {{ addr }}
+      {% endfor %}
+      
+      Sources:
+      - API Server Host: {{ kubernetes_deployment.api_server.host }}
+      - Control Plane Nodes: {{ kubernetes_deployment.control_plane_nodes | length }}
+      - Worker Nodes: {{ kubernetes_deployment.worker_nodes | default([]) | length }}
+  when: kubernetes_deployment.enabled | default(false)
+
 - name: Run Kubespray cluster deployment
   shell: |
     timeout {{ kubernetes_deployment.async_config.timeout | default(3600) }} bash -c '. {{ venv_path }}/bin/activate && \
@@ -108,11 +160,8 @@
     {{ kubespray_dir }}/cluster.yml \
     -e @{{ inventory_dir }}/kubespray/group_vars/all/all.yml \
     -e @{{ inventory_dir }}/kubespray/group_vars/k8s_cluster/addons.yml \
-    -e "kube_apiserver_ip={{ kubernetes_deployment.api_server.host }}" \
-    -e "loadbalancer_apiserver={address: \"{{ kubernetes_deployment.api_server.host }}\", port: {{ kubernetes_deployment.api_server.port }}}" \
-    -e "apiserver_loadbalancer_domain_name={{ kubernetes_deployment.api_server.host }}" \
-    -e "supplementary_addresses_in_ssl_keys=[\"{{ kubernetes_deployment.api_server.host }}\"] + {{ control_plane_ips | to_json }} + {{ worker_node_ips | to_json }}" \
-    -e "kube_apiserver_bind_address={{ first_control_plane_ip }}" \
+    -e @{{ inventory_dir }}/kubespray/temp_ssl_vars.yml \
+    -e "kube_apiserver_bind_address={{ kubernetes_deployment.api_server.host }}" \
     -e "kube_apiserver_advertise_address={{ first_control_plane_ip }}" \
     -e "kubernetes_deployment={{ kubernetes_deployment }}" \
     -e "kubelet_max_pods={{ kubernetes_deployment.kubelet_config.max_pods | default(110) }}" \
@@ -252,6 +301,41 @@
     - kubernetes_deployment.enabled | default(false)
     - local_kubeconfig_check.stat.exists | default(false)
 
+- name: Determine kubeconfig server address
+  set_fact:
+    kubeconfig_server_address: >-
+      {{
+        kubernetes_deployment.global_control_plane_ip | default(
+          kubernetes_deployment.control_plane_nodes[0].ansible_host
+        )
+      }}
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - local_kubeconfig_check.stat.exists | default(false)
+
+- name: Update kubeconfig server address to use public IP
+  replace:
+    path: "{{ playbook_dir }}/output/kubeconfig"
+    regexp: 'server: https://0\.0\.0\.0:6443'
+    replace: 'server: https://{{ kubeconfig_server_address }}:6443'
+  register: kubeconfig_update_result
+  delegate_to: localhost
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - local_kubeconfig_check.stat.exists | default(false)
+
+- name: Display kubeconfig server address update
+  debug:
+    msg: |
+      Kubeconfig server address updated:
+      - From: https://0.0.0.0:6443
+      - To: https://{{ kubeconfig_server_address }}:6443
+      - Using: {{ 'Global Control Plane IP' if kubernetes_deployment.global_control_plane_ip is defined else 'First Control Plane Node' }}
+      - Changes made: {{ kubeconfig_update_result.changed | default(false) }}
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - kubeconfig_update_result is defined
+
 - name: Set global kubeconfig path
   set_fact:
     global_kubeconfig: "{{ playbook_dir }}/output/kubeconfig"
@@ -293,4 +377,10 @@
       - "Playbook dir: {{ playbook_dir }}"
       - "Inventory dir: {{ inventory_dir }}"
       - "Kubespray dir: {{ kubespray_dir }}"
+  when: kubernetes_deployment.enabled | default(false)
+
+- name: Clean up temporary SSL variables file
+  file:
+    path: "{{ inventory_dir }}/kubespray/temp_ssl_vars.yml"
+    state: absent
   when: kubernetes_deployment.enabled | default(false) 
