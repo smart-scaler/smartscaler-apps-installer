@@ -10,12 +10,12 @@
 ###############################################################################
 kubernetes_deployment:
   # Master switch for Kubernetes deployment
-  enabled: true                           # Enable kubernetes deployment
+  enabled: false                           # Enable kubernetes deployment
   
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
   api_server:
-    host: "0.0.0.0"  # Bind to all interfaces (allows both internal and external access)
+    host: "0.0.0.0"  # Reference global IP
     port: 6443              # The port for the Kubernetes API server
                            # 6443 is the default secure port for Kubernetes
     secure: true           # Whether to use HTTPS for API server connections
@@ -23,9 +23,9 @@ kubernetes_deployment:
 
   # SSH Access Configuration
   # Required for Kubespray to access and configure nodes
-  ssh_key_path: "/root/.ssh/k8s_rsa"  # Full path to the SSH private key file
+  ssh_key_path: "/absolute/path/to/.ssh/k8s_rsa"  # Full path to the SSH private key file
                                             # Used to authenticate with the cluster nodes
-  default_ansible_user: "root"         # Default SSH user for all nodes
+  default_ansible_user: "REPLACE_SSH_USER"         # Default SSH user for all nodes
                                            # Common values: ubuntu (Ubuntu), ec2-user (AWS)
   # Ansible Sudo Password Configuration
   # Optional: Can be set here, via ANSIBLE_SUDO_PASS environment variable,
@@ -36,13 +36,13 @@ kubernetes_deployment:
   # Defines the master nodes that will run the Kubernetes control plane
   control_plane_nodes:
     - name: "master-1"                # Unique identifier for the control plane node
-      ansible_host: "13.219.250.34"  # Reference global IP
-      ansible_user: "root"      # SSH username for this specific node
+      ansible_host: "PUBLIC_IP"  # Reference global IP
+      ansible_user: "REPLACE_SSH_USER"      # SSH username for this specific node
                                      # Overrides default_ansible_user if different
       ansible_become: true            # Enable privilege escalation (sudo)
       ansible_become_method: "sudo"     # Method for privilege escalation
       ansible_become_user: "root"       # Target user for privilege escalation
-      private_ip: "10.0.102.80"      # Internal/private IP address
+      private_ip: "PRIVATE_IP"      # Internal/private IP address
                                      # Used for internal cluster communication
 
 
@@ -122,7 +122,7 @@ validate_prerequisites:
 execution_order_enabled: true                # Required: Must be enabled for ordered execution
 
 # Required Kubeconfig Settings
-global_control_plane_ip: "13.219.250.34"         # Provide the public IP for metallb/Nginx
+global_control_plane_ip: "PUBLIC_IP"         # Provide the public IP for metallb/Nginx
 global_kubeconfig: "output/kubeconfig"        # Required: Path to kubeconfig file
 global_kubecontext: "kubernetes-admin@cluster.local"  # Required: Kubernetes context
 use_global_context: true                     # Required: Use global context
@@ -164,7 +164,7 @@ execution_order:
   # SmartAI Infrastructure
   # - cert_manager                  # Install cert-manager first
   # - create_cert_manager_issuers   # Create cert-manager issuers and certificates
-  # - create_runai_namespaces_and_certificates  # Create runai namespaces and certificates
+  # - create_smartai_namespaces_and_certificates  # Create smartai namespaces and certificates
   # - verify_certificates_and_create_ca_secrets  # Verify certificates and create CA secrets
   # - patch_nodelocaldns_config     # Patch nodelocaldns for custom DNS entries
   # - local_path_retain_storageclass  # Create local-path-retain StorageClass
@@ -1458,30 +1458,30 @@ command_exec:
           KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
         ignore_errors: false
 
-  - name: "create_runai_namespaces_and_certificates"
+  - name: "create_smartai_namespaces_and_certificates"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
     kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
     commands:
       - cmd: |
-          echo "Creating runai namespaces..."
+          echo "Creating smartai namespaces..."
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            create namespace runai-backend --dry-run=client -o yaml | \
+            create namespace smartai-backend --dry-run=client -o yaml | \
             kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
             apply -f -
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            create namespace runai --dry-run=client -o yaml | \
+            create namespace smartai --dry-run=client -o yaml | \
             kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
             apply -f -
-          echo "runai namespaces created successfully!"
+          echo "smartai namespaces created successfully!"
         env:
           KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
         ignore_errors: false
       - cmd: |
-          echo "Creating runai certificates..."
+          echo "Creating smartai certificates..."
           cat <<EOF | kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
             apply -f -
@@ -1489,16 +1489,16 @@ command_exec:
           kind: Certificate
           metadata:
             name: apps-dev-aveshalabs-io-tls
-            namespace: runai-backend
+            namespace: smartai-backend
           spec:
-            secretName: runai-backend-tls
+            secretName: smartai-backend-tls
             issuerRef:
               name: my-ca-issuer
               kind: ClusterIssuer
               group: cert-manager.io
-            commonName: runai.avesha.lab
+            commonName: smartai.avesha.lab
             dnsNames:
-            - runai.avesha.lab
+            - smartai.avesha.lab
             duration: 8760h # 1 year
             renewBefore: 720h # 30 days before expiry
             privateKey:
@@ -1508,24 +1508,24 @@ command_exec:
           apiVersion: cert-manager.io/v1
           kind: Certificate
           metadata:
-            name: apps-dev-aveshalabs-io-tls-runai
-            namespace: runai
+            name: apps-dev-aveshalabs-io-tls-smartai
+            namespace: smartai
           spec:
-            secretName: runai-cluster-domain-tls-secret
+            secretName: smartai-cluster-domain-tls-secret
             issuerRef:
               name: my-ca-issuer
               kind: ClusterIssuer
               group: cert-manager.io
-            commonName: runai.avesha.lab
+            commonName: smartai.avesha.lab
             dnsNames:
-            - runai.avesha.lab
+            - smartai.avesha.lab
             duration: 8760h # 1 year
             renewBefore: 720h # 30 days before expiry
             privateKey:
               algorithm: RSA
               size: 4096
           EOF
-          echo "runai certificates created successfully!"
+          echo "smartai certificates created successfully!"
         env:
           KUBECONFIG: "{{ kubeconfig | default(global_kubeconfig) }}"
         ignore_errors: false
@@ -1542,11 +1542,11 @@ command_exec:
             get secret root-secret -n cert-manager -o jsonpath='{.data.tls\.crt}' | \
             base64 -d > avesha-labs-ca.crt
           
-          # Create CA secret in runai-backend namespace
+          # Create CA secret in smartai-backend namespace
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            -n runai-backend create secret generic runai-ca-cert \
-            --from-file=runai-ca.pem=avesha-labs-ca.crt \
+            -n smartai-backend create secret generic smartai-ca-cert \
+            --from-file=smartai-ca.pem=avesha-labs-ca.crt \
             --dry-run=client -o yaml | \
             kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
@@ -1566,11 +1566,11 @@ command_exec:
           echo "Checking certificate status..."
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            get certificate -n runai-backend apps-dev-aveshalabs-io-tls -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Certificate status not available yet"
+            get certificate -n smartai-backend apps-dev-aveshalabs-io-tls -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Certificate status not available yet"
           
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            get certificate -n runai apps-dev-aveshalabs-io-tls-runai -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Certificate status not available yet"
+            get certificate -n smartai apps-dev-aveshalabs-io-tls-smartai -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Certificate status not available yet"
           
           echo "Certificate verification completed (OpenSSL not required)"
         env:
@@ -1578,11 +1578,11 @@ command_exec:
         ignore_errors: true
       - cmd: |
           echo "Creating Run:AI CA secret with proper labels..."
-          # Create the CA certificate secret in the runai namespace
+          # Create the CA certificate secret in the smartai namespace
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            -n runai create secret generic runai-ca-cert \
-            --from-file=runai-ca.pem=avesha-labs-ca.crt \
+            -n smartai create secret generic smartai-ca-cert \
+            --from-file=smartai-ca.pem=avesha-labs-ca.crt \
             --dry-run=client -o yaml | \
             kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
@@ -1591,8 +1591,8 @@ command_exec:
           # Label the secret for Run:AI recognition
           kubectl --kubeconfig={{ kubeconfig | default(global_kubeconfig) }} \
             --context={{ kubecontext | default(global_kubecontext) }} \
-            label secret runai-ca-cert -n runai \
-            run.ai/cluster-wide=true run.ai/name=runai-ca-cert --overwrite
+            label secret smartai-ca-cert -n smartai \
+            run.ai/cluster-wide=true run.ai/name=smartai-ca-cert --overwrite
           
           echo "Run:AI CA secrets created and labeled successfully!"
         env:
@@ -1711,7 +1711,7 @@ command_exec:
             --context={{ kubecontext | default(global_kubecontext) }} \
             patch configmap -n kube-system nodelocaldns --patch '{
               "data": {
-                "Corefile": "cluster.local:53 {\n    errors\n    cache {\n        success 9984 30\n        denial 9984 5\n    }\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n    health 169.254.25.10:9254\n}\nin-addr.arpa:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n}\nip6.arpa:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n}\n.:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    hosts {\n        3.231.3.229 runai.avesha.lab\n        fallthrough\n    }\n    forward . /etc/resolv.conf\n    prometheus :9253\n}"
+                "Corefile": "cluster.local:53 {\n    errors\n    cache {\n        success 9984 30\n        denial 9984 5\n    }\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n    health 169.254.25.10:9254\n}\nin-addr.arpa:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n}\nip6.arpa:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n}\n.:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    hosts {\n        3.231.3.229 smartai.avesha.lab\n        fallthrough\n    }\n    forward . /etc/resolv.conf\n    prometheus :9253\n}"
               }
             }'
           echo "NodeLocalDNS configmap patched successfully!"
