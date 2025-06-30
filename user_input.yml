@@ -15,7 +15,7 @@ kubernetes_deployment:
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
   api_server:
-    host: "PUBLIC_IP"  # Reference global IP
+    host: "0.0.0.0"  # Reference global IP
     port: 6443              # The port for the Kubernetes API server
                            # 6443 is the default secure port for Kubernetes
     secure: true           # Whether to use HTTPS for API server connections
