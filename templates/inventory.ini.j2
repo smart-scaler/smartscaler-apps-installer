@@ -1,10 +1,10 @@
 # Kubernetes Inventory Configuration
 [all]
 {% for node in control_plane_nodes %}
-{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} ansible_python_interpreter={{ kubernetes_deployment.python_config.interpreter_path | default('/usr/bin/python3') }} ansible_become=true ansible_become_method=sudo ansible_become_user=root ansible_become_flags="-S --preserve-env" ansible_become_pass="{{ kubernetes_deployment.ansible_sudo_pass | default(node.ansible_user) | default(default_ansible_user) }}"
+{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} ansible_python_interpreter={{ kubernetes_deployment.python_config.interpreter_path | default('/usr/bin/python3') }} ansible_become=true ansible_become_method=sudo ansible_become_user=root ansible_become_flags="-S --preserve-env" ansible_become_pass="{{ kubernetes_deployment.ansible_sudo_pass | default(node.ansible_user) | default(default_ansible_user) }}" access_ip={{ node.private_ip }}
 {% endfor %}
 {% for node in worker_nodes | default([]) %}
-{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} ansible_python_interpreter={{ kubernetes_deployment.python_config.interpreter_path | default('/usr/bin/python3') }} ansible_become=true ansible_become_method=sudo ansible_become_user=root ansible_become_flags="-S --preserve-env" ansible_become_pass="{{ kubernetes_deployment.ansible_sudo_pass | default(node.ansible_user) | default(default_ansible_user) }}"
+{{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} ansible_python_interpreter={{ kubernetes_deployment.python_config.interpreter_path | default('/usr/bin/python3') }} ansible_become=true ansible_become_method=sudo ansible_become_user=root ansible_become_flags="-S --preserve-env" ansible_become_pass="{{ kubernetes_deployment.ansible_sudo_pass | default(node.ansible_user) | default(default_ansible_user) }}" access_ip={{ node.private_ip }}
 {% endfor %}
 
 # Global Variables
