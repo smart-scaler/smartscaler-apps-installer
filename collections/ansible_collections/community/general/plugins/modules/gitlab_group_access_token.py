@@ -55,8 +55,16 @@ options:
     type: list
     elements: str
     aliases: ["scope"]
-    choices: ["api", "read_api", "read_registry", "write_registry", "read_repository", "write_repository", "create_runner",
-      "ai_features", "k8s_proxy"]
+    choices:
+      - api
+      - read_api
+      - read_registry
+      - write_registry
+      - read_repository
+      - write_repository
+      - create_runner
+      - ai_features
+      - k8s_proxy
   access_level:
     description:
       - Access level of the access token.
@@ -185,7 +193,7 @@ class GitLabGroupAccessToken(object):
     @param name of the access token
     '''
     def find_access_token(self, group, name):
-        access_tokens = group.access_tokens.list(all=True)
+        access_tokens = [x for x in group.access_tokens.list(all=True) if not getattr(x, 'revoked', False)]
         for access_token in access_tokens:
             if (access_token.name == name):
                 self.access_token_object = access_token

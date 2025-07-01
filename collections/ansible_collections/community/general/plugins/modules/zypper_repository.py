@@ -142,6 +142,7 @@ from ansible.module_utils.basic import AnsibleModule, missing_required_lib
 
 from ansible.module_utils.urls import fetch_url
 from ansible.module_utils.common.text.converters import to_text
+from ansible.module_utils.six import PY3
 from ansible.module_utils.six.moves import configparser, StringIO
 from io import open
 
@@ -173,7 +174,10 @@ def _parse_repos(module):
             opts = {}
             for o in REPO_OPTS:
                 opts[o] = repo.getAttribute(o)
-            opts['url'] = repo.getElementsByTagName('url')[0].firstChild.data
+            try:
+                opts['url'] = repo.getElementsByTagName('url')[0].firstChild.data
+            except IndexError:
+                opts['url'] = repo.getAttribute('metalink')
             # A repo can be uniquely identified by an alias + url
             repos.append(opts)
         return repos
@@ -407,7 +411,10 @@ def main():
 
         repofile = configparser.ConfigParser()
         try:
-            repofile.readfp(StringIO(repofile_text))
+            if PY3:
+                repofile.read_file(StringIO(repofile_text))
+            else:
+                repofile.readfp(StringIO(repofile_text))
         except configparser.Error:
             module.fail_json(msg='Invalid format, .repo file could not be parsed')
 

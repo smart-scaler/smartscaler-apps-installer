@@ -165,6 +165,96 @@ try:
 
     print("\nSuccessfully generated inventory file.")
 
+    # Generate Kubespray group_vars from user_input.yml
+    print("\nGenerating Kubespray group variables...")
+    
+    # Load group_vars template
+    try:
+        with open('templates/kubespray_group_vars_all.yml.j2', 'r') as f:
+            group_vars_template = Template(f.read())
+    except FileNotFoundError:
+        print("Error: Group vars template file not found at templates/kubespray_group_vars_all.yml.j2")
+        sys.exit(1)
+    
+    # Create group_vars directory structure
+    os.makedirs('inventory/kubespray/group_vars/all', exist_ok=True)
+    os.makedirs('inventory/kubespray/group_vars/kube_control_plane', exist_ok=True)
+    os.makedirs('inventory/kubespray/group_vars/kube_node', exist_ok=True)
+    os.makedirs('inventory/kubespray/group_vars/etcd', exist_ok=True)
+    
+    # Render group_vars/all/all.yml
+    group_vars_content = group_vars_template.render(**template_vars)
+    with open('inventory/kubespray/group_vars/all/all.yml', 'w') as f:
+        f.write(group_vars_content)
+    
+    print("✓ Generated group_vars/all/all.yml")
+    
+    # Generate k8s-cluster.yml with certificate SAN configuration
+    print("Generating k8s-cluster configuration with certificate SAN fix...")
+    
+    try:
+        with open('templates/kubespray_k8s_cluster.yml.j2', 'r') as f:
+            k8s_cluster_template = Template(f.read())
+    except FileNotFoundError:
+        print("Error: K8s cluster template file not found at templates/kubespray_k8s_cluster.yml.j2")
+        sys.exit(1)
+    
+    # Create k8s_cluster group_vars directory
+    os.makedirs('inventory/kubespray/group_vars/k8s_cluster', exist_ok=True)
+    
+    # Render group_vars/k8s_cluster/k8s-cluster.yml with certificate SAN fix
+    k8s_cluster_content = k8s_cluster_template.render(**template_vars)
+    with open('inventory/kubespray/group_vars/k8s_cluster/k8s-cluster.yml', 'w') as f:
+        f.write(k8s_cluster_content)
+    
+    print("✓ Generated group_vars/k8s_cluster/k8s-cluster.yml with certificate SAN fix")
+    print("  - Certificate will include 0.0.0.0 to fix 'x509: certificate is valid for ... not 0.0.0.0' error")
+    
+    # Validate multi-master configuration
+    num_control_plane = len(template_vars['control_plane_nodes'])
+    lb_config = user_input['kubernetes_deployment'].get('load_balancer', {})
+    
+    if num_control_plane > 1:
+        print(f"\n🔧 Multi-Master HA Configuration Detected ({num_control_plane} control plane nodes)")
+        
+        if not lb_config.get('enabled', False):
+            print("⚠️  WARNING: Load balancer is disabled but you have multiple control plane nodes.")
+            print("   This configuration may cause connectivity issues.")
+            print("   Consider enabling load_balancer.enabled: true in user_input.yml")
+        else:
+            lb_type = lb_config.get('type', 'localhost')
+            print(f"✓ Load balancer enabled: {lb_type}")
+            
+            if lb_type == "localhost" and lb_config.get('localhost', {}).get('enabled', False):
+                lb_impl = lb_config['localhost'].get('lb_type', 'nginx')
+                print(f"  - Using {lb_impl} for local load balancing")
+            elif lb_type == "external" and lb_config.get('external', {}).get('enabled', False):
+                ext_addr = lb_config['external'].get('address', 'NOT_SET')
+                print(f"  - Using external load balancer: {ext_addr}")
+            elif lb_type == "kube-vip" and lb_config.get('kube_vip', {}).get('enabled', False):
+                vip_addr = lb_config['kube_vip'].get('vip_address', 'NOT_SET')
+                print(f"  - Using kube-vip with VIP: {vip_addr}")
+                
+        # Validate etcd HA configuration
+        etcd_config = user_input['kubernetes_deployment'].get('etcd_ha', {})
+        if etcd_config.get('enabled', False):
+            print("✓ etcd HA configuration enabled")
+            if etcd_config.get('events_cluster', {}).get('enabled', False):
+                print("  - Events cluster separation enabled")
+        else:
+            print("⚠️  WARNING: etcd HA is disabled for multi-master setup.")
+            print("   Consider enabling etcd_ha.enabled: true for production deployments.")
+            
+    elif num_control_plane == 1:
+        print(f"\n🔧 Single Master Configuration")
+        if lb_config.get('enabled', False):
+            print("ℹ️  Load balancer is enabled but not needed for single master setup.")
+    else:
+        print("\n❌ ERROR: No control plane nodes configured!")
+        sys.exit(1)
+
+    print("\nSuccessfully generated Kubespray configuration files.")
+
     # Print nodes for verification
     print("\nControl Plane Nodes:")
     for node in template_vars['control_plane_nodes']:
@@ -234,7 +324,44 @@ try:
     print("="*80)
     with open('inventory/kubespray/inventory.ini', 'r') as f:
         print(f.read())
-    print("="*80 + "\n")
+    print("="*80)
+    
+    # Print generated group_vars for verification
+    print("\n" + "="*80)
+    print("Generated Kubespray Group Variables (inventory/kubespray/group_vars/all/all.yml):")
+    print("="*80)
+    with open('inventory/kubespray/group_vars/all/all.yml', 'r') as f:
+        group_vars_content = f.read()
+        print(group_vars_content)
+    print("="*80)
+    
+    # Validate critical configurations in group_vars
+    print("\n🔍 Validating Generated Configuration:")
+    critical_checks = []
+    
+    if num_control_plane > 1:
+        if 'loadbalancer_apiserver_localhost: true' in group_vars_content:
+            critical_checks.append("✓ Local load balancer configured")
+        elif 'loadbalancer_apiserver:' in group_vars_content:
+            critical_checks.append("✓ External load balancer configured")
+        elif 'kube_vip_controlplane_enabled: true' in group_vars_content:
+            critical_checks.append("✓ kube-vip load balancer configured")
+        else:
+            critical_checks.append("❌ No load balancer configured for multi-master setup")
+    
+    if 'nvidia_accelerator_enabled: true' in group_vars_content:
+        critical_checks.append("✓ NVIDIA GPU support enabled")
+    
+    if 'etcd_events_cluster_enabled: true' in group_vars_content:
+        critical_checks.append("✓ etcd events cluster separation enabled")
+    
+    if 'rbac_enabled: true' in group_vars_content:
+        critical_checks.append("✓ RBAC security enabled")
+    
+    for check in critical_checks:
+        print(f"  {check}")
+    
+    print("\n")
 
 except FileNotFoundError as e:
     print(f"Error: File not found - {str(e)}", file=sys.stderr)
@@ -328,17 +455,102 @@ fi
 
 # Run the Ansible playbook
 echo -e "\nStarting Kubernetes deployment..."
+echo -e "${YELLOW}Certificate SAN fix applied: 0.0.0.0 included in k8s-cluster.yml${NC}"
 
 # Ensure locale is set for Ansible
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 export LC_CTYPE=en_US.UTF-8
 
-ansible-playbook kubernetes.yml -i inventory/kubespray/inventory.ini -e @user_input.yml -vv
+# Use Kubespray's cluster.yml playbook with our generated configuration
+if [ ! -f "kubespray/cluster.yml" ]; then
+    echo -e "${RED}Error: Kubespray cluster.yml not found. Please ensure Kubespray is properly installed.${NC}"
+    echo "Run: git clone https://github.com/kubernetes-sigs/kubespray.git"
+    exit 1
+fi
+
+# Run Kubespray deployment with generated inventory and group_vars
+echo "Using generated Kubespray configuration:"
+echo "  - Inventory: inventory/kubespray/inventory.ini"
+echo "  - Group Variables: inventory/kubespray/group_vars/all/all.yml"
+echo ""
+
+ansible-playbook kubespray/cluster.yml \
+    -i inventory/kubespray/inventory.ini \
+    -e @user_input.yml \
+    --become \
+    --become-user=root \
+    -vv
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}Kubernetes deployment failed.${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}Kubernetes deployment completed successfully!${NC}" 
+# Create output directory if it doesn't exist
+mkdir -p output
+
+# Copy kubeconfig from the first control plane node
+echo "Copying kubeconfig from first control plane node..."
+python3 << EOF
+import yaml
+import subprocess
+import sys
+import os
+
+try:
+    with open('user_input.yml', 'r') as f:
+        data = yaml.safe_load(f)
+
+    kube_config = data['kubernetes_deployment']
+    first_cp_node = kube_config['control_plane_nodes'][0]
+    user = first_cp_node.get('ansible_user', kube_config['default_ansible_user'])
+    host = first_cp_node['ansible_host']
+    key_path = os.path.expanduser(kube_config['ssh_key_path'])
+
+    # Copy kubeconfig from remote host
+    cmd = f"scp -i {key_path} -o StrictHostKeyChecking=no {user}@{host}:/etc/kubernetes/admin.conf output/kubeconfig"
+    subprocess.run(cmd, shell=True, check=True)
+
+    # Fix permissions
+    os.chmod('output/kubeconfig', 0o600)
+
+    # Update server address in kubeconfig if using a load balancer
+    if kube_config.get('load_balancer', {}).get('enabled', False):
+        lb_config = kube_config['load_balancer']
+        if lb_config.get('type') == 'external' and lb_config.get('external', {}).get('enabled', False):
+            server_address = lb_config['external']['address']
+            server_port = lb_config['external'].get('port', 6443)
+        else:
+            server_address = host
+            server_port = 6444 if lb_config.get('localhost', {}).get('enabled', False) else 6443
+
+        with open('output/kubeconfig', 'r') as f:
+            kubeconfig_content = f.read()
+        
+        import re
+        updated_content = re.sub(
+            r'server: https://[^:]+:[0-9]+',
+            f'server: https://{server_address}:{server_port}',
+            kubeconfig_content
+        )
+        
+        with open('output/kubeconfig', 'w') as f:
+            f.write(updated_content)
+
+        print(f"Updated kubeconfig to use server: https://{server_address}:{server_port}")
+
+    print("Successfully copied and configured kubeconfig to output/kubeconfig")
+
+except Exception as e:
+    print(f"Error copying kubeconfig: {str(e)}", file=sys.stderr)
+    sys.exit(1)
+EOF
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Failed to copy kubeconfig file.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Kubernetes deployment completed successfully!${NC}"
+echo -e "Kubeconfig file is available at: ${GREEN}output/kubeconfig${NC}" 

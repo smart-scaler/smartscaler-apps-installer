@@ -8,8 +8,7 @@
 from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
-DOCUMENTATION = '''
----
+DOCUMENTATION = r"""
 module: pacemaker_resource
 short_description: Manage pacemaker resources
 author:
@@ -28,7 +27,7 @@ options:
   state:
     description:
       - Indicate desired state for cluster resource.
-    choices: [ present, absent, enabled, disabled ]
+    choices: [present, absent, enabled, disabled]
     default: present
     type: str
   name:
@@ -89,7 +88,7 @@ options:
         description:
           - Action to apply to resource.
         type: str
-        choices: [ clone, master, group, promotable ]
+        choices: [clone, master, group, promotable]
       argument_option:
         description:
           - Options to associate with resource action.
@@ -100,9 +99,9 @@ options:
       - Timeout period for polling the resource creation.
     type: int
     default: 300
-'''
+"""
 
-EXAMPLES = '''
+EXAMPLES = r"""
 ---
 - name: Create pacemaker resource
   hosts: localhost
@@ -124,18 +123,18 @@ EXAMPLES = '''
           - operation_action: monitor
             operation_option:
               - interval=20
-'''
+"""
 
-RETURN = '''
+RETURN = r"""
 cluster_resources:
-    description: The cluster resource output message.
-    type: str
-    sample: "Assumed agent name ocf:heartbeat:IPaddr2 (deduced from IPaddr2)"
-    returned: always
-'''
+  description: The cluster resource output message.
+  type: str
+  sample: "Assumed agent name ocf:heartbeat:IPaddr2 (deduced from IPaddr2)"
+  returned: always
+"""
 
 from ansible_collections.community.general.plugins.module_utils.module_helper import StateModuleHelper
-from ansible_collections.community.general.plugins.module_utils.pacemaker import pacemaker_runner
+from ansible_collections.community.general.plugins.module_utils.pacemaker import pacemaker_runner, get_pacemaker_maintenance_mode
 
 
 class PacemakerResource(StateModuleHelper):
@@ -164,11 +163,11 @@ class PacemakerResource(StateModuleHelper):
         required_if=[('state', 'present', ['resource_type', 'resource_option'])],
         supports_check_mode=True,
     )
-    use_old_vardict = False
     default_state = "present"
 
     def __init_module__(self):
         self.runner = pacemaker_runner(self.module, cli_action='resource')
+        self._maintenance_mode_runner = pacemaker_runner(self.module, cli_action='property')
         self.vars.set('previous_value', self._get())
         self.vars.set('value', self.vars.previous_value, change=True, diff=True)
 
@@ -185,8 +184,10 @@ class PacemakerResource(StateModuleHelper):
             return ctx.run(state='status')
 
     def state_absent(self):
-        with self.runner('state name', output_process=self._process_command_output(True, "does not exist"), check_mode_skip=True) as ctx:
-            ctx.run()
+        runner_args = ['state', 'name', 'force']
+        force = get_pacemaker_maintenance_mode(self._maintenance_mode_runner)
+        with self.runner(runner_args, output_process=self._process_command_output(True, "does not exist"), check_mode_skip=True) as ctx:
+            ctx.run(force=force)
             self.vars.set('value', self._get())
             self.vars.stdout = ctx.results_out
             self.vars.stderr = ctx.results_err
@@ -195,7 +196,7 @@ class PacemakerResource(StateModuleHelper):
     def state_present(self):
         with self.runner(
                 'state name resource_type resource_option resource_operation resource_meta resource_argument wait',
-                output_process=self._process_command_output(True, "already exists"),
+                output_process=self._process_command_output(not get_pacemaker_maintenance_mode(self._maintenance_mode_runner), "already exists"),
                 check_mode_skip=True) as ctx:
             ctx.run()
             self.vars.set('value', self._get())

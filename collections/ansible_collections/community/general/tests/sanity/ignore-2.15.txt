@@ -5,7 +5,6 @@ plugins/inventory/iocage.py yamllint:unparsable-with-libyaml
 plugins/inventory/linode.py yamllint:unparsable-with-libyaml
 plugins/inventory/lxd.py yamllint:unparsable-with-libyaml
 plugins/inventory/nmap.py yamllint:unparsable-with-libyaml
-plugins/inventory/proxmox.py yamllint:unparsable-with-libyaml
 plugins/inventory/scaleway.py yamllint:unparsable-with-libyaml
 plugins/inventory/virtualbox.py yamllint:unparsable-with-libyaml
 plugins/lookup/dependent.py validate-modules:unidiomatic-typecheck
@@ -18,4 +17,5 @@ plugins/modules/parted.py validate-modules:parameter-state-invalid-choice
 plugins/modules/rhevm.py validate-modules:parameter-state-invalid-choice
 plugins/modules/udm_user.py import-3.11  # Uses deprecated stdlib library 'crypt'
 plugins/modules/xfconf.py validate-modules:return-syntax-error
+plugins/test/ansible_type.py yamllint:unparsable-with-libyaml
 tests/unit/plugins/modules/test_gio_mime.yaml no-smart-quotes

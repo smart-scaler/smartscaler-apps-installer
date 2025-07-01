@@ -12,7 +12,7 @@ name: yaml
 type: stdout
 short_description: YAML-ized Ansible screen output
 deprecated:
-  removed_in: 13.0.0
+  removed_in: 12.0.0
   why: Starting in ansible-core 2.13, the P(ansible.builtin.default#callback) callback has support for printing output in
     YAML format.
   alternative: Use O(ansible.builtin.default#callback:result_format=yaml).
@@ -37,9 +37,9 @@ import yaml
 import json
 import re
 import string
+from collections.abc import Mapping, Sequence
 
 from ansible.module_utils.common.text.converters import to_text
-from ansible.parsing.yaml.dumper import AnsibleDumper
 from ansible.plugins.callback import strip_internal_keys, module_response_deepcopy
 from ansible.plugins.callback.default import CallbackModule as Default
 
@@ -53,77 +53,77 @@ def should_use_block(value):
     return False
 
 
+def adjust_str_value_for_block(value):
+    # we care more about readable than accuracy, so...
+    # ...no trailing space
+    value = value.rstrip()
+    # ...and non-printable characters
+    value = ''.join(x for x in value if x in string.printable or ord(x) >= 0xA0)
+    # ...tabs prevent blocks from expanding
+    value = value.expandtabs()
+    # ...and odd bits of whitespace
+    value = re.sub(r'[\x0b\x0c\r]', '', value)
+    # ...as does trailing space
+    value = re.sub(r' +\n', '\n', value)
+    return value
+
+
+def create_string_node(tag, value, style, default_style):
+    if style is None:
+        if should_use_block(value):
+            style = '|'
+            value = adjust_str_value_for_block(value)
+        else:
+            style = default_style
+    return yaml.representer.ScalarNode(tag, value, style=style)
+
+
 try:
+    from ansible.module_utils.common.yaml import HAS_LIBYAML
+    # import below was added in https://github.com/ansible/ansible/pull/85039,
+    # first contained in ansible-core 2.19.0b2:
+    from ansible.utils.vars import transform_to_native_types
+
+    if HAS_LIBYAML:
+        from yaml.cyaml import CSafeDumper as SafeDumper
+    else:
+        from yaml import SafeDumper
+
+    class MyDumper(SafeDumper):
+        def represent_scalar(self, tag, value, style=None):
+            """Uses block style for multi-line strings"""
+            node = create_string_node(tag, value, style, self.default_style)
+            if self.alias_key is not None:
+                self.represented_objects[self.alias_key] = node
+            return node
+
+except ImportError:
+    # In case transform_to_native_types cannot be imported, we either have ansible-core 2.19.0b1
+    # (or some random commit from the devel or stable-2.19 branch after merging the DT changes
+    # and before transform_to_native_types was added), or we have a version without the DT changes.
+
+    # Here we simply assume we have a version without the DT changes, and thus can continue as
+    # with ansible-core 2.18 and before.
+
+    transform_to_native_types = None
+
+    from ansible.parsing.yaml.dumper import AnsibleDumper
+
     class MyDumper(AnsibleDumper):  # pylint: disable=inherit-non-class
         def represent_scalar(self, tag, value, style=None):
             """Uses block style for multi-line strings"""
-            if style is None:
-                if should_use_block(value):
-                    style = '|'
-                    # we care more about readable than accuracy, so...
-                    # ...no trailing space
-                    value = value.rstrip()
-                    # ...and non-printable characters
-                    value = ''.join(x for x in value if x in string.printable or ord(x) >= 0xA0)
-                    # ...tabs prevent blocks from expanding
-                    value = value.expandtabs()
-                    # ...and odd bits of whitespace
-                    value = re.sub(r'[\x0b\x0c\r]', '', value)
-                    # ...as does trailing space
-                    value = re.sub(r' +\n', '\n', value)
-                else:
-                    style = self.default_style
-            node = yaml.representer.ScalarNode(tag, value, style=style)
+            node = create_string_node(tag, value, style, self.default_style)
             if self.alias_key is not None:
                 self.represented_objects[self.alias_key] = node
             return node
-except:  # noqa: E722, pylint: disable=bare-except
-    # This happens with Data Tagging, see https://github.com/ansible/ansible/issues/84781
-    # Until there is a better solution we'll resort to using ansible-core internals.
-    from ansible._internal._yaml import _dumper
-    import typing as t
 
-    class MyDumper(_dumper._BaseDumper):
-        # This code is mostly taken from ansible._internal._yaml._dumper
-        @classmethod
-        def _register_representers(cls) -> None:
-            cls.add_multi_representer(_dumper.AnsibleTaggedObject, cls.represent_ansible_tagged_object)
-            cls.add_multi_representer(_dumper.Tripwire, cls.represent_tripwire)
-            cls.add_multi_representer(_dumper.c.Mapping, _dumper.SafeRepresenter.represent_dict)
-            cls.add_multi_representer(_dumper.c.Sequence, _dumper.SafeRepresenter.represent_list)
 
-        def represent_ansible_tagged_object(self, data):
-            if ciphertext := _dumper.VaultHelper.get_ciphertext(data, with_tags=False):
-                return self.represent_scalar('!vault', ciphertext, style='|')
-
-            return self.represent_data(_dumper.AnsibleTagHelper.as_native_type(data))  # automatically decrypts encrypted strings
-
-        def represent_tripwire(self, data: _dumper.Tripwire) -> t.NoReturn:
-            data.trip()
-
-        # The following function is the same as in the try/except
-        def represent_scalar(self, tag, value, style=None):
-            """Uses block style for multi-line strings"""
-            if style is None:
-                if should_use_block(value):
-                    style = '|'
-                    # we care more about readable than accuracy, so...
-                    # ...no trailing space
-                    value = value.rstrip()
-                    # ...and non-printable characters
-                    value = ''.join(x for x in value if x in string.printable or ord(x) >= 0xA0)
-                    # ...tabs prevent blocks from expanding
-                    value = value.expandtabs()
-                    # ...and odd bits of whitespace
-                    value = re.sub(r'[\x0b\x0c\r]', '', value)
-                    # ...as does trailing space
-                    value = re.sub(r' +\n', '\n', value)
-                else:
-                    style = self.default_style
-            node = yaml.representer.ScalarNode(tag, value, style=style)
-            if self.alias_key is not None:
-                self.represented_objects[self.alias_key] = node
-            return node
+def transform_recursively(value, transform):
+    if isinstance(value, Mapping):
+        return {transform(k): transform(v) for k, v in value.items()}
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return [transform(e) for e in value]
+    return transform(value)
 
 
 class CallbackModule(Default):
@@ -180,6 +180,8 @@ class CallbackModule(Default):
 
         if abridged_result:
             dumped += '\n'
+            if transform_to_native_types is not None:
+                abridged_result = transform_recursively(abridged_result, lambda v: transform_to_native_types(v, redact=False))
             dumped += to_text(yaml.dump(abridged_result, allow_unicode=True, width=1000, Dumper=MyDumper, default_flow_style=False))
 
         # indent by a couple of spaces
