@@ -281,7 +281,7 @@ helm_charts:
     atomic: false
     skip_diff: true
     dependencies: []
-    chart_version: "1.14.0"
+    chart_version: "1.14.2"
     release_values:
       global:
         imageRegistry: docker.io/aveshasystems
@@ -318,7 +318,7 @@ helm_charts:
     atomic: false
     skip_diff: true
     dependencies: []
-    chart_version: "1.14.0"
+    chart_version: "1.14.2"
     release_values:
       global:
         imageRegistry: docker.io/aveshasystems
@@ -364,7 +364,7 @@ helm_charts:
     atomic: false
     skip_diff: true
     dependencies: []
-    chart_version: "1.14.0"
+    chart_version: "1.14.2"
     values_files:
       - "output/worker-1-values.yaml"
     release_values:
