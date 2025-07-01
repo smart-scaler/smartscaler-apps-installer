@@ -1,10 +1,13 @@
 apiVersion: v2
-description:  KubeSlice operator - A Helm chart for managing life-cycle management of KubeSlice
-name: kubeslice-worker-egs
-type: application
-maintainers:
-  - name: Avesha
-    email: support@avesha.io
+appVersion: 1.14.2
+dependencies:
+- condition: kserve.enabled
+  name: kserve
+  repository: file://./charts/kserve
+  version: v0.14.0
+description: KubeSlice operator - A Helm chart for managing life-cycle management
+  of KubeSlice
+home: https://avesha.io/products/product-slice
 keywords:
 - multicloud
 - multi cloud
@@ -27,11 +30,9 @@ keywords:
 - infrastructure
 - application
 kubeVersion: '>= 1.19.0-0'
-home: https://avesha.io/products/product-slice
-dependencies:
-  - name: kserve
-    repository: file://./charts/kserve
-    version: v0.14.0
-    condition: kserve.enabled
+maintainers:
+- email: support@avesha.io
+  name: Avesha
+name: kubeslice-worker-egs
+type: application
 version: 1.14.2
-appVersion: 1.14.2
