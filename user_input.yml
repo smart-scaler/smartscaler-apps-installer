@@ -15,7 +15,7 @@ kubernetes_deployment:
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
   api_server:
-    host: "PUBLIC_IP"        # External IP for client connections
+    host: "172.235.29.19"        # External IP for client connections
     port: 6444                   # Client-facing port (what kubectl/clients connect to)
                                 # Standard Kubernetes API port - change only if required
     bind_address: "0.0.0.0"      # Address API server binds to (0.0.0.0 for all interfaces)
@@ -38,13 +38,13 @@ kubernetes_deployment:
   # Minimum 3 nodes for HA, always use odd numbers (3, 5, 7)
   control_plane_nodes:
     - name: "master-1"                # Unique identifier for the control plane node
-      ansible_host: "PUBLIC_IP"  # Reference global IP
-      ansible_user: "REPLACE_SSH_USER"      # SSH username for this specific node
+      ansible_host: "172.235.29.19"  # Replace with actual master-1 public IP
+      ansible_user: "root"      # SSH username for this specific node
                                      # Overrides default_ansible_user if different
       ansible_become: true            # Enable privilege escalation (sudo)
       ansible_become_method: "sudo"     # Method for privilege escalation
       ansible_become_user: "root"       # Target user for privilege escalation
-      private_ip: "PRIVATE_IP"      # Internal/private IP address
+      private_ip: "172.235.29.19"      # Replace with actual master-1 private IP
                                      # Used for internal cluster communication
     # Add more masters for HA (uncomment and configure):
     # - name: "master-2"
@@ -229,7 +229,7 @@ validate_prerequisites:
 execution_order_enabled: true                # Required: Must be enabled for ordered execution
 
 # Required Kubeconfig Settings
-global_control_plane_ip: "PUBLIC_IP"         # Provide the public IP for metallb/Nginx
+global_control_plane_ip: "172.235.29.19"         # Provide the public IP for metallb/Nginx
 global_kubeconfig: "output/kubeconfig"        # Required: Path to kubeconfig file
 global_kubecontext: "kubernetes-admin@cluster.local"  # Required: Kubernetes context
 use_global_context: true                     # Required: Use global context
@@ -1818,7 +1818,7 @@ command_exec:
             --context={{ kubecontext | default(global_kubecontext) }} \
             patch configmap -n kube-system nodelocaldns --patch '{
               "data": {
-                "Corefile": "cluster.local:53 {\n    errors\n    cache {\n        success 9984 30\n        denial 9984 5\n    }\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n    health 169.254.25.10:9254\n}\nin-addr.arpa:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n}\nip6.arpa:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n}\n.:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    hosts {\n        172.105.60.77 smartai.avesha.lab\n        fallthrough\n    }\n    forward . /etc/resolv.conf\n    prometheus :9253\n}"
+                "Corefile": "cluster.local:53 {\n    errors\n    cache {\n        success 9984 30\n        denial 9984 5\n    }\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n    health 169.254.25.10:9254\n}\nin-addr.arpa:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n}\nip6.arpa:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n}\n.:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    hosts {\n        172.235.29.19 smartai.avesha.lab\n        fallthrough\n    }\n    forward . /etc/resolv.conf\n    prometheus :9253\n}"
               }
             }'
           echo "NodeLocalDNS configmap patched successfully!"

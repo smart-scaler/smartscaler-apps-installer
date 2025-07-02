@@ -242,7 +242,7 @@
   when: deploy_kubernetes | default(true) | bool and kubernetes_deployment.enabled | default(false)
 
 # Post-deployment tasks that require a running Kubernetes cluster
-- name: Wait for Kubernetes API to be available
+- name: Wait for Kubernetes API to be available on first control plane node
   wait_for:
     host: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
     port: "{{ (kubernetes_deployment.api_server.port | int) + (kubernetes_deployment.load_balancer.localhost.api_port_offset | default(1) | int) if kubernetes_deployment.load_balancer.enabled and kubernetes_deployment.load_balancer.localhost.enabled else kubernetes_deployment.api_server.port }}"
@@ -250,6 +250,8 @@
   when: 
     - kubernetes_deployment.enabled | default(false)
     - deploy_kubernetes | default(true) | bool
+  delegate_to: localhost
+  run_once: true
 
 - name: Configure NVIDIA runtime and firewall
   block:
