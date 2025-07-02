@@ -462,10 +462,9 @@ export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 export LC_CTYPE=en_US.UTF-8
 
-# Use Kubespray's cluster.yml playbook with our generated configuration
-if [ ! -f "kubespray/cluster.yml" ]; then
-    echo -e "${RED}Error: Kubespray cluster.yml not found. Please ensure Kubespray is properly installed.${NC}"
-    echo "Run: git clone https://github.com/kubernetes-sigs/kubespray.git"
+# Use kubernetes.yml playbook which provides better orchestration
+if [ ! -f "kubernetes.yml" ]; then
+    echo -e "${RED}Error: kubernetes.yml not found in the current directory.${NC}"
     exit 1
 fi
 
@@ -475,82 +474,17 @@ echo "  - Inventory: inventory/kubespray/inventory.ini"
 echo "  - Group Variables: inventory/kubespray/group_vars/all/all.yml"
 echo ""
 
-ansible-playbook kubespray/cluster.yml \
+ansible-playbook kubernetes.yml \
     -i inventory/kubespray/inventory.ini \
     -e @user_input.yml \
     --become \
     --become-user=root \
-    -vv
+    -vvv
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}Kubernetes deployment failed.${NC}"
     exit 1
 fi
 
-# Create output directory if it doesn't exist
-mkdir -p output
-
-# Copy kubeconfig from the first control plane node
-echo "Copying kubeconfig from first control plane node..."
-python3 << EOF
-import yaml
-import subprocess
-import sys
-import os
-
-try:
-    with open('user_input.yml', 'r') as f:
-        data = yaml.safe_load(f)
-
-    kube_config = data['kubernetes_deployment']
-    first_cp_node = kube_config['control_plane_nodes'][0]
-    user = first_cp_node.get('ansible_user', kube_config['default_ansible_user'])
-    host = first_cp_node['ansible_host']
-    key_path = os.path.expanduser(kube_config['ssh_key_path'])
-
-    # Copy kubeconfig from remote host
-    cmd = f"scp -i {key_path} -o StrictHostKeyChecking=no {user}@{host}:/etc/kubernetes/admin.conf output/kubeconfig"
-    subprocess.run(cmd, shell=True, check=True)
-
-    # Fix permissions
-    os.chmod('output/kubeconfig', 0o600)
-
-    # Update server address in kubeconfig if using a load balancer
-    if kube_config.get('load_balancer', {}).get('enabled', False):
-        lb_config = kube_config['load_balancer']
-        if lb_config.get('type') == 'external' and lb_config.get('external', {}).get('enabled', False):
-            server_address = lb_config['external']['address']
-            server_port = lb_config['external'].get('port', 6443)
-        else:
-            server_address = host
-            server_port = 6444 if lb_config.get('localhost', {}).get('enabled', False) else 6443
-
-        with open('output/kubeconfig', 'r') as f:
-            kubeconfig_content = f.read()
-        
-        import re
-        updated_content = re.sub(
-            r'server: https://[^:]+:[0-9]+',
-            f'server: https://{server_address}:{server_port}',
-            kubeconfig_content
-        )
-        
-        with open('output/kubeconfig', 'w') as f:
-            f.write(updated_content)
-
-        print(f"Updated kubeconfig to use server: https://{server_address}:{server_port}")
-
-    print("Successfully copied and configured kubeconfig to output/kubeconfig")
-
-except Exception as e:
-    print(f"Error copying kubeconfig: {str(e)}", file=sys.stderr)
-    sys.exit(1)
-EOF
-
-if [ $? -ne 0 ]; then
-    echo -e "${RED}Failed to copy kubeconfig file.${NC}"
-    exit 1
-fi
-
 echo -e "${GREEN}Kubernetes deployment completed successfully!${NC}"
-echo -e "Kubeconfig file is available at: ${GREEN}output/kubeconfig${NC}" 
+echo -e "Kubeconfig file will be available at: ${GREEN}output/kubeconfig${NC} after kubernetes.yml completes" 
