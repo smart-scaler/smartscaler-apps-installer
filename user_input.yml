@@ -1,7 +1,7 @@
 ---
 ################################################################################
 # USER INPUT CONFIGURATION
-# Last updated: JULY 2, 2025
+# Last updated: JULY 3, 2025
 ################################################################################
 
 ###############################################################################
@@ -162,28 +162,28 @@ kubernetes_deployment:
       memory_requests: "32M"              # DEFAULT: Memory allocation for LB pod
       cpu_requests: "25m"                 # DEFAULT: CPU allocation for LB pod
     
-    # External Load Balancer Configuration (ALTERNATIVE: For external LB like HAProxy/F5)
-    external:
-      enabled: false                       # ALTERNATIVE: Use only if you have external load balancer
-      address: ""                         # External LB IP address (defaults to api_server.host)
-      domain_name: "k8s-api.yourdomain.com"  # Optional: Domain name for LB
-                                          # External LB port uses api_server.port automatically
+    # # External Load Balancer Configuration (ALTERNATIVE: For external LB like HAProxy/F5)
+    # external:
+    #   enabled: false                       # ALTERNATIVE: Use only if you have external load balancer
+    #   address: ""                         # External LB IP address (defaults to api_server.host)
+    #   domain_name: "k8s-api.yourdomain.com"  # Optional: Domain name for LB
+    #                                       # External LB port uses api_server.port automatically
     
-    # kube-vip Configuration (ALTERNATIVE: For VIP-based HA)
-    kube_vip:
-      enabled: false                       # ALTERNATIVE: Use only for VIP-based high availability
-      controlplane_enabled: true          # Enable kube-vip for control plane
-      vip_address: ""                     # Virtual IP address (defaults to api_server.host)
-      interface: "eth0"                   # Network interface for VIP
-      arp_enabled: true                   # Enable ARP for VIP management
-      leader_election: true               # Enable leader election
-      cidr: 24                           # CIDR for VIP network
+    # # kube-vip Configuration (ALTERNATIVE: For VIP-based HA)
+    # kube_vip:
+    #   enabled: false                       # ALTERNATIVE: Use only for VIP-based high availability
+    #   controlplane_enabled: true          # Enable kube-vip for control plane
+    #   vip_address: ""                     # Virtual IP address (defaults to api_server.host)
+    #   interface: "eth0"                   # Network interface for VIP
+    #   arp_enabled: true                   # Enable ARP for VIP management
+    #   leader_election: true               # Enable leader election
+    #   cidr: 24                           # CIDR for VIP network
 
   # etcd High Availability Configuration
   # Critical for multi-master cluster stability and data consistency
   # NOTE: Disabled for single master setup
   etcd_ha:
-    enabled: false                         # Disabled for single master setup
+    enabled: true                         # Disabled for single master setup
     deployment_type: "kubeadm"            # Deployment type: "kubeadm" or "external"
     
     # etcd Cluster Configuration
