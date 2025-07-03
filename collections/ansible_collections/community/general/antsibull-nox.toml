@@ -8,10 +8,6 @@
 "community.docker" = "git+https://github.com/ansible-collections/community.docker.git,main"
 "community.internal_test_tools" = "git+https://github.com/ansible-collections/community.internal_test_tools.git,main"
 
-[collection_sources_per_ansible.'2.15']
-# community.crypto's main branch needs ansible-core >= 2.17
-"community.crypto" = "git+https://github.com/ansible-collections/community.crypto.git,stable-2"
-
 [collection_sources_per_ansible.'2.16']
 # community.crypto's main branch needs ansible-core >= 2.17
 "community.crypto" = "git+https://github.com/ansible-collections/community.crypto.git,stable-2"
@@ -28,6 +24,18 @@ run_no_unwanted_files = true
 no_unwanted_files_module_extensions = [".py"]
 no_unwanted_files_yaml_extensions = [".yml"]
 run_action_groups = true
+run_no_trailing_whitespace = true
+no_trailing_whitespace_skip_paths = [
+    "tests/integration/targets/iso_extract/files/test.iso",
+    "tests/integration/targets/java_cert/files/testpkcs.p12",
+    "tests/integration/targets/one_host/files/testhost/tmp/opennebula-fixtures.json.gz",
+    "tests/integration/targets/one_template/files/testhost/tmp/opennebula-fixtures.json.gz",
+    "tests/integration/targets/setup_flatpak_remote/files/repo.tar.xz",
+]
+no_trailing_whitespace_skip_directories = [
+    "tests/unit/plugins/modules/interfaces_file/interfaces_file_fixtures/golden_output/",
+    "tests/unit/plugins/modules/interfaces_file/interfaces_file_fixtures/input/",
+]
 
 [[sessions.extra_checks.action_groups_config]]
 name = "consul"
@@ -45,12 +53,6 @@ exclusions = [
     "keycloak_realm_info",
 ]
 doc_fragment = "community.general.keycloak.actiongroup_keycloak"
-
-[[sessions.extra_checks.action_groups_config]]
-name = "proxmox"
-pattern = "^proxmox(_.*)?$"
-exclusions = []
-doc_fragment = "community.general.proxmox.actiongroup_proxmox"
 
 [sessions.build_import_check]
 run_galaxy_importer = true

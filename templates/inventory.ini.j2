@@ -1,4 +1,12 @@
 # Kubernetes Inventory Configuration
+# This inventory describes a HA topology with stacked etcd (same nodes as control plane)
+# and separate worker nodes
+# See https://docs.ansible.com/ansible/latest/inventory_guide/intro_inventory.html
+
+# Configure 'ip' variable to bind kubernetes services on a different ip than the default iface
+# We should set etcd_member_name for etcd cluster. The node that are not etcd members do not need to set the value,
+# or can set the empty string value.
+
 [all]
 {% for node in control_plane_nodes %}
 {{ node.name }} ansible_host={{ node.ansible_host }} ansible_user={{ node.ansible_user | default(default_ansible_user) }} ansible_ssh_private_key_file={{ ssh_key_path }} ansible_python_interpreter={{ kubernetes_deployment.python_config.interpreter_path | default('/usr/bin/python3') }} ansible_become=true ansible_become_method=sudo ansible_become_user=root ansible_become_flags="-S --preserve-env" ansible_become_pass="{{ kubernetes_deployment.ansible_sudo_pass | default(node.ansible_user) | default(default_ansible_user) }}" access_ip={{ node.private_ip }}
@@ -16,26 +24,29 @@ ansible_become_method=sudo
 ansible_become_user=root
 ansible_become_flags="-S --preserve-env"
 
-# Control Plane Configuration
+# Control Plane Configuration (Masters)
 [kube_control_plane]
 {% for node in control_plane_nodes %}
-{{ node.name }}
+{{ node.name }} ansible_host={{ node.ansible_host }}{% if node.private_ip %} ip={{ node.private_ip }}{% endif %} etcd_member_name=etcd{{ loop.index }}
 {% endfor %}
 
-# etcd Configuration
-[etcd]
-{% for node in control_plane_nodes %}
-{{ node.name }}
-{% endfor %}
+# etcd Configuration - Stacked etcd (runs on control plane nodes)
+[etcd:children]
+kube_control_plane
 
-# Node Configuration
+# Node Configuration (Workers + Masters if no dedicated workers)
 [kube_node]
+{% if worker_nodes | default([]) | length > 0 %}
+{# Dedicated worker nodes exist, don't include masters as workers #}
+{% for node in worker_nodes %}
+{{ node.name }} ansible_host={{ node.ansible_host }}{% if node.private_ip %} ip={{ node.private_ip }}{% endif %}
+{% endfor %}
+{% else %}
+{# No dedicated workers, masters also act as workers #}
 {% for node in control_plane_nodes %}
 {{ node.name }}
 {% endfor %}
-{% for node in worker_nodes | default([]) %}
-{{ node.name }}
-{% endfor %}
+{% endif %}
 
 # Cluster Groups
 [k8s_cluster:children]
@@ -61,12 +72,17 @@ kube_pods_subnet="{{ kubernetes_deployment.network_config.pod_subnet | default('
 kube_network_node_prefix={{ kubernetes_deployment.network_config.node_prefix | default(24) }}
 
 # API Server Configuration
-kube_apiserver_ip="{{ kubernetes_deployment.api_server.host }}"
-apiserver_loadbalancer_domain_name="{{ kubernetes_deployment.api_server.host }}"
-loadbalancer_apiserver='{"address":"{{ kubernetes_deployment.api_server.host }}","port":{{ kubernetes_deployment.api_server.port }}}'
+# kube_apiserver_ip removed - each node should use its own IP via main_ip variable
+{% if kubernetes_deployment.load_balancer.type == "external" and kubernetes_deployment.load_balancer.external.enabled %}
+apiserver_loadbalancer_domain_name="{{ kubernetes_deployment.load_balancer.external.domain_name | default(kubernetes_deployment.load_balancer.external.address) }}"
+loadbalancer_apiserver='{"address":"{{ kubernetes_deployment.load_balancer.external.address }}","port":{{ kubernetes_deployment.load_balancer.external.port | default(6443) }}}'
+{% elif kubernetes_deployment.load_balancer.type == "kube-vip" and kubernetes_deployment.load_balancer.kube_vip.enabled %}
+apiserver_loadbalancer_domain_name="{{ kubernetes_deployment.load_balancer.kube_vip.vip_address }}"
+loadbalancer_apiserver='{"address":"{{ kubernetes_deployment.load_balancer.kube_vip.vip_address }}","port":{{ kubernetes_deployment.api_server.port | default(6443) }}}'
+{% endif %}
 
-# SSL Configuration
-supplementary_addresses_in_ssl_keys='["{{ kubernetes_deployment.api_server.host }}"{% for node in control_plane_nodes + (worker_nodes | default([])) %},"{{ node.ansible_host }}"{% if node.private_ip and node.private_ip != node.ansible_host %},"{{ node.private_ip }}"{% endif %}{% endfor %}]'
+# SSL Configuration - Certificate Subject Alternative Names (SAN)
+# Now configured in group_vars/all/all.yml for proper precedence
 
 # Additional Kubernetes Configuration
 {% if kubernetes_deployment.additional_vars is defined %}

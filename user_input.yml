@@ -1,7 +1,7 @@
 ---
 ################################################################################
 # USER INPUT CONFIGURATION
-# Last updated: JUNE 27, 2025
+# Last updated: JULY 3, 2025
 ################################################################################
 
 ###############################################################################
@@ -15,11 +15,12 @@ kubernetes_deployment:
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
   api_server:
-    host: "0.0.0.0"  # Reference global IP
-    port: 6443              # The port for the Kubernetes API server
-                           # 6443 is the default secure port for Kubernetes
-    secure: true           # Whether to use HTTPS for API server connections
-                          # Should always be true in production environments
+    host: "PUBLIC_IP"        # Load balancer VIP or first master for initial setup
+    port: 6443                   # Standard Kubernetes API port (will be load balanced)
+                                # Standard Kubernetes API port - change only if required
+    bind_address: "0.0.0.0"      # Listen on all interfaces
+    secure: true                 # Whether to use HTTPS for API server connections
+                                # Should always be true in production environments
 
   # SSH Access Configuration
   # Required for Kubespray to access and configure nodes
@@ -32,18 +33,46 @@ kubernetes_deployment:
   # or will prompt if neither is set
   ansible_sudo_pass: ""  # Leave empty to use environment variable or prompt
 
-  # Control Plane Node Configuration
-  # Defines the master nodes that will run the Kubernetes control plane
+
+  # Control Plane Node Configuration (Multi-Master HA Support)
+  # Minimum 3 nodes for HA, always use odd numbers (3, 5, 7)
   control_plane_nodes:
     - name: "master-1"                # Unique identifier for the control plane node
-      ansible_host: "PUBLIC_IP"  # Reference global IP
-      ansible_user: "REPLACE_SSH_USER"      # SSH username for this specific node
+      ansible_host: "PUBLIC_IP"  # Replace with actual master-1 public IP
+      ansible_user: "root"      # SSH username for this specific node
                                      # Overrides default_ansible_user if different
       ansible_become: true            # Enable privilege escalation (sudo)
       ansible_become_method: "sudo"     # Method for privilege escalation
       ansible_become_user: "root"       # Target user for privilege escalation
-      private_ip: "PRIVATE_IP"      # Internal/private IP address
+      private_ip: "PRIVATE_IP"      # Replace with actual master-1 private IP
                                      # Used for internal cluster communication
+    # # Add more masters for HA (uncomment and configure):
+    # - name: "master-2"
+    #   ansible_host: "PUBLIC_IP_2"
+    #   ansible_user: "root"
+    #   ansible_become: true
+    #   ansible_become_method: "sudo"
+    #   ansible_become_user: "root"
+    #   private_ip: "PRIVATE_IP_2"
+    # - name: "master-3"
+    #   ansible_host: "PUBLIC_IP_3"
+    #   ansible_user: "root"
+    #   ansible_become: true
+    #   ansible_become_method: "sudo"
+    #   ansible_become_user: "root"
+    #   private_ip: "PRIVATE_IP_3"
+
+  # Worker Node Configuration (Optional but recommended)
+  # worker_nodes: []
+  # Example worker node configuration:
+  # worker_nodes:
+  #   - name: "worker-1"
+  #     ansible_host: "WORKER_PUBLIC_IP"
+  #     ansible_user: "root"
+  #     ansible_become: true
+  #     ansible_become_method: "sudo"
+  #     ansible_become_user: "root"
+  #     private_ip: "WORKER_PRIVATE_IP"
 
 
     # Python Configuration
@@ -107,6 +136,84 @@ kubernetes_deployment:
   async_config:
     timeout: 3600                          # Maximum time (in seconds) to wait for task completion
     poll_interval: 5                       # How often (in seconds) to check task status
+
+  # Load Balancer Configuration
+  # ============================================================================
+  # DEFAULT STRATEGY: Load Balancer ALWAYS ENABLED
+  # ============================================================================
+  # WHY: Future-proof scaling, health monitoring, operational consistency
+  # WORKS: Single master (1 node) and multi-master (3+ nodes) deployments
+  # FLOW: kubectl → haproxy:6443 → API server:6444 (on each master)
+  # ============================================================================
+  load_balancer:
+    enabled: true                          # DEFAULT: Always enabled (recommended best practice)
+    type: "localhost"                      # DEFAULT: Use localhost haproxy proxy
+    
+    # Localhost Load Balancer Configuration (DEFAULT: Enabled for all deployments)
+    # Benefits: Future-proof scaling, health monitoring, consistent architecture
+    localhost:
+      enabled: true                        # DEFAULT: Always enabled (works for single/multi-master)
+      lb_type: "haproxy"                   # Using HAProxy for enterprise-grade load balancing
+      bind_address: "0.0.0.0"             # DEFAULT: Bind to all interfaces
+      api_port_offset: 1                  # DEFAULT: API server port = client_port + offset (6443+1=6444)
+      pod_name: "haproxy"                 # HAProxy load balancer pod name
+      healthcheck_port: 8081              # DEFAULT: Health monitoring port
+      keepalive_timeout: "5m"             # DEFAULT: Connection timeout
+      memory_requests: "32M"              # DEFAULT: Memory allocation for LB pod
+      cpu_requests: "25m"                 # DEFAULT: CPU allocation for LB pod
+    
+    # # External Load Balancer Configuration (ALTERNATIVE: For external LB like HAProxy/F5)
+    # external:
+    #   enabled: false                       # ALTERNATIVE: Use only if you have external load balancer
+    #   address: ""                         # External LB IP address (defaults to api_server.host)
+    #   domain_name: "k8s-api.yourdomain.com"  # Optional: Domain name for LB
+    #                                       # External LB port uses api_server.port automatically
+    
+    # # kube-vip Configuration (ALTERNATIVE: For VIP-based HA)
+    # kube_vip:
+    #   enabled: false                       # ALTERNATIVE: Use only for VIP-based high availability
+    #   controlplane_enabled: true          # Enable kube-vip for control plane
+    #   vip_address: ""                     # Virtual IP address (defaults to api_server.host)
+    #   interface: "eth0"                   # Network interface for VIP
+    #   arp_enabled: true                   # Enable ARP for VIP management
+    #   leader_election: true               # Enable leader election
+    #   cidr: 24                           # CIDR for VIP network
+
+  # etcd High Availability Configuration
+  # Critical for multi-master cluster stability and data consistency
+  # NOTE: Disabled for single master setup
+  etcd_ha:
+    enabled: true                         # Disabled for single master setup
+    deployment_type: "kubeadm"            # Deployment type: "kubeadm" or "external"
+    
+    # etcd Cluster Configuration
+    cluster:
+      initial_cluster_state: "new"        # Initial cluster state: "new" or "existing"
+      heartbeat_interval: "100"           # Heartbeat interval in milliseconds
+      election_timeout: "1000"            # Election timeout in milliseconds
+      quota_backend_bytes: "2147483648"   # Storage quota (2GB default)
+      auto_compaction_retention: "8"      # Auto compaction retention in hours
+      max_request_bytes: "1572864"        # Max request size (1.5MB)
+      metrics: "basic"                    # Metrics level: "basic" or "extensive"
+    
+    # etcd Events Cluster (Optional)
+    events_cluster:
+      enabled: false                      # Disabled for single master
+      setup: false                       # Disabled for single master
+    
+    # etcd Security Configuration
+    security:
+      peer_auto_tls: false               # Disable peer auto TLS (use proper certs)
+      client_cert_auth: true             # Require client certificate authentication
+      peer_cert_auth: true               # Require peer certificate authentication
+    
+    # etcd Performance Tuning
+    performance:
+      max_snapshots: 5                   # Maximum number of snapshots to retain
+      max_wals: 5                        # Maximum number of WAL files to retain
+      snapshot_count: 100000             # Snapshot after this many transactions
+      wal_dir: ""                        # Custom WAL directory (empty = default)
+      data_dir: ""                       # Custom data directory (empty = default)
 
 ###############################################################################
 # REQUIRED SETTINGS
@@ -1711,7 +1818,7 @@ command_exec:
             --context={{ kubecontext | default(global_kubecontext) }} \
             patch configmap -n kube-system nodelocaldns --patch '{
               "data": {
-                "Corefile": "cluster.local:53 {\n    errors\n    cache {\n        success 9984 30\n        denial 9984 5\n    }\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n    health 169.254.25.10:9254\n}\nin-addr.arpa:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n}\nip6.arpa:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n}\n.:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    hosts {\n        PUBLIC_IP smartai.avesha.lab\n        fallthrough\n    }\n    forward . /etc/resolv.conf\n    prometheus :9253\n}"
+                "Corefile": "cluster.local:53 {\n    errors\n    cache {\n        success 9984 30\n        denial 9984 5\n    }\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n    health 169.254.25.10:9254\n}\nin-addr.arpa:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n}\nip6.arpa:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    forward . 10.233.0.3 {\n        force_tcp\n    }\n    prometheus :9253\n}\n.:53 {\n    errors\n    cache 30\n    reload\n    loop\n    bind 169.254.25.10\n    hosts {\n        172.235.29.19 smartai.avesha.lab\n        fallthrough\n    }\n    forward . /etc/resolv.conf\n    prometheus :9253\n}"
               }
             }'
           echo "NodeLocalDNS configmap patched successfully!"

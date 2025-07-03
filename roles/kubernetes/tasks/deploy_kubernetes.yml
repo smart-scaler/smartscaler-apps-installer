@@ -161,8 +161,6 @@
     -e @{{ inventory_dir }}/kubespray/group_vars/all/all.yml \
     -e @{{ inventory_dir }}/kubespray/group_vars/k8s_cluster/addons.yml \
     -e @{{ inventory_dir }}/kubespray/temp_ssl_vars.yml \
-    -e "kube_apiserver_bind_address={{ kubernetes_deployment.api_server.host }}" \
-    -e "kube_apiserver_advertise_address={{ first_control_plane_ip }}" \
     -e "kubernetes_deployment={{ kubernetes_deployment }}" \
     -e "kubelet_max_pods={{ kubernetes_deployment.kubelet_config.max_pods | default(110) }}" \
     --become \
@@ -303,6 +301,15 @@
 
 - name: Determine kubeconfig server address
   set_fact:
+    kubeconfig_server_address: "{{ kubernetes_deployment.api_server.host }}"
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - local_kubeconfig_check.stat.exists | default(false)
+    - kubernetes_deployment.load_balancer.enabled | default(false)
+    - kubernetes_deployment.load_balancer.localhost.enabled | default(false)
+
+- name: Determine kubeconfig server address (direct access)
+  set_fact:
     kubeconfig_server_address: >-
       {{
         kubernetes_deployment.global_control_plane_ip | default(
@@ -312,29 +319,52 @@
   when: 
     - kubernetes_deployment.enabled | default(false)
     - local_kubeconfig_check.stat.exists | default(false)
+    - not (kubernetes_deployment.load_balancer.enabled | default(false) and kubernetes_deployment.load_balancer.localhost.enabled | default(false))
 
-- name: Update kubeconfig server address to use public IP
+- name: Update kubeconfig server address to use API server host
   replace:
     path: "{{ playbook_dir }}/output/kubeconfig"
     regexp: 'server: https://0\.0\.0\.0:6443'
-    replace: 'server: https://{{ kubeconfig_server_address }}:6443'
+    replace: 'server: https://{{ kubeconfig_server_address }}:{{ kubernetes_deployment.api_server.port | default(6443) }}'
   register: kubeconfig_update_result
   delegate_to: localhost
   when: 
     - kubernetes_deployment.enabled | default(false)
     - local_kubeconfig_check.stat.exists | default(false)
+    - kubernetes_deployment.load_balancer.enabled | default(false)
+    - kubernetes_deployment.load_balancer.localhost.enabled | default(false)
+
+- name: Update kubeconfig server address to use public IP (no load balancer)
+  replace:
+    path: "{{ playbook_dir }}/output/kubeconfig"
+    regexp: 'server: https://0\.0\.0\.0:6443'
+    replace: 'server: https://{{ kubeconfig_server_address }}:{{ kubernetes_deployment.api_server.port | default(6443) }}'
+  register: kubeconfig_update_result_direct
+  delegate_to: localhost
+  when: 
+    - kubernetes_deployment.enabled | default(false)
+    - local_kubeconfig_check.stat.exists | default(false)
+    - not (kubernetes_deployment.load_balancer.enabled | default(false) and kubernetes_deployment.load_balancer.localhost.enabled | default(false))
 
 - name: Display kubeconfig server address update
   debug:
     msg: |
       Kubeconfig server address updated:
+      {% if kubernetes_deployment.load_balancer.enabled | default(false) and kubernetes_deployment.load_balancer.localhost.enabled | default(false) %}
       - From: https://0.0.0.0:6443
-      - To: https://{{ kubeconfig_server_address }}:6443
-      - Using: {{ 'Global Control Plane IP' if kubernetes_deployment.global_control_plane_ip is defined else 'First Control Plane Node' }}
+      - To: https://{{ kubeconfig_server_address }}:{{ kubernetes_deployment.api_server.port | default(6443) }}
+      - Using: API Server Host with Load Balancer ({{ kubernetes_deployment.api_server.host }})
+      - Load Balancer: HAProxy on each master distributes across all 3 backends
       - Changes made: {{ kubeconfig_update_result.changed | default(false) }}
+      {% else %}
+      - From: https://0.0.0.0:6443
+      - To: https://{{ kubeconfig_server_address }}:{{ kubernetes_deployment.api_server.port | default(6443) }}
+      - Using: {{ 'Global Control Plane IP' if kubernetes_deployment.global_control_plane_ip is defined else 'First Control Plane Node' }}
+      - Changes made: {{ kubeconfig_update_result_direct.changed | default(false) }}
+      {% endif %}
   when: 
     - kubernetes_deployment.enabled | default(false)
-    - kubeconfig_update_result is defined
+    - kubeconfig_update_result is defined or kubeconfig_update_result_direct is defined
 
 - name: Set global kubeconfig path
   set_fact:

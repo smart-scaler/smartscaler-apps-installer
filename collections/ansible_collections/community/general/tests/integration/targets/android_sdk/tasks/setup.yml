@@ -9,7 +9,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 - name: Include OS-specific variables
-  include_vars: '{{ ansible_os_family }}.yml'
+  include_vars: '{{ lookup("first_found", params) }}'
+  vars:
+    params:
+      files:
+        - '{{ ansible_distribution }}-{{ ansible_distribution_version }}.yml'
+        - '{{ ansible_distribution }}-{{ ansible_distribution_major_version }}.yml'
+        - '{{ ansible_os_family }}.yml'
+      paths:
+        - '{{ role_path }}/vars'
 
 - name: Install dependencies
   become: true
@@ -74,7 +82,7 @@
       unarchive:
         src: "{{ commandline_tools_link }}"
         dest: "{{ android_cmdline_temp_dir }}"
-        remote_src: yes
+        remote_src: true
         creates: "{{ android_cmdline_temp_dir }}/cmdline-tools"
       when: not sdkmanager_installed.stat.exists
 
@@ -83,4 +91,4 @@
       copy:
         src: "{{ android_cmdline_temp_dir }}/cmdline-tools/"
         dest: "{{ android_sdk_location }}/cmdline-tools/latest"
-        remote_src: yes
+        remote_src: true

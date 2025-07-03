@@ -30,9 +30,9 @@ frontend healthz
 {% endif %}
 
 frontend kube_api_frontend
-  bind 127.0.0.1:{{ loadbalancer_apiserver_port|default(kube_apiserver_port) }}
+  bind {{ haproxy_bind_address | default('0.0.0.0') }}:{{ loadbalancer_apiserver_port|default(kube_apiserver_port) }}
   {% if ipv6_stack -%}
-  bind [::1]:{{ loadbalancer_apiserver_port|default(kube_apiserver_port) }};
+  bind [::]:{{ loadbalancer_apiserver_port|default(kube_apiserver_port) }}
   {% endif -%}
   mode tcp
   option tcplog
