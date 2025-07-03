@@ -51,7 +51,7 @@ haproxy_bind_address: "{{ kubernetes_deployment.load_balancer.localhost.bind_add
 nginx_bind_address: "{{ kubernetes_deployment.load_balancer.localhost.bind_address | default('0.0.0.0') }}"
 {% endif -%}
 
-# API Server - binds to backend port (6444) to avoid conflict
+# API Server - binds to backend port to avoid conflict with load balancer
 kube_apiserver_port: {{ api_server_port }}
 kube_apiserver_bind_address: "{{ kubernetes_deployment.api_server.bind_address | default('0.0.0.0') }}"
 

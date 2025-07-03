@@ -29,13 +29,32 @@ dns_domain: "{{ kubernetes_deployment.cluster_name | default('cluster.local') }}
 # Load balancer configuration
 {% if kubernetes_deployment.get('load_balancer', {}).get('localhost', {}).get('enabled', false) %}
 loadbalancer_apiserver_localhost: true
-loadbalancer_apiserver_type: {{ kubernetes_deployment.get('load_balancer', {}).get('localhost', {}).get('type', 'haproxy') }}
-loadbalancer_apiserver_port: {{ kubernetes_deployment.get('load_balancer', {}).get('localhost', {}).get('port', 6444) }}
+loadbalancer_apiserver_type: {{ kubernetes_deployment.get('load_balancer', {}).get('localhost', {}).get('lb_type', 'haproxy') }}
+{% set client_port = kubernetes_deployment.api_server.port | default(6443) -%}
+loadbalancer_apiserver_port: {{ client_port }}
+{% endif %}
+
+# API Server endpoint for cluster discovery
+# This tells secondary masters where to connect for joining the cluster
+{% if kubernetes_deployment.get('load_balancer', {}).get('localhost', {}).get('enabled', false) -%}
+{% set client_port = kubernetes_deployment.api_server.port | default(6443) -%}
+{% set api_port_offset = kubernetes_deployment.get('load_balancer', {}).get('localhost', {}).get('api_port_offset', 1) -%}
+{% set api_server_port = client_port + api_port_offset -%}
+kube_apiserver_endpoint: "https://{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}:{{ api_server_port }}"
+{% else -%}
+kube_apiserver_endpoint: "https://{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}:{{ kubernetes_deployment.api_server.port | default(6443) }}"
 {% endif %}
 
 # API Server configuration
 kube_apiserver_bind_address: "{{ kubernetes_deployment.api_server.bind_address | default('0.0.0.0') }}"
+{% if kubernetes_deployment.get('load_balancer', {}).get('localhost', {}).get('enabled', false) -%}
+{% set client_port = kubernetes_deployment.api_server.port | default(6443) -%}
+{% set api_port_offset = kubernetes_deployment.get('load_balancer', {}).get('localhost', {}).get('api_port_offset', 1) -%}
+{% set api_server_port = client_port + api_port_offset -%}
+kube_apiserver_port: {{ api_server_port }}
+{% else -%}
 kube_apiserver_port: {{ kubernetes_deployment.api_server.port | default(6443) }}
+{% endif %}
 
 ###############################################################################
 # CERTIFICATE CONFIGURATION - CRITICAL FOR FIXING CERTIFICATE ERRORS

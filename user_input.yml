@@ -10,23 +10,23 @@
 ###############################################################################
 kubernetes_deployment:
   # Master switch for Kubernetes deployment
-  enabled: false                           # Enable kubernetes deployment
+  enabled: true                           # Enable kubernetes deployment
   
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
   api_server:
-    host: "172.235.29.19"        # External IP for client connections
-    port: 6444                   # Client-facing port (what kubectl/clients connect to)
+    host: "172.235.29.19"        # Load balancer VIP or first master for initial setup
+    port: 6443                   # Standard Kubernetes API port (will be load balanced)
                                 # Standard Kubernetes API port - change only if required
-    bind_address: "0.0.0.0"      # Address API server binds to (0.0.0.0 for all interfaces)
+    bind_address: "0.0.0.0"      # Listen on all interfaces
     secure: true                 # Whether to use HTTPS for API server connections
                                 # Should always be true in production environments
 
   # SSH Access Configuration
   # Required for Kubespray to access and configure nodes
-  ssh_key_path: "/absolute/path/to/.ssh/k8s_rsa"  # Full path to the SSH private key file
+  ssh_key_path: "/root/.ssh/k8s_rsa"  # Full path to the SSH private key file
                                             # Used to authenticate with the cluster nodes
-  default_ansible_user: "REPLACE_SSH_USER"         # Default SSH user for all nodes
+  default_ansible_user: "root"         # Default SSH user for all nodes
                                            # Common values: ubuntu (Ubuntu), ec2-user (AWS)
   # Ansible Sudo Password Configuration
   # Optional: Can be set here, via ANSIBLE_SUDO_PASS environment variable,
@@ -47,32 +47,32 @@ kubernetes_deployment:
       private_ip: "172.235.29.19"      # Replace with actual master-1 private IP
                                      # Used for internal cluster communication
     # Add more masters for HA (uncomment and configure):
-    # - name: "master-2"
-    #   ansible_host: "MASTER_2"
-    #   ansible_user: "root"
-    #   ansible_become: true
-    #   ansible_become_method: "sudo"
-    #   ansible_become_user: "root"
-    #   private_ip: "MASTER_2"
-    # - name: "master-3"
-    #   ansible_host: "MASTER_3"
-    #   ansible_user: "root"
-    #   ansible_become: true
-    #   ansible_become_method: "sudo"
-    #   ansible_become_user: "root"
-    #   private_ip: "MASTER_3"
+    - name: "master-2"
+      ansible_host: "172.232.121.146"
+      ansible_user: "root"
+      ansible_become: true
+      ansible_become_method: "sudo"
+      ansible_become_user: "root"
+      private_ip: "172.232.121.146"
+    - name: "master-3"
+      ansible_host: "172.235.16.49"
+      ansible_user: "root"
+      ansible_become: true
+      ansible_become_method: "sudo"
+      ansible_become_user: "root"
+      private_ip: "172.235.16.49"
 
   # Worker Node Configuration (Optional but recommended)
-  worker_nodes: []
+  # worker_nodes: []
   # Example worker node configuration:
   # worker_nodes:
   #   - name: "worker-1"
-  #     ansible_host: "WORKER_1"
+  #     ansible_host: "172.232.121.146"
   #     ansible_user: "root"
   #     ansible_become: true
   #     ansible_become_method: "sudo"
   #     ansible_become_user: "root"
-  #     private_ip: "WORKER_1"
+  #     private_ip: "172.232.121.146"
 
 
     # Python Configuration
@@ -143,11 +143,11 @@ kubernetes_deployment:
   # ============================================================================
   # WHY: Future-proof scaling, health monitoring, operational consistency
   # WORKS: Single master (1 node) and multi-master (3+ nodes) deployments
-  # FLOW: kubectl → nginx:6443 → API server:6444
+  # FLOW: kubectl → haproxy:6443 → API server:6444 (on each master)
   # ============================================================================
   load_balancer:
     enabled: true                          # DEFAULT: Always enabled (recommended best practice)
-    type: "localhost"                      # DEFAULT: Use localhost nginx proxy
+    type: "localhost"                      # DEFAULT: Use localhost haproxy proxy
     
     # Localhost Load Balancer Configuration (DEFAULT: Enabled for all deployments)
     # Benefits: Future-proof scaling, health monitoring, consistent architecture
