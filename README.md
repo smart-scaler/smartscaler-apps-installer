@@ -131,11 +131,11 @@ You can quickly update your `user_input.yml` by replacing only the **values** in
 
 ```bash
 sed -i \
-  -e 's|PUBLIC_IP|192.168.1.100|g' \
-  -e 's|PRIVATE_IP|192.168.1.100|g' \
+  -e 's|PUBLIC_IP|172.235.157.18|g' \
+  -e 's|PRIVATE_IP|172.235.157.18|g' \
   -e 's|REPLACE_SSH_USER|root|g' \
   -e 's|/absolute/path/to/.ssh/k8s_rsa|/root/.ssh/k8s_rsa|g' \
-  -e '/kubernetes_deployment:/,/^[^ ]/ s/enabled: false/enabled: true/' \
+  -e '/kubernetes_deployment:/,/^[[:space:]]*[^[:space:]]*enabled:/ s/enabled: false/enabled: true/' \
   user_input.yml
 ```
 
@@ -228,7 +228,7 @@ You can quickly replace the placeholder values in your `user_input.yml` configur
 
 ```bash
 sed -i \
-   -e '/kubernetes_deployment:/,/^[^ ]/ s/enabled: true/enabled: false/' \
+   -e '/kubernetes_deployment:/,/^[[:space:]]*[^[:space:]]*enabled:/ s/enabled: true/enabled: false/' \
   user_input.yml
 ```
 ---
