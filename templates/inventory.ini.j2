@@ -72,7 +72,7 @@ kube_pods_subnet="{{ kubernetes_deployment.network_config.pod_subnet | default('
 kube_network_node_prefix={{ kubernetes_deployment.network_config.node_prefix | default(24) }}
 
 # API Server Configuration
-kube_apiserver_ip="{{ kubernetes_deployment.api_server.host }}"
+# kube_apiserver_ip removed - each node should use its own IP via main_ip variable
 {% if kubernetes_deployment.load_balancer.type == "external" and kubernetes_deployment.load_balancer.external.enabled %}
 apiserver_loadbalancer_domain_name="{{ kubernetes_deployment.load_balancer.external.domain_name | default(kubernetes_deployment.load_balancer.external.address) }}"
 loadbalancer_apiserver='{"address":"{{ kubernetes_deployment.load_balancer.external.address }}","port":{{ kubernetes_deployment.load_balancer.external.port | default(6443) }}}'
