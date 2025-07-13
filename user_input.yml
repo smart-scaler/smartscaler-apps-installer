@@ -92,7 +92,7 @@ kubernetes_deployment:
   # Firewall Configuration
   # Controls access to cluster nodes
   firewall:
-    enabled: true                            # Whether to configure firewall rules
+    enabled: false                            # Whether to configure firewall rules
     allow_additional_ports:
       - "80"      # HTTP
       - "443"     # HTTPS
