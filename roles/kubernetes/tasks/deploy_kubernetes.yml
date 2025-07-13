@@ -324,20 +324,20 @@
 - name: Update kubeconfig server address to use API server host
   replace:
     path: "{{ playbook_dir }}/output/kubeconfig"
-    regexp: 'server: https://0\.0\.0\.0:6443'
-    replace: 'server: https://{{ kubeconfig_server_address }}:{{ kubernetes_deployment.api_server.port | default(6443) }}'
+    regexp: 'server: https://[^:]+:6444'
+    replace: 'server: https://{{ kubeconfig_server_address }}:6443'
   register: kubeconfig_update_result
   delegate_to: localhost
   when: 
     - kubernetes_deployment.enabled | default(false)
     - local_kubeconfig_check.stat.exists | default(false)
-    - kubernetes_deployment.load_balancer.enabled | default(false)
-    - kubernetes_deployment.load_balancer.localhost.enabled | default(false)
+    - kubernetes_deployment.load_balancer.enabled | default(true)
+    - kubernetes_deployment.load_balancer.localhost.enabled | default(true)
 
 - name: Update kubeconfig server address to use public IP (no load balancer)
   replace:
     path: "{{ playbook_dir }}/output/kubeconfig"
-    regexp: 'server: https://0\.0\.0\.0:6443'
+    regexp: 'server: https://[^:]+:{{ kubernetes_deployment.api_server.port | default(6443) }}'
     replace: 'server: https://{{ kubeconfig_server_address }}:{{ kubernetes_deployment.api_server.port | default(6443) }}'
   register: kubeconfig_update_result_direct
   delegate_to: localhost
@@ -351,13 +351,13 @@
     msg: |
       Kubeconfig server address updated:
       {% if kubernetes_deployment.load_balancer.enabled | default(false) and kubernetes_deployment.load_balancer.localhost.enabled | default(false) %}
-      - From: https://0.0.0.0:6443
-      - To: https://{{ kubeconfig_server_address }}:{{ kubernetes_deployment.api_server.port | default(6443) }}
+      - From: https://[any-ip]:6444
+      - To: https://{{ kubeconfig_server_address }}:6443
       - Using: API Server Host with Load Balancer ({{ kubernetes_deployment.api_server.host }})
       - Load Balancer: HAProxy on each master distributes across all 3 backends
       - Changes made: {{ kubeconfig_update_result.changed | default(false) }}
       {% else %}
-      - From: https://0.0.0.0:6443
+      - From: https://[any-ip]:{{ kubernetes_deployment.api_server.port | default(6443) }}
       - To: https://{{ kubeconfig_server_address }}:{{ kubernetes_deployment.api_server.port | default(6443) }}
       - Using: {{ 'Global Control Plane IP' if kubernetes_deployment.global_control_plane_ip is defined else 'First Control Plane Node' }}
       - Changes made: {{ kubeconfig_update_result_direct.changed | default(false) }}

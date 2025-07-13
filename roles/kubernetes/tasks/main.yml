@@ -245,7 +245,7 @@
 - name: Wait for Kubernetes API to be available on first control plane node
   wait_for:
     host: "{{ kubernetes_deployment.control_plane_nodes[0].ansible_host }}"
-    port: "{{ (kubernetes_deployment.api_server.port | int) + (kubernetes_deployment.load_balancer.localhost.api_port_offset | default(1) | int) if kubernetes_deployment.load_balancer.enabled and kubernetes_deployment.load_balancer.localhost.enabled else kubernetes_deployment.api_server.port }}"
+    port: "{{ kubernetes_deployment.api_server.port }}"
     timeout: 300
   when: 
     - kubernetes_deployment.enabled | default(false)
