@@ -1,27 +1,27 @@
 apiVersion: amd.com/v1alpha1
 kind: DeviceConfig
 metadata:
-  name: {{ deviceconfig_name }}
+  name: {{ manifest_vars.deviceconfig_name }}
   # use the namespace where AMD GPU Operator is running
-  namespace: {{ deviceconfig_namespace }}
+  namespace: {{ manifest_vars.deviceconfig_namespace }}
 spec:
   driver:
     # disable the installation of our-of-tree amdgpu kernel module
-    enable: {{ driver_enable | lower }}
+    enable: {{ manifest_vars.driver_enable | lower }}
       #version: 6.3.3 
 
   devicePlugin:
-    devicePluginImage: {{ device_plugin_image }}
-    nodeLabellerImage: {{ node_labeller_image }}
+    devicePluginImage: {{ manifest_vars.device_plugin_image }}
+    nodeLabellerImage: {{ manifest_vars.node_labeller_image }}
         
   # Specify the metrics exporter config
   metricsExporter:
-     enable: {{ metrics_exporter_enable | lower }}
-     serviceType: "{{ metrics_exporter_service_type }}"
+     enable: {{ manifest_vars.metrics_exporter_enable | lower }}
+     serviceType: "{{ manifest_vars.metrics_exporter_service_type }}"
      # Node port for metrics exporter service, metrics endpoint $node-ip:$nodePort
-     nodePort: {{ metrics_exporter_node_port }}
-     image: {{ metrics_exporter_image }}
+     nodePort: {{ manifest_vars.metrics_exporter_node_port }}
+     image: {{ manifest_vars.metrics_exporter_image }}
 
   # Specifythe node to be managed by this DeviceConfig Custom Resource
   selector:
-    {{ selector_label_key }}: "{{ selector_label_value }}" 
+    {{ manifest_vars.selector_label_key }}: "{{ manifest_vars.selector_label_value }}" 
