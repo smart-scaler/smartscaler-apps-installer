@@ -92,7 +92,7 @@ kubernetes_deployment:
   # Firewall Configuration
   # Controls access to cluster nodes
   firewall:
-    enabled: true                            # Whether to configure firewall rules
+    enabled: false                            # Whether to configure firewall rules
     allow_additional_ports:
       - "80"      # HTTP
       - "443"     # HTTPS
@@ -255,7 +255,8 @@ execution_order:
   # - metallb_l2_config            
   # - metallb_ip_pool              
   # - nginx_ingress_config         
-  # - nginx_ingress_chart   
+  # - nginx_ingress_chart
+  # - cert_manager 
 
   # Base Applications
   - gpu_operator_chart
@@ -267,7 +268,10 @@ execution_order:
   - verify_ngc_secrets
   - create_avesha_secret
 
-
+  # AMD GPU Support
+  - amd_gpu_operator_chart         # Install AMD GPU operator for AMD GPU support
+  - amd_gpu_deviceconfig_manifest  # Configure AMD GPU device settings
+  
   # SmartAI Infrastructure
   # - cert_manager                  # Install cert-manager first
   # - create_cert_manager_issuers   # Create cert-manager issuers and certificates
@@ -625,6 +629,19 @@ helm_charts:
           - name: "CONTAINERD_RUNTIME_CLASS"
             value: "nvidia"
 
+  # AMD GPU Operator Chart
+  amd_gpu_operator_chart:
+    release_name: "amd-gpu-operator"
+    chart_ref: "./amd-gpu-operator"
+    release_namespace: "amd-gpu-operator"
+    create_namespace: true
+    wait: false
+    timeout: "300s"
+    force: true
+    atomic: false
+    skip_diff: true
+    dependencies: []
+
   # Prometheus Stack
   prometheus_stack:
     release_name: "prometheus"
@@ -872,6 +889,36 @@ manifests:
       nginx_use_gzip: "true"
       nginx_gzip_level: "6"
       nginx_gzip_types: "application/atom+xml application/javascript application/x-javascript application/json application/rss+xml application/vnd.ms-fontobject application/x-font-ttf application/x-web-app-manifest+json application/xhtml+xml application/xml font/opentype image/svg+xml image/x-icon text/css text/javascript text/plain text/x-component"
+
+
+  # AMD GPU DeviceConfig Manifest
+  amd_gpu_deviceconfig_manifest:
+    name: "amd-gpu-deviceconfig"
+    manifest_file: "files/amd-gpu-deviceconfig.yaml.j2"
+    namespace: "amd-gpu-operator"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: "Available"
+      status: "True"
+    validate: false
+    strict_validation: false
+    dependencies:
+      - amd_gpu_operator_chart
+    variables:
+      deviceconfig_name: "amd-deviceconfig"
+      deviceconfig_namespace: "amd-gpu-operator"
+      driver_enable: false
+      device_plugin_image: "rocm/k8s-device-plugin:latest"
+      node_labeller_image: "rocm/k8s-device-plugin:labeller-latest"
+      metrics_exporter_enable: true
+      metrics_exporter_service_type: "NodePort"
+      metrics_exporter_node_port: 32500
+      metrics_exporter_image: "docker.io/rocm/device-metrics-exporter:v1.2.0"
+      selector_label_key: "feature.node.kubernetes.io/amd-gpu"
+      selector_label_value: "true"
 
   # OPTIONAL: Pushgateway Manifest
   pushgateway_manifest:
