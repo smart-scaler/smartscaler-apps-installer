@@ -269,8 +269,8 @@ execution_order:
   - create_avesha_secret
 
   # AMD GPU Support
-  - amd_gpu_operator_chart         # Install AMD GPU operator for AMD GPU support
-  - amd_gpu_deviceconfig_manifest  # Configure AMD GPU device settings
+  # - amd_gpu_operator_chart         # Install AMD GPU operator for AMD GPU support,enable cert-manager as well from above section.
+  # - amd_gpu_deviceconfig_manifest  # Configure AMD GPU device settings
   
   # SmartAI Infrastructure
   # - cert_manager                  # Install cert-manager first
