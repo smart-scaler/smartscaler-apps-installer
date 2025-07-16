@@ -22,10 +22,14 @@
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
     kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
 
-- name: Install required locale packages
+- name: Wait for any existing package management operations to complete
   shell: |
-    DEBIAN_FRONTEND=noninteractive apt-get update
-    DEBIAN_FRONTEND=noninteractive apt-get install -y locales
+    echo "Checking for package management locks..."
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || fuser /var/lib/dpkg/lock >/dev/null 2>&1 || fuser /var/cache/apt/archives/lock >/dev/null 2>&1; do
+      echo "Waiting for package management operations to complete..."
+      sleep 15
+    done
+    echo "Package management locks are clear."
   args:
     executable: /bin/bash
   become: true
@@ -39,6 +43,44 @@
   environment:
     LC_ALL: C
     LANG: C
+
+- name: Update package cache for locale packages
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  become: true
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
+  environment:
+    LC_ALL: C
+    LANG: C
+  retries: 5
+  delay: 30
+  until: not ansible_failed | default(false)
+
+- name: Install required locale packages
+  apt:
+    name: locales
+    state: present
+  become: true
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
+  environment:
+    LC_ALL: C
+    LANG: C
+  retries: 5
+  delay: 30
+  until: not ansible_failed | default(false)
 
 - name: Ensure C.UTF-8 locale is generated
   locale_gen:
@@ -86,12 +128,10 @@
     ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
     kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
 
-- name: Check if UFW is installed
-  shell: |
-    DEBIAN_FRONTEND=noninteractive apt-get update
-    DEBIAN_FRONTEND=noninteractive apt-get install -y ufw
-  args:
-    executable: /bin/bash
+- name: Update package cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
   become: true
   delegate_to: "{{ item.ansible_host }}"
   loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
@@ -103,6 +143,28 @@
   environment:
     LC_ALL: C.UTF-8
     LANG: C.UTF-8
+  retries: 5
+  delay: 30
+  until: not ansible_failed | default(false)
+
+- name: Install UFW
+  apt:
+    name: ufw
+    state: present
+  become: true
+  delegate_to: "{{ item.ansible_host }}"
+  loop: "{{ kubernetes_deployment.control_plane_nodes + kubernetes_deployment.worker_nodes | default([]) }}"
+  when: kubernetes_deployment.enabled | default(false)
+  vars:
+    ansible_ssh_private_key_file: "{{ kubernetes_deployment.ssh_key_path }}"
+    ansible_user: "{{ item.ansible_user | default(kubernetes_deployment.default_ansible_user) }}"
+    kubernetes_deployment: "{{ hostvars['localhost']['kubernetes_deployment'] }}"
+  environment:
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
+  retries: 5
+  delay: 30
+  until: not ansible_failed | default(false)
 
 - name: Allow Kubernetes API Server port
   ufw:
