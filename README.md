@@ -440,6 +440,7 @@ The deployment process follows a specific execution order defined in `user_input
 - `metallb_ip_pool` - IP pool configuration for MetalLB
 - `nginx_ingress_config` - NGINX ingress controller configuration
 - `nginx_ingress_chart` - NGINX ingress controller installation
+- `cert_manager` - Cert-manager for certificate management (required for AMD GPU operator)
 
 #### Base Components
 - `gpu_operator_chart` - NVIDIA GPU operator installation
@@ -450,6 +451,18 @@ The deployment process follows a specific execution order defined in `user_input
 - `create_ngc_secrets` - NGC credentials setup
 - `verify_ngc_secrets` - NGC credentials verification
 - `create_avesha_secret` - Avesha credentials setup
+
+#### AMD GPU Support (Alternative to NVIDIA)
+- `amd_gpu_operator_chart` - AMD GPU operator for AMD Instinct GPU accelerators
+- `amd_gpu_deviceconfig_manifest` - AMD GPU device configuration and settings
+
+#### EGS (Enterprise Gateway Service) Installation
+- `kubeslice_controller_egs` - KubeSlice EGS controller for multi-cluster management
+- `kubeslice_ui_egs` - KubeSlice EGS management UI interface
+- `egs_project_manifest` - EGS project configuration
+- `egs_cluster_registration_worker_1` - Register worker cluster
+- `fetch_worker_secret_worker_1` - Fetch worker authentication secrets
+- `kubeslice_worker_egs_worker_1` - Install EGS worker components
 
 #### NIM 70B Components
 - `nim_cache_manifest_70b` - NIM cache for 70B model
@@ -495,6 +508,24 @@ sudo ansible-playbook site.yml \
   -e "avesha_docker_password=$AVESHA_DOCKER_PASSWORD" \
   -vv
 
+# Execute AMD GPU operator setup (alternative to NVIDIA)
+sudo ansible-playbook site.yml \
+  --extra-vars "execution_order=['cert_manager','amd_gpu_operator_chart','amd_gpu_deviceconfig_manifest']" \
+  -e "ngc_api_key=$NGC_API_KEY" \
+  -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
+  -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \
+  -e "avesha_docker_password=$AVESHA_DOCKER_PASSWORD" \
+  -vv
+
+# Execute EGS (Enterprise Gateway Service) installation
+sudo ansible-playbook site.yml \
+  --extra-vars "execution_order=['cert_manager','kubeslice_controller_egs','kubeslice_ui_egs','egs_project_manifest','egs_cluster_registration_worker_1','fetch_worker_secret_worker_1','kubeslice_worker_egs_worker_1']" \
+  -e "ngc_api_key=$NGC_API_KEY" \
+  -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
+  -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \
+  -e "avesha_docker_password=$AVESHA_DOCKER_PASSWORD" \
+  -vv
+
 # Execute only NGINX ingress setup
 sudo ansible-playbook site.yml \
   --extra-vars "execution_order=['nginx_ingress_config','nginx_ingress_chart']" \
@@ -515,6 +546,71 @@ sudo ansible-playbook site.yml \
 ```
 
 > 💡 **Tip**: Components are executed in the order they appear in the list. Make sure to list dependent components in the correct order and include all required credentials.
+
+### Component Configuration Details
+
+#### AMD GPU Operator Installation
+
+The AMD GPU Operator simplifies deployment and management of AMD Instinct GPU accelerators within Kubernetes clusters. It provides comprehensive GPU support for machine learning, Generative AI, and other GPU-intensive applications.
+
+**Prerequisites:**
+- Kubernetes v1.29.0+
+- Cert-manager installed (`cert_manager` component)
+- AMD Instinct GPUs (MI210, MI300X, MI325X) or AMD Radeon Pro (V710, V620) with MxGPU support
+- ROCm drivers (can be installed automatically or use inbox drivers)
+
+**Components:**
+- **amd_gpu_operator_chart**: Installs AMD GPU Operator controller, K8s Device Plugin, Node Labeller, Device Metrics Exporter, Node Feature Discovery (NFD), and Kernel Module Management (KMM)
+- **amd_gpu_deviceconfig_manifest**: Configures GPU device settings, driver management, metrics collection, and node labeling
+
+**Features:**
+- Streamlined GPU driver installation and management
+- Comprehensive metrics collection and export (accessible via NodePort 32500)
+- Automated labeling of nodes with AMD GPU capabilities
+- Efficient GPU resource allocation for containerized workloads
+- GPU health monitoring and troubleshooting
+
+**Configuration Variables:**
+```yaml
+# AMD GPU DeviceConfig settings
+driver_enable: false                    # Use inbox drivers (set true for out-of-tree)
+metrics_exporter_enable: true          # Enable metrics collection
+metrics_exporter_node_port: 32500      # NodePort for metrics access
+selector_label_key: "feature.node.kubernetes.io/amd-vgpu"  # Node selector for virtual GPUs
+```
+
+#### EGS (Enterprise Gateway Service) Installation
+
+EGS provides enterprise-grade multi-cluster management through KubeSlice technology, enabling secure network slicing across distributed Kubernetes environments.
+
+**Prerequisites:**
+- Kubernetes cluster with proper networking
+- Cert-manager for certificate management
+- Valid Avesha credentials for EGS components
+
+**Components:**
+- **kubeslice_controller_egs**: Central controller for multi-cluster slice management and configuration
+- **kubeslice_ui_egs**: Web-based management interface for cluster registration and slice management
+- **egs_project_manifest**: Creates EGS project configuration for cluster grouping
+- **egs_cluster_registration_worker_1**: Registers worker clusters with the controller
+- **fetch_worker_secret_worker_1**: Retrieves authentication secrets for worker cluster communication
+- **kubeslice_worker_egs_worker_1**: Installs worker operator on target clusters
+
+**Features:**
+- Multi-cluster/cloud fleet management
+- Secure network slicing and isolation
+- Centralized cluster registration and management
+- Web-based UI for slice configuration
+- Federated workload deployment
+- Enhanced security and networking capabilities
+
+**Access Information:**
+- Controller API: Available through Kubernetes API server endpoint
+- Management UI: Accessible via service endpoints (check `kubectl get svc -n kubeslice-controller`)
+- Worker communication: Secured through automatically generated secrets
+
+**Integration with GPU Workloads:**
+EGS can be combined with both NVIDIA and AMD GPU operators to provide GPU-accelerated workloads across multiple clusters with secure networking.
 
 ---
 
