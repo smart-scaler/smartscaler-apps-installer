@@ -456,7 +456,7 @@ The deployment process follows a specific execution order defined in `user_input
 - `amd_gpu_operator_chart` - AMD GPU operator for AMD Instinct GPU accelerators
 - `amd_gpu_deviceconfig_manifest` - AMD GPU device configuration and settings
 
-#### EGS (Enterprise Gateway Service) Installation
+#### EGS Installation
 - `kubeslice_controller_egs` - KubeSlice EGS controller for multi-cluster management
 - `kubeslice_ui_egs` - KubeSlice EGS management UI interface
 - `egs_project_manifest` - EGS project configuration
@@ -517,7 +517,7 @@ sudo ansible-playbook site.yml \
   -e "avesha_docker_password=$AVESHA_DOCKER_PASSWORD" \
   -vv
 
-# Execute EGS (Enterprise Gateway Service) installation
+# Execute EGS installation
 sudo ansible-playbook site.yml \
   --extra-vars "execution_order=['cert_manager','kubeslice_controller_egs','kubeslice_ui_egs','egs_project_manifest','egs_cluster_registration_worker_1','fetch_worker_secret_worker_1','kubeslice_worker_egs_worker_1']" \
   -e "ngc_api_key=$NGC_API_KEY" \
