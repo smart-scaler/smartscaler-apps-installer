@@ -440,6 +440,7 @@ The deployment process follows a specific execution order defined in `user_input
 - `metallb_ip_pool` - IP pool configuration for MetalLB
 - `nginx_ingress_config` - NGINX ingress controller configuration
 - `nginx_ingress_chart` - NGINX ingress controller installation
+- `cert_manager` - Cert-manager for certificate management (required for AMD GPU operator)
 
 #### Base Components
 - `gpu_operator_chart` - NVIDIA GPU operator installation
@@ -450,6 +451,18 @@ The deployment process follows a specific execution order defined in `user_input
 - `create_ngc_secrets` - NGC credentials setup
 - `verify_ngc_secrets` - NGC credentials verification
 - `create_avesha_secret` - Avesha credentials setup
+
+#### AMD GPU Support (Alternative to NVIDIA)
+- `amd_gpu_operator_chart` - AMD GPU operator for AMD Instinct GPU accelerators
+- `amd_gpu_deviceconfig_manifest` - AMD GPU device configuration and settings
+
+#### EGS (Enterprise Gateway Service) Installation
+- `kubeslice_controller_egs` - KubeSlice EGS controller for multi-cluster management
+- `kubeslice_ui_egs` - KubeSlice EGS management UI interface
+- `egs_project_manifest` - EGS project configuration
+- `egs_cluster_registration_worker_1` - Register worker cluster
+- `fetch_worker_secret_worker_1` - Fetch worker authentication secrets
+- `kubeslice_worker_egs_worker_1` - Install EGS worker components
 
 #### NIM 70B Components
 - `nim_cache_manifest_70b` - NIM cache for 70B model
@@ -489,6 +502,24 @@ To execute specific components, use the `execution_order` variable with a list o
 # Execute only GPU operator and monitoring stack
 sudo ansible-playbook site.yml \
   --extra-vars "execution_order=['gpu_operator_chart','prometheus_stack']" \
+  -e "ngc_api_key=$NGC_API_KEY" \
+  -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
+  -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \
+  -e "avesha_docker_password=$AVESHA_DOCKER_PASSWORD" \
+  -vv
+
+# Execute AMD GPU operator setup (alternative to NVIDIA)
+sudo ansible-playbook site.yml \
+  --extra-vars "execution_order=['cert_manager','amd_gpu_operator_chart','amd_gpu_deviceconfig_manifest']" \
+  -e "ngc_api_key=$NGC_API_KEY" \
+  -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
+  -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \
+  -e "avesha_docker_password=$AVESHA_DOCKER_PASSWORD" \
+  -vv
+
+# Execute EGS (Enterprise Gateway Service) installation
+sudo ansible-playbook site.yml \
+  --extra-vars "execution_order=['cert_manager','kubeslice_controller_egs','kubeslice_ui_egs','egs_project_manifest','egs_cluster_registration_worker_1','fetch_worker_secret_worker_1','kubeslice_worker_egs_worker_1']" \
   -e "ngc_api_key=$NGC_API_KEY" \
   -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
   -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \
