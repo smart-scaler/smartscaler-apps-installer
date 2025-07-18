@@ -1540,7 +1540,7 @@ manifests:
     variables:
       mcp_server_name: "smart-scaler-mcp-server"
       mcp_server_namespace: "smart-scaler"
-      mcp_server_image: "docker.io/aveshasystems/smart-scaler-mcp-server:v1.0.0"
+      mcp_server_image: "docker.io/aveshasystems/smart-scaler-mcp-server:v1.0.1"
       mcp_server_image_pull_secret: "avesha-systems"
       mcp_server_prometheus_url: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/"
       mcp_server_tenant_id: "tenant-b200-local"
