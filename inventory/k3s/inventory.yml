@@ -1,0 +1,26 @@
+---
+k3s_cluster:
+  children:
+    server:
+      hosts:
+
+        172.105.57.17:
+          ansible_user: root
+          ansible_become: True
+          ansible_become_method: sudo
+          ansible_become_user: root
+          ansible_ssh_private_key_file: /root/.ssh/k8s_rsa
+          ansible_python_interpreter: /usr/bin/python3
+          private_ip: 172.105.57.17
+          node_name: master-1
+
+
+
+  vars:
+    k3s_version: v1.33.3+k3s1
+    service_cidr: 10.43.0.0/16
+    cluster_cidr: 10.42.0.0/16
+    cluster_dns: 10.43.0.10
+    cni: flannel
+    use_external_database: False
+    ansible_python_interpreter: /usr/bin/python3

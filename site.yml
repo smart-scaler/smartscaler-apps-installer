@@ -11,6 +11,7 @@
     - name: Set global variables
       set_fact:
         kubernetes_deployment: "{{ kubernetes_deployment }}"
+        k3s_deployment: "{{ k3s_deployment }}"
         metallb: "{{ metallb }}"
         nginx_ingress: "{{ nginx_ingress }}"
         global_control_plane_ip: "{{ global_control_plane_ip }}"
@@ -115,6 +116,12 @@
           avesha_docker_username: "{{ avesha_docker_username }}"
           avesha_docker_password: "{{ avesha_docker_password }}"
       when: execution_order_enabled | default(true)
+
+    - name: Deploy K3s cluster if enabled
+      ansible.builtin.import_playbook: "{{ playbook_dir }}/k3s-ansible/playbooks/site.yml"
+      vars:
+        inventory_file: "{{ inventory_dir }}/k3s/inventory.yml"
+      when: k3s_deployment.enabled | default(false)
 
   post_tasks:
     - name: Collect Kubernetes cluster information
