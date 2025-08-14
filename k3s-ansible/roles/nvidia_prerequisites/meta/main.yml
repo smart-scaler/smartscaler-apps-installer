@@ -1,0 +1,33 @@
+---
+galaxy_info:
+  author: "K3s Automation Team"
+  description: "NVIDIA Prerequisites Role - Automatically detect NVIDIA GPUs and install container runtime support"
+  company: ""
+  license: "Apache-2.0"
+  min_ansible_version: "2.9"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - "bionic"
+        - "focal"
+        - "jammy"
+    - name: Debian
+      versions:
+        - "buster"
+        - "bullseye"
+    - name: EL
+      versions:
+        - "7"
+        - "8"
+        - "9"
+  galaxy_tags:
+    - nvidia
+    - gpu
+    - container-runtime
+    - kubernetes
+    - k3s
+    - kubespray
+    - prerequisites
+    - platform-agnostic
+
+dependencies: []

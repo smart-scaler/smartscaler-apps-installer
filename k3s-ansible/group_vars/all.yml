@@ -1,0 +1,29 @@
+---
+# K3s Group Variables
+# Generated automatically for K3s deployment
+
+k3s_version: v1.33.3+k3s1
+service_cidr: 10.43.0.0/16
+cluster_cidr: 10.42.0.0/16
+cluster_dns: 10.43.0.10
+cni: flannel
+use_external_database: False
+ansible_python_interpreter: /usr/bin/python3
+disable_firewalld: true
+disable_swap: true
+
+# K3s API Configuration
+api_endpoint: "172.105.57.17"
+api_port: 6443
+kubeconfig: ~/.kube/config.new
+
+# Cluster Configuration
+cluster_context: "smart-scaler-k3s-master-1"
+cluster_name: "smart-scaler-k3s-master-1"
+
+# Node Configuration
+extra_server_args: "--node-label node.kubernetes.io/role=control-plane --node-label node-type=master --node-label cluster=smart-scaler-k3s-master-1"
+extra_agent_args: "--node-label node.kubernetes.io/role=worker --node-label node-type=worker --node-label cluster=smart-scaler-k3s-master-1"
+
+# Additional Configuration
+user_kubectl: true

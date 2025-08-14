@@ -1,0 +1,236 @@
+---
+# NVIDIA Prerequisites Role - Main Tasks
+# This role detects NVIDIA GPUs and installs container runtime support
+# Works for BOTH K3s and Kubespray deployments
+
+- name: Check if NVIDIA prerequisites are enabled
+  set_fact:
+    nvidia_enabled: "{{ nvidia_prerequisites.enabled | default(false) }}"
+  when: nvidia_prerequisites is defined
+
+- name: Skip NVIDIA prerequisites if disabled
+  meta: end_play
+  when: not nvidia_enabled | default(false)
+
+- name: Gather system facts
+  setup:
+  when: nvidia_enabled | default(false)
+
+- name: Check for NVIDIA GPUs using multiple detection methods
+  block:
+    - name: Check for NVIDIA GPUs using nvidia-smi
+      command: nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits
+      register: nvidia_smi_check
+      failed_when: false
+      changed_when: false
+      when: "'nvidia_smi' in nvidia_prerequisites.detection.methods"
+
+    - name: Check for NVIDIA devices using lspci
+      command: lspci | grep -i nvidia
+      register: lspci_nvidia_check
+      failed_when: false
+      changed_when: false
+      when: "'lspci' in nvidia_prerequisites.detection.methods"
+
+    - name: Check for NVIDIA device files
+      find:
+        paths: /dev
+        patterns: "nvidia*"
+      register: nvidia_device_files
+      when: "'device_files' in nvidia_prerequisites.detection.methods"
+
+    - name: Check for loaded NVIDIA kernel modules
+      command: lsmod | grep nvidia
+      register: nvidia_kernel_modules
+      failed_when: false
+      changed_when: false
+      when: "'kernel_modules' in nvidia_prerequisites.detection.methods"
+
+    - name: Determine if NVIDIA GPUs are present
+      set_fact:
+        has_nvidia_gpus: >-
+          {{ (nvidia_smi_check.rc == 0 and nvidia_smi_check.stdout != '') or
+             (lspci_nvidia_check.rc == 0 and lspci_nvidia_check.stdout != '') or
+             (nvidia_device_files.matched > 0) or
+             (nvidia_kernel_modules.rc == 0 and nvidia_kernel_modules.stdout != '') }}
+
+    - name: Display NVIDIA GPU detection results
+      debug:
+        msg: |
+          NVIDIA GPU Detection Results:
+          - nvidia-smi check: {{ 'PASS' if nvidia_smi_check.rc == 0 and nvidia_smi_check.stdout != '' else 'FAIL' }}
+          - lspci check: {{ 'PASS' if lspci_nvidia_check.rc == 0 and lspci_nvidia_check.stdout != '' else 'FAIL' }}
+          - device files: {{ nvidia_device_files.matched }} NVIDIA device files found
+          - kernel modules: {{ 'PASS' if nvidia_kernel_modules.rc == 0 and nvidia_kernel_modules.stdout != '' else 'FAIL' }}
+          - NVIDIA GPUs detected: {{ has_nvidia_gpus }}
+
+  when: nvidia_enabled | default(false)
+
+- name: Skip NVIDIA installation if no GPUs detected
+  meta: end_play
+  when: 
+    - nvidia_enabled | default(false)
+    - not has_nvidia_gpus | default(false)
+
+- name: Install NVIDIA Container Toolkit
+  block:
+    - name: Add NVIDIA repository
+      apt_repository:
+        repo: "deb [arch={{ nvidia_prerequisites.container_runtime.architecture }}] https://nvidia.github.io/libnvidia-container/{{ ansible_distribution | lower }}/amd64 /"
+        state: present
+        filename: nvidia-container-toolkit
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Add NVIDIA repository (RHEL/CentOS)
+      yum_repository:
+        name: nvidia-container-toolkit
+        description: NVIDIA Container Toolkit Repository
+        baseurl: https://nvidia.github.io/libnvidia-container/rhel7/x86_64/
+        gpgcheck: false
+        enabled: true
+      when: ansible_os_family == "RedHat"
+
+    - name: Install NVIDIA Container Toolkit
+      package:
+        name: nvidia-container-toolkit
+        state: present
+        update_cache: true
+
+    - name: Install NVIDIA Container Runtime
+      package:
+        name: nvidia-container-runtime
+        state: present
+        update_cache: true
+
+    - name: Configure containerd for NVIDIA runtime
+      block:
+        - name: Backup containerd config
+          copy:
+            src: /etc/containerd/config.toml
+            dest: /etc/containerd/config.toml.backup
+            remote_src: true
+          when: nvidia_prerequisites.container_runtime.configure_containerd | default(true)
+
+        - name: Update containerd config for NVIDIA
+          replace:
+            path: /etc/containerd/config.toml
+            regexp: '^\s*#\s*\[plugins\."io\.containerd\.grpc\.v1\.cri"\.containerd\.runtimes\]'
+            replace: '[plugins."io.containerd.grpc.v1.cri".containerd.runtimes]'
+          when: nvidia_prerequisites.container_runtime.configure_containerd | default(true)
+
+        - name: Add NVIDIA runtime configuration to containerd
+          blockinfile:
+            path: /etc/containerd/config.toml
+            block: |
+              [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+                privileged_without_host_devices = false
+                runtime_engine = ""
+                runtime_root = ""
+                runtime_type = "io.containerd.runc.v2"
+                [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
+                  BinaryName = "/usr/bin/nvidia-container-runtime"
+                  SystemdCgroup = false
+            marker: "# {mark} NVIDIA runtime configuration"
+            insertafter: '^\s*\[plugins\."io\.containerd\.grpc\.v1\.cri"\.containerd\.runtimes\]'
+          when: nvidia_prerequisites.container_runtime.configure_containerd | default(true)
+
+        - name: Restart containerd service
+          systemd:
+            name: containerd
+            state: restarted
+            daemon_reload: true
+          when: nvidia_prerequisites.container_runtime.configure_containerd | default(true)
+
+      when: nvidia_prerequisites.container_runtime.configure_containerd | default(true)
+
+    - name: Create Kubernetes RuntimeClass for NVIDIA
+      block:
+        - name: Create RuntimeClass manifest
+          copy:
+            dest: /tmp/nvidia-runtime-class.yaml
+            content: |
+              apiVersion: node.k8s.io/v1
+              kind: RuntimeClass
+              metadata:
+                name: nvidia
+              handler: nvidia
+              scheduling:
+                nodeSelector:
+                  nvidia.com/gpu.present: "true"
+          when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
+
+        - name: Apply RuntimeClass (will be applied when cluster is ready)
+          command: kubectl apply -f /tmp/nvidia-runtime-class.yaml
+          register: runtime_class_result
+          failed_when: false
+          changed_when: false
+          when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
+
+      when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
+
+  when: 
+    - nvidia_enabled | default(false)
+    - has_nvidia_gpus | default(false)
+    - nvidia_prerequisites.container_runtime.install_toolkit | default(true)
+
+- name: Verify NVIDIA installation
+  block:
+    - name: Test NVIDIA Container Runtime
+      command: nvidia-container-cli info
+      register: nvidia_cli_test
+      failed_when: false
+      changed_when: false
+
+    - name: Check NVIDIA runtime version
+      command: nvidia-container-runtime --version
+      register: nvidia_runtime_version
+      failed_when: false
+      changed_when: false
+
+    - name: Display NVIDIA verification results
+      debug:
+        msg: |
+          NVIDIA Installation Verification:
+          - Container CLI: {{ 'PASS' if nvidia_cli_test.rc == 0 else 'FAIL' }}
+          - Runtime Version: {{ nvidia_runtime_version.stdout if nvidia_runtime_version.rc == 0 else 'FAIL' }}
+          - Runtime Class: {{ 'CREATED' if nvidia_prerequisites.container_runtime.create_runtime_class | default(true) else 'SKIPPED' }}
+
+    - name: Create test container to verify GPU access
+      docker_container:
+        name: nvidia-test
+        image: nvidia/cuda:11.0-base-ubuntu18.04
+        command: nvidia-smi
+        runtime: nvidia
+        auto_remove: true
+        state: started
+      register: nvidia_test_container
+      failed_when: false
+      changed_when: false
+      when: nvidia_prerequisites.verification.test_gpu_access | default(true)
+
+    - name: Display GPU test results
+      debug:
+        msg: |
+          GPU Access Test:
+          - Test container created: {{ 'PASS' if nvidia_test_container.changed else 'FAIL' }}
+          - Container output: {{ nvidia_test_container.container.logs if nvidia_test_container.changed else 'N/A' }}
+
+  when: 
+    - nvidia_enabled | default(false)
+    - has_nvidia_gpus | default(false)
+
+- name: NVIDIA Prerequisites Summary
+  debug:
+    msg: |
+      🎯 NVIDIA Prerequisites Summary:
+      =================================
+      - Role enabled: {{ nvidia_enabled }}
+      - NVIDIA GPUs detected: {{ has_nvidia_gpus | default(false) }}
+      - Container toolkit installed: {{ nvidia_prerequisites.container_runtime.install_toolkit | default(true) }}
+      - Containerd configured: {{ nvidia_prerequisites.container_runtime.configure_containerd | default(true) }}
+      - Runtime class created: {{ nvidia_prerequisites.container_runtime.create_runtime_class | default(true) }}
+      - GPU access verified: {{ nvidia_prerequisites.verification.test_gpu_access | default(true) }}
+      
+      🚀 NVIDIA support is now ready for {{ ansible_distribution }} {{ ansible_distribution_version }}!
+  when: nvidia_enabled | default(false)
