@@ -50,7 +50,7 @@ options:
 
   record_name:
     description:
-      - Record name to get/create/delete/update. If record_name is not specified; all records for the domain will be returned
+      - Record name to get/create/delete/update. If O(record_name) is not specified; all records for the domain are returned
         in "result" regardless of the state argument.
     type: str
 
@@ -64,8 +64,8 @@ options:
     description:
       - 'Record value. HTTPRED: <redirection URL>, MX: <priority> <target name>, NS: <name server>, PTR: <target name>, SRV:
         <priority> <weight> <port> <target name>, TXT: <text value>".'
-      - If record_value is not specified; no changes will be made and the record will be returned in 'result' (in other words,
-        this module can be used to fetch a record's current ID, type, and ttl).
+      - If O(record_value) is not specified; no changes are made and the record is returned in RV(ignore:result) (in other
+        words, this module can be used to fetch a record's current ID, type, and TTL).
     type: str
 
   record_ttl:
@@ -83,8 +83,8 @@ options:
 
   validate_certs:
     description:
-      - If V(false), SSL certificates will not be validated. This should only be used on personally controlled sites using
-        self-signed certificates.
+      - If V(false), SSL certificates are not validated. This should only be used on personally controlled sites using self-signed
+        certificates.
     type: bool
     default: true
 
@@ -128,7 +128,7 @@ options:
 
   contactList:
     description:
-      - Name or ID of the contact list that the monitor will notify.
+      - Name or ID of the contact list that the monitor notifies.
       - The default V('') means the Account Owner.
     type: str
 
@@ -195,7 +195,7 @@ notes:
   - Only A records can have a O(monitor) or O(failover).
   - To add failover, the O(failover), O(autoFailover), O(port), O(protocol), O(ip1), and O(ip2) options are required.
   - To add monitor, the O(monitor), O(port), O(protocol), O(maxEmails), O(systemDescription), and O(ip1) options are required.
-  - The monitor and the failover will share O(port), O(protocol), and O(ip1) options.
+  - The options O(monitor) and O(failover) share O(port), O(protocol), and O(ip1) options.
 requirements: [hashlib, hmac]
 author: "Brice Burgess (@briceburg)"
 """
@@ -553,28 +553,28 @@ def main():
             domain=dict(required=True),
             sandbox=dict(default=False, type='bool'),
             state=dict(required=True, choices=['present', 'absent']),
-            record_name=dict(required=False),
-            record_type=dict(required=False, choices=[
+            record_name=dict(),
+            record_type=dict(choices=[
                              'A', 'AAAA', 'CNAME', 'ANAME', 'HTTPRED', 'MX', 'NS', 'PTR', 'SRV', 'TXT']),
-            record_value=dict(required=False),
-            record_ttl=dict(required=False, default=1800, type='int'),
+            record_value=dict(),
+            record_ttl=dict(default=1800, type='int'),
             monitor=dict(default=False, type='bool'),
             systemDescription=dict(default=''),
             maxEmails=dict(default=1, type='int'),
             protocol=dict(default='HTTP', choices=['TCP', 'UDP', 'HTTP', 'DNS', 'SMTP', 'HTTPS']),
             port=dict(default=80, type='int'),
             sensitivity=dict(default='Medium', choices=['Low', 'Medium', 'High']),
-            contactList=dict(default=None),
-            httpFqdn=dict(required=False),
-            httpFile=dict(required=False),
-            httpQueryString=dict(required=False),
+            contactList=dict(),
+            httpFqdn=dict(),
+            httpFile=dict(),
+            httpQueryString=dict(),
             failover=dict(default=False, type='bool'),
             autoFailover=dict(default=False, type='bool'),
-            ip1=dict(required=False),
-            ip2=dict(required=False),
-            ip3=dict(required=False),
-            ip4=dict(required=False),
-            ip5=dict(required=False),
+            ip1=dict(),
+            ip2=dict(),
+            ip3=dict(),
+            ip4=dict(),
+            ip5=dict(),
             validate_certs=dict(default=True, type='bool'),
         ),
         required_together=[

@@ -42,12 +42,12 @@ options:
     type: str
   force:
     description:
-      - If V(true), any modified files in the working tree will be discarded.
+      - If V(true), any modified files in the working tree is discarded.
     type: bool
     default: false
   executable:
     description:
-      - Path to bzr executable to use. If not supplied, the normal mechanism for resolving binary paths will be used.
+      - Path to C(bzr) executable to use. If not supplied, the normal mechanism for resolving binary paths is used.
     type: str
 """
 
@@ -80,7 +80,7 @@ class Bzr(object):
     def get_version(self):
         '''samples the version of the bzr branch'''
 
-        cmd = "%s revno" % self.bzr_path
+        cmd = [self.bzr_path, "revno"]
         rc, stdout, stderr = self.module.run_command(cmd, cwd=self.dest)
         revno = stdout.strip()
         return revno
@@ -100,7 +100,7 @@ class Bzr(object):
 
     def has_local_mods(self):
 
-        cmd = "%s status -S" % self.bzr_path
+        cmd = [self.bzr_path, "status", "-S"]
         rc, stdout, stderr = self.module.run_command(cmd, cwd=self.dest)
         lines = stdout.splitlines()
 

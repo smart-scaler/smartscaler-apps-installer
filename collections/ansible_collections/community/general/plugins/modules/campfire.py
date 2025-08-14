@@ -14,7 +14,7 @@ module: campfire
 short_description: Send a message to Campfire
 description:
   - Send a message to Campfire.
-  - Messages with newlines will result in a "Paste" message being sent.
+  - Messages with newlines result in a "Paste" message being sent.
 extends_documentation_fragment:
   - community.general.attributes
 attributes:
@@ -137,8 +137,7 @@ def main():
             token=dict(required=True, no_log=True),
             room=dict(required=True),
             msg=dict(required=True),
-            notify=dict(required=False,
-                        choices=["56k", "bell", "bezos", "bueller",
+            notify=dict(choices=["56k", "bell", "bezos", "bueller",
                                  "clowntown", "cottoneyejoe",
                                  "crickets", "dadgummit", "dangerzone",
                                  "danielsan", "deeper", "drama",

@@ -92,6 +92,8 @@ files:
     maintainers: ryancurrah
   $callbacks/syslog_json.py:
     maintainers: imjoseangel
+  $callbacks/tasks_only.py:
+    maintainers: felixfontein
   $callbacks/timestamp.py:
     maintainers: kurokobo
   $callbacks/unixy.py:
@@ -252,6 +254,8 @@ files:
     maintainers: ddelnano shinuza
   $lookups/:
     labels: lookups
+  $lookups/binary_file.py:
+    maintainers: felixfontein
   $lookups/bitwarden_secrets_manager.py:
     maintainers: jantari
   $lookups/bitwarden.py:
@@ -781,6 +785,8 @@ files:
     maintainers: brettmilford unnecessary-username juanmcasanova
   $modules/jenkins_build_info.py:
     maintainers: juanmcasanova
+  $modules/jenkins_credential.py:
+    maintainers: YoussefKhalidAli
   $modules/jenkins_job.py:
     maintainers: sermilrod
   $modules/jenkins_job_info.py:
@@ -898,6 +904,8 @@ files:
   $modules/lvg.py:
     maintainers: abulimov
   $modules/lvm_pv.py:
+    maintainers: klention
+  $modules/lvm_pv_move_data.py:
     maintainers: klention
   $modules/lvg_rename.py:
     maintainers: lszomor
@@ -1053,7 +1061,9 @@ files:
   $modules/ovh_monthly_billing.py:
     maintainers: fraff
   $modules/pacemaker_cluster.py:
-    maintainers: matbu
+    maintainers: matbu munchtoast
+  $modules/pacemaker_info.py:
+    maintainers: munchtoast
   $modules/pacemaker_resource.py:
     maintainers: munchtoast
   $modules/packet_:
@@ -1513,6 +1523,22 @@ files:
     maintainers: russoz
   docs/docsite/rst/guide_deps.rst:
     maintainers: russoz
+  docs/docsite/rst/guide_iocage.rst:
+    maintainers: russoz felixfontein
+  docs/docsite/rst/guide_iocage_inventory.rst:
+    maintainers: vbotka
+  docs/docsite/rst/guide_iocage_inventory_aliases.rst:
+    maintainers: vbotka
+  docs/docsite/rst/guide_iocage_inventory_basics.rst:
+    maintainers: vbotka
+  docs/docsite/rst/guide_iocage_inventory_dhcp.rst:
+    maintainers: vbotka
+  docs/docsite/rst/guide_iocage_inventory_hooks.rst:
+    maintainers: vbotka
+  docs/docsite/rst/guide_iocage_inventory_properties.rst:
+    maintainers: vbotka
+  docs/docsite/rst/guide_iocage_inventory_tags.rst:
+    maintainers: vbotka
   docs/docsite/rst/guide_modulehelper.rst:
     maintainers: russoz
   docs/docsite/rst/guide_online.rst:

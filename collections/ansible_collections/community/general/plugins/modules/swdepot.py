@@ -16,7 +16,7 @@ DOCUMENTATION = r"""
 module: swdepot
 short_description: Manage packages with swdepot package manager (HP-UX)
 description:
-  - Will install, upgrade and remove packages with swdepot package manager (HP-UX).
+  - Installs, upgrades, and removes packages with C(swdepot) package manager (HP-UX).
 notes: []
 author: "Raul Melo (@melodous)"
 extends_documentation_fragment:
@@ -134,7 +134,7 @@ def main():
         argument_spec=dict(
             name=dict(aliases=['pkg'], required=True),
             state=dict(choices=['present', 'absent', 'latest'], required=True),
-            depot=dict(default=None, required=False)
+            depot=dict()
         ),
         supports_check_mode=True
     )

@@ -1,14 +1,9 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2018 Felix Fontein <felix@fontein.de>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -19,14 +14,13 @@ short_description: Retrieves ACME Renewal Information (ARI) for a certificate
 description:
   - Allows to retrieve renewal information on a certificate obtained with the L(ACME protocol,https://tools.ietf.org/html/rfc8555).
   - This module only works with the ACME v2 protocol, and requires the ACME server to support the ARI extension
-    (U(https://datatracker.ietf.org/doc/draft-ietf-acme-ari/)).
-    This module implements version 3 of the ARI draft.
+    (L(RFC 9773, https://www.rfc-editor.org/rfc/rfc9773.html)).
 extends_documentation_fragment:
-  - community.crypto.acme.basic
-  - community.crypto.acme.no_account
-  - community.crypto.attributes
-  - community.crypto.attributes.info_module
-  - community.crypto.attributes.idempotent_not_modify_state
+  - community.crypto._acme.basic
+  - community.crypto._acme.no_account
+  - community.crypto._attributes
+  - community.crypto._attributes.info_module
+  - community.crypto._attributes.idempotent_not_modify_state
 options:
   certificate_path:
     description:
@@ -59,7 +53,7 @@ EXAMPLES = r"""
 
 RETURN = r"""
 renewal_info:
-  description: The ARI renewal info object (U(https://www.ietf.org/archive/id/draft-ietf-acme-ari-03.html#section-4.2)).
+  description: The ARI renewal info object (U(https://www.rfc-editor.org/rfc/rfc9773.html#section-4.2)).
   returned: success
   type: dict
   contains:
@@ -99,31 +93,33 @@ renewal_info:
       sample: '2024-04-29T01:17:10.236921+00:00'
 """
 
-from ansible_collections.community.crypto.plugins.module_utils.acme.acme import (
+import typing as t
+
+from ansible_collections.community.crypto.plugins.module_utils._acme.acme import (
     ACMEClient,
     create_backend,
     create_default_argspec,
 )
-from ansible_collections.community.crypto.plugins.module_utils.acme.errors import (
+from ansible_collections.community.crypto.plugins.module_utils._acme.errors import (
     ModuleFailException,
 )
 
 
-def main():
+def main() -> t.NoReturn:
     argument_spec = create_default_argspec(with_account=False)
     argument_spec.update_argspec(
-        certificate_path=dict(type="path"),
-        certificate_content=dict(type="str"),
+        certificate_path={"type": "path"},
+        certificate_content={"type": "str"},
     )
     argument_spec.update(
-        required_one_of=(["certificate_path", "certificate_content"],),
-        mutually_exclusive=(["certificate_path", "certificate_content"],),
+        required_one_of=[("certificate_path", "certificate_content")],
+        mutually_exclusive=[("certificate_path", "certificate_content")],
     )
     module = argument_spec.create_ansible_module(supports_check_mode=True)
-    backend = create_backend(module, True)
+    backend = create_backend(module, needs_acme_v2=True)
 
     try:
-        client = ACMEClient(module, backend)
+        client = ACMEClient(module=module, backend=backend)
         if not client.directory.has_renewal_info_endpoint():
             module.fail_json(
                 msg="The ACME endpoint does not support ACME Renewal Information retrieval"
@@ -135,7 +131,7 @@ def main():
         )
         module.exit_json(renewal_info=renewal_info)
     except ModuleFailException as e:
-        e.do_fail(module)
+        e.do_fail(module=module)
 
 
 if __name__ == "__main__":

@@ -165,6 +165,21 @@
     select_crypto_backend: '{{ select_crypto_backend }}'
   register: csr_ku_xku_change_2
 
+- name: "({{ select_crypto_backend }}) Generate CSR with KU and XKU (idempotency 2)"
+  community.crypto.openssl_csr:
+    path: '{{ remote_tmp_dir }}/csr_ku_xku.csr'
+    privatekey_path: '{{ remote_tmp_dir }}/privatekey.pem'
+    subject:
+      commonName: 'www.ansible.com'
+    keyUsage:
+      - digitalSignature
+    extendedKeyUsage:
+      - ipsecUser
+      - qcStatements
+      - Biometric Info
+    select_crypto_backend: '{{ select_crypto_backend }}'
+  register: csr_ku_xku_change_2_idempotency
+
 - name: "({{ select_crypto_backend }}) Generate CSR with old API"
   community.crypto.openssl_csr:
     path: '{{ remote_tmp_dir }}/csr_oldapi.csr'
@@ -884,7 +899,7 @@
     select_crypto_backend: '{{ select_crypto_backend }}'
   register: everything_info
 
-- name: "({{ select_crypto_backend }}) Ed25519 and Ed448 tests (for cryptography >= 2.6)"
+- name: "({{ select_crypto_backend }}) Ed25519 and Ed448 tests"
   block:
     - name: "({{ select_crypto_backend }}) Generate privatekeys"
       community.crypto.openssl_privatekey:
@@ -926,9 +941,9 @@
           register: generate_csr_ed25519_ed448_idempotent
           ignore_errors: true
 
-  when: select_crypto_backend == 'cryptography' and cryptography_version.stdout is version('2.6', '>=')
+  when: select_crypto_backend == 'cryptography'
 
-- name: "({{ select_crypto_backend }}) CRL distribution endpoints (for cryptography >= 1.6)"
+- name: "({{ select_crypto_backend }}) CRL distribution endpoints"
   block:
     - name: "({{ select_crypto_backend }}) Create CSR with CRL distribution endpoints"
       community.crypto.openssl_csr:
@@ -1015,4 +1030,4 @@
         select_crypto_backend: '{{ select_crypto_backend }}'
       register: crl_distribution_endpoints_5
 
-  when: select_crypto_backend == 'cryptography' and cryptography_version.stdout is version('1.6', '>=')
+  when: select_crypto_backend == 'cryptography'

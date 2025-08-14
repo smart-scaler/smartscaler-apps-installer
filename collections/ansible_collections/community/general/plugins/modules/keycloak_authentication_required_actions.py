@@ -49,7 +49,7 @@ options:
         type: dict
       defaultAction:
         description:
-          - Indicates, if any new user will have the required action assigned to it.
+          - Indicates whether new users have the required action assigned to them.
         type: bool
       enabled:
         description:
@@ -149,7 +149,7 @@ end_state:
       type: dict
     defaultAction:
       description:
-        - Indicates, if any new user will have the required action assigned to it.
+        - Indicates whether new users have the required action assigned to them.
       sample: false
       type: bool
     enabled:
@@ -237,8 +237,8 @@ def main():
     module = AnsibleModule(
         argument_spec=argument_spec,
         supports_check_mode=True,
-        required_one_of=([['token', 'auth_realm', 'auth_username', 'auth_password']]),
-        required_together=([['auth_realm', 'auth_username', 'auth_password']]),
+        required_one_of=([['token', 'auth_realm', 'auth_username', 'auth_password', 'auth_client_id', 'auth_client_secret']]),
+        required_together=([['auth_username', 'auth_password']]),
         required_by={'refresh_token': 'auth_realm'},
     )
 

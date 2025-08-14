@@ -1,14 +1,9 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2020, Felix Fontein <felix@fontein.de>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -26,9 +21,9 @@ author:
   - Yanis Guenane (@Spredzy)
   - Felix Fontein (@felixfontein)
 extends_documentation_fragment:
-  - community.crypto.attributes
-  - community.crypto.attributes.flow
-  - community.crypto.module_privatekey
+  - community.crypto._attributes
+  - community.crypto._attributes.flow
+  - community.crypto._module_privatekey
 attributes:
   action:
     support: full
@@ -39,10 +34,7 @@ attributes:
   check_mode:
     support: full
     details:
-      - Currently in check mode, private keys will not be (re-)generated, only the changed status is set. This will change
-        in community.crypto 3.0.0.
-      - From community.crypto 3.0.0 on, the module will ignore check mode and always behave as if check mode is not active.
-        If you think this breaks your use-case of this module, please create an issue in the community.crypto repository.
+      - Since community.crypto 3.0.0, the module ignores check mode and always behaves as if check mode is not active.
 options:
   content:
     description:

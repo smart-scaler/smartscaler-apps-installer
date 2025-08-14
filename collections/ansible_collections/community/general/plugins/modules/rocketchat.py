@@ -69,7 +69,7 @@ options:
     description:
       - Emoji for the message sender. The representation for the available emojis can be got from Rocket Chat.
       - For example V(:thumbsup:).
-      - If O(icon_emoji) is set, O(icon_url) will not be used.
+      - If O(icon_emoji) is set, O(icon_url) is not used.
   link_names:
     type: int
     description:
@@ -80,8 +80,8 @@ options:
       - 0
   validate_certs:
     description:
-      - If V(false), SSL certificates will not be validated. This should only be used on personally controlled sites using
-        self-signed certificates.
+      - If V(false), SSL certificates are not validated. This should only be used on personally controlled sites using self-signed
+        certificates.
     type: bool
     default: true
   color:
@@ -102,12 +102,11 @@ options:
       - Define a list of attachments.
   is_pre740:
     description:
-      - If V(true), the payload matches Rocket.Chat prior to 7.4.0 format.
-        This format has been used by the module since its inception, but is no longer supported by Rocket.Chat 7.4.0.
-      - The default value of the option will change to V(false) eventually.
-      - This parameter will be removed in a future release when Rocket.Chat 7.4.0 becomes the minimum supported version.
+      - If V(true), the payload matches Rocket.Chat prior to 7.4.0 format. This format has been used by the module since its
+        inception, but is no longer supported by Rocket.Chat 7.4.0.
+      - The default value of the option, V(true), is B(deprecated) since community.general 11.2.0 and will change to V(false) in community.general 13.0.0.
+      - This parameter is going to be removed in a future release when Rocket.Chat 7.4.0 becomes the minimum supported version.
     type: bool
-    default: true
     version_added: 10.5.0
 """
 
@@ -159,13 +158,6 @@ EXAMPLES = r"""
   delegate_to: localhost
 """
 
-RETURN = r"""
-changed:
-  description: A flag indicating if any change was made or not.
-  returned: success
-  type: bool
-  sample: false
-"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.urls import fetch_url
@@ -181,7 +173,7 @@ def build_payload_for_rocketchat(module, text, channel, username, icon_url, icon
     elif text is not None:
         payload = dict(attachments=[dict(text=text, color=color)])
     if channel is not None:
-        if (channel[0] == '#') or (channel[0] == '@'):
+        if channel[0] == '#' or channel[0] == '@':
             payload['channel'] = channel
         else:
             payload['channel'] = '#' + channel
@@ -228,7 +220,7 @@ def main():
             domain=dict(type='str', required=True),
             token=dict(type='str', required=True, no_log=True),
             protocol=dict(type='str', default='https', choices=['http', 'https']),
-            msg=dict(type='str', required=False),
+            msg=dict(type='str'),
             channel=dict(type='str'),
             username=dict(type='str', default='Ansible'),
             icon_url=dict(type='str', default='https://docs.ansible.com/favicon.ico'),
@@ -236,8 +228,8 @@ def main():
             link_names=dict(type='int', default=1, choices=[0, 1]),
             validate_certs=dict(default=True, type='bool'),
             color=dict(type='str', default='normal', choices=['normal', 'good', 'warning', 'danger']),
-            attachments=dict(type='list', elements='dict', required=False),
-            is_pre740=dict(default=True, type='bool')
+            attachments=dict(type='list', elements='dict'),
+            is_pre740=dict(type='bool')
         )
     )
 
@@ -253,6 +245,15 @@ def main():
     color = module.params['color']
     attachments = module.params['attachments']
     is_pre740 = module.params['is_pre740']
+
+    if is_pre740 is None:
+        module.deprecate(
+            "The default value 'true' for 'is_pre740' is deprecated and will change to 'false' in community.general 13.0.0."
+            " You can explicitly set 'is_pre740' in your task to avoid this deprecation warning",
+            version="13.0.0",
+            collection_name="community.general",
+        )
+        is_pre740 = True
 
     payload = build_payload_for_rocketchat(module, text, channel, username, icon_url, icon_emoji, link_names, color, attachments, is_pre740)
     do_notify_rocketchat(module, domain, token, protocol, payload)

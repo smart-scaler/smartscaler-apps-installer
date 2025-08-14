@@ -1,13 +1,9 @@
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2022, Felix Fontein <felix@fontein.de>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
+from __future__ import annotations
 
-
-__metaclass__ = type
 
 DOCUMENTATION = r"""
 name: x509_certificate_info
@@ -25,7 +21,7 @@ options:
     type: string
     required: true
 extends_documentation_fragment:
-  - community.crypto.name_encoding
+  - community.crypto._name_encoding
 seealso:
   - module: community.crypto.x509_certificate_info
   - plugin: community.crypto.to_serial
@@ -312,50 +308,52 @@ _value:
       type: str
 """
 
+import typing as t
+
 from ansible.errors import AnsibleFilterError
-from ansible.module_utils.common.text.converters import to_bytes, to_native
-from ansible.module_utils.six import string_types
-from ansible_collections.community.crypto.plugins.module_utils.crypto.basic import (
+from ansible.module_utils.common.text.converters import to_bytes, to_text
+from ansible_collections.community.crypto.plugins.module_utils._crypto.basic import (
     OpenSSLObjectError,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.module_backends.certificate_info import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.module_backends.certificate_info import (
     get_certificate_info,
 )
-from ansible_collections.community.crypto.plugins.plugin_utils.filter_module import (
+from ansible_collections.community.crypto.plugins.plugin_utils._filter_module import (
     FilterModuleMock,
 )
 
 
-def x509_certificate_info_filter(data, name_encoding="ignore"):
+def x509_certificate_info_filter(
+    data: str | bytes, name_encoding: t.Literal["ignore", "idna", "unicode"] = "ignore"
+) -> dict[str, t.Any]:
     """Extract information from X.509 PEM certificate."""
-    if not isinstance(data, string_types):
+    if not isinstance(data, (str, bytes)):
         raise AnsibleFilterError(
-            "The community.crypto.x509_certificate_info input must be a text type, not %s"
-            % type(data)
+            f"The community.crypto.x509_certificate_info input must be a text type, not {type(data)}"
         )
-    if not isinstance(name_encoding, string_types):
+    if not isinstance(name_encoding, (str, bytes)):
         raise AnsibleFilterError(
-            "The name_encoding option must be of a text type, not %s"
-            % type(name_encoding)
+            f"The name_encoding option must be of a text type, not {type(name_encoding)}"
         )
-    name_encoding = to_native(name_encoding)
+    name_encoding = t.cast(
+        t.Literal["ignore", "idna", "unicode"], to_text(name_encoding)
+    )
     if name_encoding not in ("ignore", "idna", "unicode"):
         raise AnsibleFilterError(
-            'The name_encoding option must be one of the values "ignore", "idna", or "unicode", not "%s"'
-            % name_encoding
+            f'The name_encoding option must be one of the values "ignore", "idna", or "unicode", not "{name_encoding}"'
         )
 
     module = FilterModuleMock({"name_encoding": name_encoding})
     try:
-        return get_certificate_info(module, "cryptography", content=to_bytes(data))
+        return get_certificate_info(module=module, content=to_bytes(data))
     except OpenSSLObjectError as exc:
-        raise AnsibleFilterError(to_native(exc))
+        raise AnsibleFilterError(str(exc)) from exc
 
 
-class FilterModule(object):
+class FilterModule:
     """Ansible jinja2 filters"""
 
-    def filters(self):
+    def filters(self) -> dict[str, t.Callable]:
         return {
             "x509_certificate_info": x509_certificate_info_filter,
         }

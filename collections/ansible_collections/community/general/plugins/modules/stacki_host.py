@@ -119,25 +119,6 @@ EXAMPLES = r"""
     state: absent
 """
 
-RETURN = r"""
-changed:
-  description: Response to whether or not the API call completed successfully.
-  returned: always
-  type: bool
-  sample: true
-
-stdout:
-  description: The set of responses from the commands.
-  returned: always
-  type: list
-  sample: ['...', '...']
-
-stdout_lines:
-  description: The value of stdout split into a list.
-  returned: always
-  type: list
-  sample: [['...', '...'], ['...'], ['...']]
-"""
 
 import json
 
@@ -288,7 +269,7 @@ def main():
         for param in ['appliance', 'rack', 'rank', 'prim_intf', 'prim_intf_ip', 'network', 'prim_intf_mac']:
             if not module.params[param]:
                 missing_params.append(param)
-        if len(missing_params) > 0:   # @FIXME replace with required_if
+        if len(missing_params) > 0:
             module.fail_json(msg="missing required arguments: {0}".format(missing_params))
 
         stacki.stack_add(result)

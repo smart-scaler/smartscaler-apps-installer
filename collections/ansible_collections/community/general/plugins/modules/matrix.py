@@ -13,7 +13,7 @@ author: "Jan Christian Grünhage (@jcgruenhage)"
 module: matrix
 short_description: Send notifications to matrix
 description:
-  - This module sends html formatted notifications to matrix rooms.
+  - This module sends HTML formatted notifications to matrix rooms.
 extends_documentation_fragment:
   - community.general.attributes
 attributes:
@@ -99,9 +99,9 @@ def run_module():
         msg_html=dict(type='str', required=True),
         room_id=dict(type='str', required=True),
         hs_url=dict(type='str', required=True),
-        token=dict(type='str', required=False, no_log=True),
-        user_id=dict(type='str', required=False),
-        password=dict(type='str', required=False, no_log=True),
+        token=dict(type='str', no_log=True),
+        user_id=dict(type='str'),
+        password=dict(type='str', no_log=True),
     )
 
     result = dict(

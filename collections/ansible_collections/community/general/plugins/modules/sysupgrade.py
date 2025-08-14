@@ -25,7 +25,7 @@ options:
   snapshot:
     description:
       - Apply the latest snapshot.
-      - Otherwise release will be applied.
+      - Otherwise release is applied.
     default: false
     type: bool
   force:
@@ -36,14 +36,13 @@ options:
   keep_files:
     description:
       - Keep the files under C(/home/_sysupgrade).
-      - By default, the files will be deleted after the upgrade.
+      - By default, the files are deleted after the upgrade.
     default: false
     type: bool
   fetch_only:
     description:
       - Fetch and verify files and create C(/bsd.upgrade) but do not reboot.
-      - Set to V(false) if you want C(sysupgrade) to reboot. This will cause Ansible to error, as it expects the module to
-        exit gracefully. See the examples.
+      - Set to V(false) if you want C(sysupgrade) to reboot. This causes the module to fail. See the examples.
     default: true
     type: bool
   installurl:
@@ -79,21 +78,6 @@ EXAMPLES = r"""
   ignore_errors: true
 """
 
-RETURN = r"""
-rc:
-  description: The command return code (0 means success).
-  returned: always
-  type: int
-stdout:
-  description: Sysupgrade standard output.
-  returned: always
-  type: str
-stderr:
-  description: Sysupgrade standard error.
-  returned: always
-  type: str
-  sample: "sysupgrade: need root privileges"
-"""
 
 from ansible.module_utils.basic import AnsibleModule
 
@@ -102,7 +86,6 @@ def sysupgrade_run(module):
     sysupgrade_bin = module.get_bin_path('/usr/sbin/sysupgrade', required=True)
     cmd = [sysupgrade_bin]
     changed = False
-    warnings = []
 
     # Setup command flags
     if module.params['snapshot']:
@@ -138,7 +121,6 @@ def sysupgrade_run(module):
         rc=rc,
         stderr=err,
         stdout=out,
-        warnings=warnings
     )
 
 

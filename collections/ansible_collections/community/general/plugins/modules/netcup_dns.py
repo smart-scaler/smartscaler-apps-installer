@@ -68,7 +68,7 @@ options:
     default: false
     description:
       - Whether the record should be the only one for that record type and record name. Only use with O(state=present).
-      - This will delete all other records with the same record name and type.
+      - This deletes all other records with the same record name and type.
   priority:
     description:
       - Record priority. Required for O(type=MX).
@@ -213,15 +213,15 @@ def main():
             customer_id=dict(required=True, type='int'),
 
             domain=dict(required=True),
-            record=dict(required=False, default='@', aliases=['name']),
+            record=dict(default='@', aliases=['name']),
             type=dict(required=True, choices=['A', 'AAAA', 'MX', 'CNAME', 'CAA', 'SRV', 'TXT',
                                               'TLSA', 'NS', 'DS', 'OPENPGPKEY', 'SMIMEA',
                                               'SSHFP']),
             value=dict(required=True),
-            priority=dict(required=False, type='int'),
-            solo=dict(required=False, type='bool', default=False),
-            state=dict(required=False, choices=['present', 'absent'], default='present'),
-            timeout=dict(required=False, type='int', default=5),
+            priority=dict(type='int'),
+            solo=dict(type='bool', default=False),
+            state=dict(choices=['present', 'absent'], default='present'),
+            timeout=dict(type='int', default=5),
 
         ),
         supports_check_mode=True

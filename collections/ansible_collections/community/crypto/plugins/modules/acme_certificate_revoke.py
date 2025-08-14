@@ -1,14 +1,9 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2016 Michael Gruener <michael.gruener@chaosmoon.net>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -34,10 +29,10 @@ seealso:
   - module: community.crypto.acme_inspect
     description: Allows to debug problems.
 extends_documentation_fragment:
-  - community.crypto.acme.basic
-  - community.crypto.acme.account
-  - community.crypto.attributes
-  - community.crypto.attributes.actiongroup_acme
+  - community.crypto._acme.basic
+  - community.crypto._acme.account
+  - community.crypto._attributes
+  - community.crypto._attributes.actiongroup_acme
 attributes:
   check_mode:
     support: none
@@ -115,71 +110,68 @@ EXAMPLES = r"""
 
 RETURN = """#"""
 
-from ansible_collections.community.crypto.plugins.module_utils.acme.account import (
+import typing as t
+
+from ansible_collections.community.crypto.plugins.module_utils._acme.account import (
     ACMEAccount,
 )
-from ansible_collections.community.crypto.plugins.module_utils.acme.acme import (
+from ansible_collections.community.crypto.plugins.module_utils._acme.acme import (
     ACMEClient,
     create_backend,
     create_default_argspec,
 )
-from ansible_collections.community.crypto.plugins.module_utils.acme.errors import (
+from ansible_collections.community.crypto.plugins.module_utils._acme.errors import (
     ACMEProtocolException,
     KeyParsingError,
     ModuleFailException,
 )
-from ansible_collections.community.crypto.plugins.module_utils.acme.utils import (
+from ansible_collections.community.crypto.plugins.module_utils._acme.utils import (
     nopad_b64,
     pem_to_der,
 )
 
 
-def main():
+def main() -> t.NoReturn:
     argument_spec = create_default_argspec(require_account_key=False)
     argument_spec.update_argspec(
-        private_key_src=dict(type="path"),
-        private_key_content=dict(type="str", no_log=True),
-        private_key_passphrase=dict(type="str", no_log=True),
-        certificate=dict(type="path", required=True),
-        revoke_reason=dict(type="int"),
+        private_key_src={"type": "path"},
+        private_key_content={"type": "str", "no_log": True},
+        private_key_passphrase={"type": "str", "no_log": True},
+        certificate={"type": "path", "required": True},
+        revoke_reason={"type": "int"},
     )
     argument_spec.update(
-        required_one_of=(
-            [
+        required_one_of=[
+            (
                 "account_key_src",
                 "account_key_content",
                 "private_key_src",
                 "private_key_content",
-            ],
-        ),
-        mutually_exclusive=(
-            [
+            ),
+        ],
+        mutually_exclusive=[
+            (
                 "account_key_src",
                 "account_key_content",
                 "private_key_src",
                 "private_key_content",
-            ],
-        ),
+            ),
+        ],
     )
     module = argument_spec.create_ansible_module()
-    backend = create_backend(module, False)
+    backend = create_backend(module, needs_acme_v2=False)
 
     try:
-        client = ACMEClient(module, backend)
-        account = ACMEAccount(client)
+        client = ACMEClient(module=module, backend=backend)
+        account = ACMEAccount(client=client)
         # Load certificate
-        certificate = pem_to_der(module.params.get("certificate"))
-        certificate = nopad_b64(certificate)
+        certificate = pem_to_der(pem_filename=module.params.get("certificate"))
+        certificate_b64 = nopad_b64(certificate)
         # Construct payload
-        payload = {"certificate": certificate}
+        payload = {"certificate": certificate_b64}
         if module.params.get("revoke_reason") is not None:
             payload["reason"] = module.params.get("revoke_reason")
-        # Determine endpoint
-        if module.params.get("acme_version") == 1:
-            endpoint = client.directory["revoke-cert"]
-            payload["resource"] = "revoke-cert"
-        else:
-            endpoint = client.directory["revokeCert"]
+        endpoint = client.directory["revokeCert"]
         # Get hold of private key (if available) and make sure it comes from disk
         private_key = module.params.get("private_key_src")
         private_key_content = module.params.get("private_key_content")
@@ -189,12 +181,14 @@ def main():
             # Step 1: load and parse private key
             try:
                 private_key_data = client.parse_key(
-                    private_key, private_key_content, passphrase=passphrase
+                    key_file=private_key,
+                    key_content=private_key_content,
+                    passphrase=passphrase,
                 )
             except KeyParsingError as e:
                 raise ModuleFailException(
-                    "Error while parsing private key: {msg}".format(msg=e.msg)
-                )
+                    f"Error while parsing private key: {e.msg}"
+                ) from e
             # Step 2: sign revokation request with private key
             jws_header = {
                 "alg": private_key_data["alg"],
@@ -211,7 +205,7 @@ def main():
             # Step 1: get hold of account URI
             created, account_data = account.setup_account(allow_creation=False)
             if created:
-                raise AssertionError("Unwanted account creation")
+                raise AssertionError("Unwanted account creation")  # pragma: no cover
             if account_data is None:
                 raise ModuleFailException(
                     msg="Account does not exist or is deactivated."
@@ -223,16 +217,16 @@ def main():
         if info["status"] != 200:
             already_revoked = False
             # Standardized error from draft 14 on (https://tools.ietf.org/html/rfc8555#section-7.6)
-            if result.get("type") == "urn:ietf:params:acme:error:alreadyRevoked":
+            if (
+                isinstance(result, dict)
+                and result.get("type") == "urn:ietf:params:acme:error:alreadyRevoked"
+            ):
                 already_revoked = True
             else:
                 # Hack for Boulder errors
-                if module.params.get("acme_version") == 1:
-                    error_type = "urn:acme:error:malformed"
-                else:
-                    error_type = "urn:ietf:params:acme:error:malformed"
                 if (
-                    result.get("type") == error_type
+                    isinstance(result, dict)
+                    and result.get("type") == "urn:ietf:params:acme:error:malformed"
                     and result.get("detail") == "Certificate already revoked"
                 ):
                     # Fallback: boulder returns this in case the certificate was already revoked.
@@ -242,11 +236,14 @@ def main():
             if already_revoked:
                 module.exit_json(changed=False)
             raise ACMEProtocolException(
-                module, "Failed to revoke certificate", info=info, content_json=result
+                module=module,
+                msg="Failed to revoke certificate",
+                info=info,
+                content_json=result,
             )
         module.exit_json(changed=True)
     except ModuleFailException as e:
-        e.do_fail(module)
+        e.do_fail(module=module)
 
 
 if __name__ == "__main__":

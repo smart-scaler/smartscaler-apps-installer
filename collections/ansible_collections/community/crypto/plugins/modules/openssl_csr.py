@@ -1,15 +1,10 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2017, Yanis Guenane <yanis+ansible@guenane.org>
 # Copyright (c) 2020, Felix Fontein <felix@fontein.de>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -23,9 +18,9 @@ author:
   - Felix Fontein (@felixfontein)
 extends_documentation_fragment:
   - ansible.builtin.files
-  - community.crypto.attributes
-  - community.crypto.attributes.files
-  - community.crypto.module_csr
+  - community.crypto._attributes
+  - community.crypto._attributes.files
+  - community.crypto._module_csr
 attributes:
   check_mode:
     support: full
@@ -244,42 +239,52 @@ csr:
 """
 
 import os
+import typing as t
 
-from ansible.module_utils.common.text.converters import to_native
-from ansible_collections.community.crypto.plugins.module_utils.crypto.basic import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.basic import (
     OpenSSLObjectError,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.module_backends.csr import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.module_backends.csr import (
     get_csr_argument_spec,
     select_backend,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.support import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.support import (
     OpenSSLObject,
 )
-from ansible_collections.community.crypto.plugins.module_utils.io import (
+from ansible_collections.community.crypto.plugins.module_utils._io import (
     load_file_if_exists,
     write_file,
 )
 
 
-class CertificateSigningRequestModule(OpenSSLObject):
+if t.TYPE_CHECKING:
+    from ansible.module_utils.basic import AnsibleModule  # pragma: no cover
+    from ansible_collections.community.crypto.plugins.module_utils._crypto.module_backends.csr import (  # pragma: no cover
+        CertificateSigningRequestBackend,
+    )
 
-    def __init__(self, module, module_backend):
-        super(CertificateSigningRequestModule, self).__init__(
-            module.params["path"],
-            module.params["state"],
-            module.params["force"],
-            module.check_mode,
+
+class CertificateSigningRequestModule(OpenSSLObject):
+    def __init__(
+        self, module: AnsibleModule, module_backend: CertificateSigningRequestBackend
+    ) -> None:
+        super().__init__(
+            path=module.params["path"],
+            state=module.params["state"],
+            force=module.params["force"],
+            check_mode=module.check_mode,
         )
         self.module_backend = module_backend
         self.return_content = module.params["return_content"]
 
         self.backup = module.params["backup"]
-        self.backup_file = None
+        self.backup_file: str | None = None
 
-        self.module_backend.set_existing(load_file_if_exists(self.path, module))
+        self.module_backend.set_existing(
+            csr_bytes=load_file_if_exists(path=self.path, module=module)
+        )
 
-    def generate(self, module):
+    def generate(self, module: AnsibleModule) -> None:
         """Generate the certificate signing request."""
         if self.force or self.module_backend.needs_regeneration():
             if not self.check_mode:
@@ -287,7 +292,7 @@ class CertificateSigningRequestModule(OpenSSLObject):
                 result = self.module_backend.get_csr_data()
                 if self.backup:
                     self.backup_file = module.backup_local(self.path)
-                write_file(module, result)
+                write_file(module=module, content=result)
             self.changed = True
 
         file_args = module.load_file_common_arguments(module.params)
@@ -298,13 +303,13 @@ class CertificateSigningRequestModule(OpenSSLObject):
                 file_args, self.changed
             )
 
-    def remove(self, module):
-        self.module_backend.set_existing(None)
+    def remove(self, module: AnsibleModule) -> None:
+        self.module_backend.set_existing(csr_bytes=None)
         if self.backup and not self.check_mode:
             self.backup_file = module.backup_local(self.path)
-        super(CertificateSigningRequestModule, self).remove(module)
+        super().remove(module)
 
-    def dump(self):
+    def dump(self) -> dict[str, t.Any]:
         """Serialize the object into a dictionary."""
         result = self.module_backend.dump(include_csr=self.return_content)
         result.update(
@@ -318,16 +323,20 @@ class CertificateSigningRequestModule(OpenSSLObject):
         return result
 
 
-def main():
+def main() -> t.NoReturn:
     argument_spec = get_csr_argument_spec()
     argument_spec.argument_spec.update(
-        dict(
-            state=dict(type="str", default="present", choices=["absent", "present"]),
-            force=dict(type="bool", default=False),
-            path=dict(type="path", required=True),
-            backup=dict(type="bool", default=False),
-            return_content=dict(type="bool", default=False),
-        )
+        {
+            "state": {
+                "type": "str",
+                "default": "present",
+                "choices": ["absent", "present"],
+            },
+            "force": {"type": "bool", "default": False},
+            "path": {"type": "path", "required": True},
+            "backup": {"type": "bool", "default": False},
+            "return_content": {"type": "bool", "default": False},
+        }
     )
     argument_spec.required_if.extend(
         [("state", "present", rof, True) for rof in argument_spec.required_one_of]
@@ -342,13 +351,11 @@ def main():
     if not os.path.isdir(base_dir):
         module.fail_json(
             name=base_dir,
-            msg="The directory %s does not exist or the file is not a directory"
-            % base_dir,
+            msg=f"The directory {base_dir} does not exist or the file is not a directory",
         )
 
     try:
-        backend = module.params["select_crypto_backend"]
-        backend, module_backend = select_backend(module, backend)
+        module_backend = select_backend(module)
 
         csr = CertificateSigningRequestModule(module, module_backend)
         if module.params["state"] == "present":
@@ -359,7 +366,7 @@ def main():
         result = csr.dump()
         module.exit_json(**result)
     except OpenSSLObjectError as exc:
-        module.fail_json(msg=to_native(exc))
+        module.fail_json(msg=str(exc))
 
 
 if __name__ == "__main__":

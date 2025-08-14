@@ -10,10 +10,10 @@ __metaclass__ = type
 
 DOCUMENTATION = r"""
 module: opendj_backendprop
-short_description: Will update the backend configuration of OpenDJ using the dsconfig set-backend-prop command
+short_description: Update the backend configuration of OpenDJ using the dsconfig set-backend-prop command
 description:
-  - This module will update settings for OpenDJ with the command set-backend-prop.
-  - It will check first using de get-backend-prop if configuration needs to be applied.
+  - This module updates settings for OpenDJ with the command C(set-backend-prop).
+  - It checks first using C(get-backend-prop) if configuration needs to be applied.
 author:
   - Werner Dijkerman (@dj-wasabi)
 extends_documentation_fragment:
@@ -153,9 +153,9 @@ def main():
             opendj_bindir=dict(default="/opt/opendj/bin", type="path"),
             hostname=dict(required=True),
             port=dict(required=True),
-            username=dict(default="cn=Directory Manager", required=False),
-            password=dict(required=False, no_log=True),
-            passwordfile=dict(required=False, type="path"),
+            username=dict(default="cn=Directory Manager"),
+            password=dict(no_log=True),
+            passwordfile=dict(type="path"),
             backend=dict(required=True),
             name=dict(required=True),
             value=dict(required=True),

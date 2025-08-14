@@ -24,8 +24,8 @@ options:
   name:
     description:
       - Name of the certificate in the keystore.
-      - If the provided name does not exist in the keystore, the module will re-create the keystore. This behavior changed
-        in community.general 3.0.0, before that the module would fail when the name did not match.
+      - If the provided name does not exist in the keystore, the module re-creates the keystore. This behavior changed in
+        community.general 3.0.0, before that the module would fail when the name did not match.
     type: str
     required: true
   certificate:
@@ -62,7 +62,7 @@ options:
   password:
     description:
       - Password that should be used to secure the keystore.
-      - If the provided password fails to unlock the keystore, the module will re-create the keystore with the new passphrase.
+      - If the provided password fails to unlock the keystore, the module re-creates the keystore with the new passphrase.
         This behavior changed in community.general 3.0.0, before that the module would fail when the password did not match.
     type: str
     required: true
@@ -130,7 +130,7 @@ notes:
     or with the P(ansible.builtin.file#lookup) lookup), while O(certificate_path) and O(private_key_path) require that the
     files are available on the target host.
   - By design, any change of a value of options O(keystore_type), O(name) or O(password), as well as changes of key or certificate
-    materials will cause the existing O(dest) to be overwritten.
+    materials causes the existing O(dest) to be overwritten.
 """
 
 EXAMPLES = r"""
@@ -166,23 +166,11 @@ EXAMPLES = r"""
 """
 
 RETURN = r"""
-msg:
-  description: Output from stdout of keytool/openssl command after execution of given command or an error.
-  returned: changed and failure
-  type: str
-  sample: "Unable to find the current certificate fingerprint in ..."
-
 err:
   description: Output from stderr of keytool/openssl command after error of given command.
   returned: failure
   type: str
   sample: "Keystore password is too short - must be at least 6 characters\n"
-
-rc:
-  description: Keytool/openssl command execution return value.
-  returned: changed and failure
-  type: int
-  sample: "0"
 
 cmd:
   description: Executed command to get action done.

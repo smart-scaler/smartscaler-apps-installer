@@ -24,14 +24,14 @@ options:
   name:
     description:
       - Name of the encrypted block device as it appears in the C(/etc/crypttab) file, or optionally prefixed with V(/dev/mapper/),
-        as it appears in the filesystem. V(/dev/mapper/) will be stripped from O(name).
+        as it appears in the filesystem. V(/dev/mapper/) is stripped from O(name).
     type: str
     required: true
   state:
     description:
       - Use V(present) to add a line to C(/etc/crypttab) or update its definition if already present.
       - Use V(absent) to remove a line with matching O(name).
-      - Use V(opts_present) to add options to those already present; options with different values will be updated.
+      - Use V(opts_present) to add options to those already present; options with different values are updated.
       - Use V(opts_absent) to remove options from the existing set.
     type: str
     required: true
@@ -73,6 +73,14 @@ EXAMPLES = r"""
     opts: discard
   loop: '{{ ansible_mounts }}'
   when: "'/dev/mapper/luks-' in item.device"
+
+- name: Add entry to /etc/crypttab for luks-home with password file
+  community.general.crypttab:
+    name: luks-home
+    backing_device: UUID=123e4567-e89b-12d3-a456-426614174000
+    password: /root/keys/luks-home.key
+    opts: discard,cipher=aes-cbc-essiv:sha256
+    state: present
 """
 
 import os
@@ -116,7 +124,7 @@ def main():
                           ('backing_device', backing_device),
                           ('password', password),
                           ('opts', opts)):
-        if (arg is not None and (' ' in arg or '\t' in arg or arg == '')):
+        if arg is not None and (' ' in arg or '\t' in arg or arg == ''):
             module.fail_json(msg="invalid '%s': contains white space or is empty" % arg_name,
                              **module.params)
 

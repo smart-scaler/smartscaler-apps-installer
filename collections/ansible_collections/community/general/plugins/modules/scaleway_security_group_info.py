@@ -25,12 +25,17 @@ options:
     choices:
       - ams1
       - EMEA-NL-EVS
+      - ams2
+      - ams3
       - par1
       - EMEA-FR-PAR1
       - par2
       - EMEA-FR-PAR2
+      - par3
       - waw1
       - EMEA-PL-WAW1
+      - waw2
+      - waw3
 extends_documentation_fragment:
   - community.general.scaleway
   - community.general.attributes
@@ -56,7 +61,7 @@ scaleway_security_group_info:
   type: list
   elements: dict
   sample:
-    "scaleway_security_group_info": [
+    [
       {
         "description": "test-ams",
         "enable_default_security": true,

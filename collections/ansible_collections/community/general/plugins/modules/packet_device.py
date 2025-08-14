@@ -111,9 +111,9 @@ options:
   state:
     description:
       - Desired state of the device.
-      - If set to V(present) (the default), the module call will return immediately after the device-creating HTTP request
-        successfully returns.
-      - If set to V(active), the module call will block until all the specified devices are in state active due to the Packet
+      - If set to V(present) (the default), the module call returns immediately after the device-creating HTTP request successfully
+        returns.
+      - If set to V(active), the module call blocks until all the specified devices are in state active due to the Packet
         API, or until O(wait_timeout).
     choices: [present, absent, active, inactive, rebooted]
     default: present
@@ -127,16 +127,16 @@ options:
   wait_for_public_IPv:
     description:
       - Whether to wait for the instance to be assigned a public IPv4/IPv6 address.
-      - If set to 4, it will wait until IPv4 is assigned to the instance.
-      - If set to 6, wait until public IPv6 is assigned to the instance.
+      - If set to V(4), it waits until IPv4 is assigned to the instance.
+      - If set to V(6), it waits until public IPv6 is assigned to the instance.
     choices: [4, 6]
     type: int
 
   wait_timeout:
     description:
       - How long (seconds) to wait either for automatic IP address assignment, or for the device to reach the V(active) state.
-      - If O(wait_for_public_IPv) is set and O(state=active), the module will wait for both events consequently, applying
-        the timeout twice.
+      - If O(wait_for_public_IPv) is set and O(state=active), the module waits for both events consequently, applying the
+        timeout twice.
     default: 900
     type: int
 
@@ -258,12 +258,6 @@ EXAMPLES = r"""
 """
 
 RETURN = r"""
-changed:
-  description: True if a device was altered in any way (created, modified or removed).
-  type: bool
-  sample: true
-  returned: success
-
 devices:
   description: Information about each device that was processed.
   type: list
@@ -420,12 +414,12 @@ def get_hostname_list(module):
     # at this point, hostnames is a list
     hostnames = [h.strip() for h in hostnames]
 
-    if (len(hostnames) > 1) and (count > 1):
+    if len(hostnames) > 1 and count > 1:
         _msg = ("If you set count>1, you should only specify one hostname "
                 "with the %d formatter, not a list of hostnames.")
         raise Exception(_msg)
 
-    if (len(hostnames) == 1) and (count > 0):
+    if len(hostnames) == 1 and count > 0:
         hostname_spec = hostnames[0]
         count_range = range(count_offset, count_offset + count)
         if re.search(r"%\d{0,2}d", hostname_spec):

@@ -20,7 +20,7 @@ options:
   state:
     description:
       - Control whether to apply the latest image or switch the image.
-      - B(Note:) This will not reboot the system.
+      - B(Note:) This does not reboot the system.
       - Please use M(ansible.builtin.reboot) to reboot the system.
     required: true
     type: str
@@ -57,7 +57,7 @@ from ansible.module_utils.common.locale import get_best_parsable_locale
 def main():
     argument_spec = dict(
         state=dict(type='str', required=True, choices=['switch', 'latest']),
-        image=dict(type='str', required=False),
+        image=dict(type='str'),
     )
     module = AnsibleModule(
         argument_spec=argument_spec,

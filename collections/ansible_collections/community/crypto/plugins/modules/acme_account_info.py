@@ -1,14 +1,9 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2018 Felix Fontein <felix@fontein.de>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -23,12 +18,12 @@ notes:
   - The M(community.crypto.acme_account) module allows to modify, create and delete ACME accounts.
   - This module was called C(acme_account_facts) before Ansible 2.8. The usage did not change.
 extends_documentation_fragment:
-  - community.crypto.acme.basic
-  - community.crypto.acme.account
-  - community.crypto.attributes
-  - community.crypto.attributes.actiongroup_acme
-  - community.crypto.attributes.info_module
-  - community.crypto.attributes.idempotent_not_modify_state
+  - community.crypto._acme.basic
+  - community.crypto._acme.account
+  - community.crypto._attributes
+  - community.crypto._attributes.actiongroup_acme
+  - community.crypto._attributes.info_module
+  - community.crypto._attributes.idempotent_not_modify_state
 options:
   retrieve_orders:
     description:
@@ -209,96 +204,126 @@ order_uris:
   version_added: 1.5.0
 """
 
-from ansible_collections.community.crypto.plugins.module_utils.acme.account import (
+import typing as t
+
+from ansible_collections.community.crypto.plugins.module_utils._acme.account import (
     ACMEAccount,
 )
-from ansible_collections.community.crypto.plugins.module_utils.acme.acme import (
+from ansible_collections.community.crypto.plugins.module_utils._acme.acme import (
     ACMEClient,
     create_backend,
     create_default_argspec,
 )
-from ansible_collections.community.crypto.plugins.module_utils.acme.errors import (
+from ansible_collections.community.crypto.plugins.module_utils._acme.errors import (
+    ACMEProtocolException,
     ModuleFailException,
 )
-from ansible_collections.community.crypto.plugins.module_utils.acme.utils import (
+from ansible_collections.community.crypto.plugins.module_utils._acme.utils import (
     process_links,
 )
 
 
-def get_orders_list(module, client, orders_url):
+if t.TYPE_CHECKING:
+    from ansible.module_utils.basic import AnsibleModule  # pragma: no cover
+
+
+def get_orders_list(
+    module: AnsibleModule, client: ACMEClient, orders_url: str
+) -> list[str]:
     """
-    Retrieves orders list (handles pagination).
+    Retrieves order URL list (handles pagination).
     """
-    orders = []
-    while orders_url:
+    orders: list[str] = []
+    next_orders_url: str | None = orders_url
+    while next_orders_url:
         # Get part of orders list
         res, info = client.get_request(
-            orders_url, parse_json_result=True, fail_on_error=True
+            next_orders_url, parse_json_result=True, fail_on_error=True
         )
+        if not isinstance(res, dict):
+            raise ACMEProtocolException(
+                module=module,
+                msg="Unexpected account information",
+                info=info,
+                content_json=res,
+            )
         if not res.get("orders"):
             if orders:
                 module.warn(
-                    "When retrieving orders list part {0}, got empty result list".format(
-                        orders_url
-                    )
+                    f"When retrieving orders list part {next_orders_url}, got empty result list"
                 )
             break
         # Add order URLs to result list
         orders.extend(res["orders"])
         # Extract URL of next part of results list
-        new_orders_url = []
+        new_orders_url: list[str | None] = []
 
-        def f(link, relation):
+        def f(link: str, relation: str) -> None:
             if relation == "next":
                 new_orders_url.append(link)
 
-        process_links(info, f)
+        process_links(info=info, callback=f)
         new_orders_url.append(None)
-        previous_orders_url, orders_url = orders_url, new_orders_url.pop(0)
-        if orders_url == previous_orders_url:
+        previous_orders_url, next_orders_url = next_orders_url, new_orders_url.pop(0)
+        if next_orders_url == previous_orders_url:
             # Prevent infinite loop
-            orders_url = None
+            next_orders_url = None
     return orders
 
 
-def get_order(client, order_url):
+def get_order(client: ACMEClient, order_url: str) -> dict[str, t.Any]:
     """
     Retrieve order data.
     """
-    return client.get_request(order_url, parse_json_result=True, fail_on_error=True)[0]
+    result, info = client.get_request(
+        order_url, parse_json_result=True, fail_on_error=True
+    )
+    if not isinstance(result, dict):
+        raise ACMEProtocolException(
+            module=client.module,
+            msg="Unexpected order data",
+            info=info,
+            content_json=result,
+        )
+    return result
 
 
-def main():
+def main() -> t.NoReturn:
     argument_spec = create_default_argspec()
     argument_spec.update_argspec(
-        retrieve_orders=dict(
-            type="str", default="ignore", choices=["ignore", "url_list", "object_list"]
-        ),
+        retrieve_orders={
+            "type": "str",
+            "default": "ignore",
+            "choices": ["ignore", "url_list", "object_list"],
+        },
     )
     module = argument_spec.create_ansible_module(supports_check_mode=True)
-    backend = create_backend(module, True)
+    backend = create_backend(module, needs_acme_v2=True)
 
     try:
-        client = ACMEClient(module, backend)
-        account = ACMEAccount(client)
+        client = ACMEClient(module=module, backend=backend)
+        account = ACMEAccount(client=client)
         # Check whether account exists
         created, account_data = account.setup_account(
-            [],
+            contact=[],
             allow_creation=False,
             remove_account_uri_if_not_exists=True,
         )
         if created:
-            raise AssertionError("Unwanted account creation")
-        result = {
+            raise AssertionError("Unwanted account creation")  # pragma: no cover
+        result: dict[str, t.Any] = {
             "changed": False,
-            "exists": client.account_uri is not None,
-            "account_uri": client.account_uri,
+            "exists": False,
+            "account_uri": None,
         }
-        if client.account_uri is not None:
+        if client.account_uri is not None and account_data:
+            result["account_uri"] = client.account_uri
+            result["exists"] = True
             # Make sure promised data is there
             if "contact" not in account_data:
                 account_data["contact"] = []
-            account_data["public_account_key"] = client.account_key_data["jwk"]
+            if client.account_key_data:
+                account_data["public_account_key"] = client.account_key_data["jwk"]
             result["account"] = account_data
             # Retrieve orders list
             if (
@@ -311,7 +336,7 @@ def main():
                     result["orders"] = [get_order(client, order) for order in orders]
         module.exit_json(**result)
     except ModuleFailException as e:
-        e.do_fail(module)
+        e.do_fail(module=module)
 
 
 if __name__ == "__main__":

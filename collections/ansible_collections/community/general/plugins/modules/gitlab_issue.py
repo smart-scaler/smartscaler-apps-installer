@@ -18,8 +18,8 @@ short_description: Create, update, or delete GitLab issues
 version_added: '8.1.0'
 description:
   - Creates an issue if it does not exist.
-  - When an issue does exist, it will be updated if the provided parameters are different.
-  - When an issue does exist and O(state=absent), the issue will be deleted.
+  - When an issue does exist, it is updated if the provided parameters are different.
+  - When an issue does exist and O(state=absent), the issue is deleted.
   - When multiple issues are detected, the task fails.
   - Existing issues are matched based on O(title) and O(state_filter) filters.
 author:
@@ -284,13 +284,13 @@ def main():
     argument_spec = basic_auth_argument_spec()
     argument_spec.update(auth_argument_spec())
     argument_spec.update(
-        assignee_ids=dict(type='list', elements='str', required=False),
-        description=dict(type='str', required=False),
-        description_path=dict(type='path', required=False),
-        issue_type=dict(type='str', default='issue', choices=["issue", "incident", "test_case"], required=False),
-        labels=dict(type='list', elements='str', required=False),
-        milestone_search=dict(type='str', required=False),
-        milestone_group_id=dict(type='str', required=False),
+        assignee_ids=dict(type='list', elements='str'),
+        description=dict(type='str'),
+        description_path=dict(type='path'),
+        issue_type=dict(type='str', default='issue', choices=["issue", "incident", "test_case"]),
+        labels=dict(type='list', elements='str'),
+        milestone_search=dict(type='str'),
+        milestone_group_id=dict(type='str'),
         project=dict(type='str', required=True),
         state=dict(type='str', default="present", choices=["absent", "present"]),
         state_filter=dict(type='str', default="opened", choices=["opened", "closed"]),

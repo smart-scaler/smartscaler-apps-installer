@@ -30,7 +30,7 @@ options:
   build_number:
     description:
       - An integer which specifies a build of a job.
-      - If not specified the last build information will be returned.
+      - If not specified the last build information is returned.
     type: int
   password:
     description:
@@ -138,11 +138,11 @@ class JenkinsBuildInfo:
 
     def get_jenkins_connection(self):
         try:
-            if (self.user and self.password):
+            if self.user and self.password:
                 return jenkins.Jenkins(self.jenkins_url, self.user, self.password)
-            elif (self.user and self.token):
+            elif self.user and self.token:
                 return jenkins.Jenkins(self.jenkins_url, self.user, self.token)
-            elif (self.user and not (self.password or self.token)):
+            elif self.user and not (self.password or self.token):
                 return jenkins.Jenkins(self.jenkins_url, self.user)
             else:
                 return jenkins.Jenkins(self.jenkins_url)

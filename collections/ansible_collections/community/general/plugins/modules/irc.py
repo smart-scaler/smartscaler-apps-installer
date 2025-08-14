@@ -73,13 +73,13 @@ options:
   channel:
     type: str
     description:
-      - Channel name. One of nick_to or channel needs to be set. When both are set, the message will be sent to both of them.
+      - Channel name. One of nick_to or channel needs to be set. When both are set, the message is sent to both of them.
   nick_to:
     type: list
     elements: str
     description:
       - A list of nicknames to send the message to. One of nick_to or channel needs to be set. When both are defined, the
-        message will be sent to both of them.
+        message is sent to both of them.
   key:
     type: str
     description:
@@ -118,7 +118,7 @@ options:
     default: none
   validate_certs:
     description:
-      - If set to V(false), the SSL certificates will not be validated.
+      - If set to V(false), the SSL certificates are not validated.
       - This should always be set to V(true). Using V(false) is unsafe and should only be done if the network between between
         Ansible and the IRC server is known to be safe.
       - B(Note:) for security reasons, you should always set O(use_tls=true) and O(validate_certs=true) whenever possible.
@@ -232,9 +232,11 @@ def send_msg(msg, server='localhost', port='6667', channel=None, nick_to=None, k
 
     irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     if use_tls:
+        kwargs = {}
         if validate_certs:
             try:
                 context = ssl.create_default_context()
+                kwargs["server_hostname"] = server
             except AttributeError:
                 raise Exception('Need at least Python 2.7.9 for SSL certificate validation')
         else:
@@ -244,7 +246,7 @@ def send_msg(msg, server='localhost', port='6667', channel=None, nick_to=None, k
             else:
                 context = ssl.SSLContext()
             context.verify_mode = ssl.CERT_NONE
-        irc = context.wrap_socket(irc)
+        irc = context.wrap_socket(irc, **kwargs)
     irc.connect((server, int(port)))
 
     if passwd:
@@ -309,7 +311,7 @@ def main():
             server=dict(default='localhost'),
             port=dict(type='int', default=6667),
             nick=dict(default='ansible'),
-            nick_to=dict(required=False, type='list', elements='str'),
+            nick_to=dict(type='list', elements='str'),
             msg=dict(required=True),
             color=dict(default="none", aliases=['colour'], choices=["white", "black", "blue",
                                                                     "green", "red", "brown",
@@ -318,7 +320,7 @@ def main():
                                                                     "light_blue", "pink", "gray",
                                                                     "light_gray", "none"]),
             style=dict(default="none", choices=["underline", "reverse", "bold", "italic", "none"]),
-            channel=dict(required=False),
+            channel=dict(),
             key=dict(no_log=True),
             topic=dict(),
             passwd=dict(no_log=True),

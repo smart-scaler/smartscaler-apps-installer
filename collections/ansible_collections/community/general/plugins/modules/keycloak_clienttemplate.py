@@ -35,8 +35,8 @@ options:
   state:
     description:
       - State of the client template.
-      - On V(present), the client template will be created (or updated if it exists already).
-      - On V(absent), the client template will be removed if it exists.
+      - On V(present), the client template is created (or updated if it exists already).
+      - On V(absent), the client template is removed if it exists.
     choices: ['present', 'absent']
     default: 'present'
     type: str
@@ -238,10 +238,7 @@ proposed:
   description: Representation of proposed client template.
   returned: always
   type: dict
-  sample:
-    {
-      "name": "test01"
-    }
+  sample: {"name": "test01"}
 
 existing:
   description: Representation of existing client template (sample is truncated).
@@ -311,8 +308,8 @@ def main():
     module = AnsibleModule(argument_spec=argument_spec,
                            supports_check_mode=True,
                            required_one_of=([['id', 'name'],
-                                             ['token', 'auth_realm', 'auth_username', 'auth_password']]),
-                           required_together=([['auth_realm', 'auth_username', 'auth_password']]),
+                                             ['token', 'auth_realm', 'auth_username', 'auth_password', 'auth_client_id', 'auth_client_secret']]),
+                           required_together=([['auth_username', 'auth_password']]),
                            required_by={'refresh_token': 'auth_realm'},
                            )
 

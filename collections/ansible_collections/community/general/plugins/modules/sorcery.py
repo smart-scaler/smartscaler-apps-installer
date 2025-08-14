@@ -34,7 +34,7 @@ options:
     description:
       - Name of the spell or grimoire.
       - Multiple names can be given, separated by commas.
-      - Special value V(*) in conjunction with states V(latest) or V(rebuild) will update or rebuild the whole system respectively.
+      - Special value V(*) in conjunction with states V(latest) or V(rebuild) updates or rebuilds the whole system respectively.
       - The alias O(grimoire) was added in community.general 7.3.0.
     aliases: ["spell", "grimoire"]
     type: list
@@ -44,7 +44,7 @@ options:
     description:
       - Repository location.
       - If specified, O(name) represents grimoire(s) instead of spell(s).
-      - Special value V(*) will pull grimoire from the official location.
+      - Special value V(*) pulls grimoire from the official location.
       - Only single item in O(name) in conjunction with V(*) can be used.
       - O(state=absent) must be used with a special value V(*).
     type: str
@@ -697,11 +697,11 @@ def manage_spells(module):
 def main():
     module = AnsibleModule(
         argument_spec=dict(
-            name=dict(default=None, aliases=['spell', 'grimoire'], type='list', elements='str'),
-            repository=dict(default=None, type='str'),
+            name=dict(aliases=['spell', 'grimoire'], type='list', elements='str'),
+            repository=dict(type='str'),
             state=dict(default='present', choices=['present', 'latest',
                                                    'absent', 'cast', 'dispelled', 'rebuild']),
-            depends=dict(default=None),
+            depends=dict(),
             update=dict(default=False, type='bool'),
             update_cache=dict(default=False, aliases=['update_codex'], type='bool'),
             cache_valid_time=dict(default=0, type='int')

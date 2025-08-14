@@ -1,16 +1,11 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2016-2017, Yanis Guenane <yanis+ansible@guenane.org>
 # Copyright (c) 2017, Markus Teufelberger <mteufelberger+ansible@mgit.at>
 # Copyright (2) 2020, Felix Fontein <felix@fontein.de>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -18,33 +13,28 @@ module: x509_certificate_pipe
 short_description: Generate and/or check OpenSSL certificates
 version_added: 1.3.0
 description:
-  - It implements a notion of provider (one of V(selfsigned), V(ownca), V(entrust)) for your certificate.
+  - It implements a notion of provider (one of V(selfsigned) and V(ownca)) for your certificate.
 author:
   - Yanis Guenane (@Spredzy)
   - Markus Teufelberger (@MarkusTeufelberger)
   - Felix Fontein (@felixfontein)
 extends_documentation_fragment:
-  - community.crypto.attributes
-  - community.crypto.module_certificate
-  - community.crypto.module_certificate.backend_entrust_documentation
-  - community.crypto.module_certificate.backend_ownca_documentation
-  - community.crypto.module_certificate.backend_selfsigned_documentation
+  - community.crypto._attributes
+  - community.crypto._module_certificate
+  - community.crypto._module_certificate.backend_ownca_documentation
+  - community.crypto._module_certificate.backend_selfsigned_documentation
 attributes:
   check_mode:
     support: full
     details:
-      - Currently in check mode, private keys will not be (re-)generated, only the changed status is set. This will change
-        in community.crypto 3.0.0.
-      - From community.crypto 3.0.0 on, the module will ignore check mode and always behave as if check mode is not active.
-        If you think this breaks your use-case of this module, please create an issue in the community.crypto repository.
+      - Since community.crypto 3.0.0 the module ignores check mode and always behaves as if check mode is not active.
 options:
   provider:
     description:
       - Name of the provider to use to generate/retrieve the OpenSSL certificate.
-      - The V(entrust) provider requires credentials for the L(Entrust Certificate Services,
-        https://www.entrustdatacard.com/products/categories/ssl-certificates) (ECS) API.
+      - The V(entrust) provider has been removed from community.crypto 3.0.0 due to sunsetting of the ECS API.
     type: str
-    choices: [entrust, ownca, selfsigned]
+    choices: [ownca, selfsigned]
     required: true
 
   content:
@@ -126,57 +116,50 @@ certificate:
   type: str
 """
 
+import typing as t
 
-from ansible.module_utils.common.text.converters import to_native
-from ansible_collections.community.crypto.plugins.module_utils.crypto.basic import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.basic import (
     OpenSSLObjectError,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.module_backends.certificate import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.module_backends.certificate import (
     get_certificate_argument_spec,
     select_backend,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.module_backends.certificate_entrust import (
-    EntrustCertificateProvider,
-    add_entrust_provider_to_argument_spec,
-)
-from ansible_collections.community.crypto.plugins.module_utils.crypto.module_backends.certificate_ownca import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.module_backends.certificate_ownca import (
     OwnCACertificateProvider,
     add_ownca_provider_to_argument_spec,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.module_backends.certificate_selfsigned import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.module_backends.certificate_selfsigned import (
     SelfSignedCertificateProvider,
     add_selfsigned_provider_to_argument_spec,
 )
 
 
-class GenericCertificate(object):
+if t.TYPE_CHECKING:
+    from ansible.module_utils.basic import AnsibleModule  # pragma: no cover
+    from ansible_collections.community.crypto.plugins.module_utils._crypto.module_backends.certificate import (  # pragma: no cover
+        CertificateBackend,
+    )
+
+
+class GenericCertificate:
     """Retrieve a certificate using the given module backend."""
 
-    def __init__(self, module, module_backend):
+    def __init__(self, module: AnsibleModule, module_backend: CertificateBackend):
         self.check_mode = module.check_mode
         self.module = module
         self.module_backend = module_backend
         self.changed = False
-        if module.params["content"] is not None:
-            self.module_backend.set_existing(module.params["content"].encode("utf-8"))
+        content: str | None = module.params["content"]
+        if content is not None:
+            self.module_backend.set_existing(content.encode("utf-8"))
 
-    def generate(self, module):
+    def generate(self, module: AnsibleModule) -> None:
         if self.module_backend.needs_regeneration():
-            if not self.check_mode:
-                self.module_backend.generate_certificate()
-            else:
-                self.module.deprecate(
-                    "Check mode support for x509_certificate_pipe will change in community.crypto 3.0.0"
-                    " to behave the same as without check mode. You can get that behavior right now"
-                    " by adding `check_mode: false` to the x509_certificate_pipe task. If you think this"
-                    " breaks your use-case of this module, please create an issue in the"
-                    " community.crypto repository",
-                    version="3.0.0",
-                    collection_name="community.crypto",
-                )
+            self.module_backend.generate_certificate()
             self.changed = True
 
-    def dump(self, check_mode=False):
+    def dump(self, check_mode: bool = False) -> dict[str, t.Any]:
         result = self.module_backend.dump(include_certificate=True)
         result.update(
             {
@@ -186,16 +169,15 @@ class GenericCertificate(object):
         return result
 
 
-def main():
+def main() -> t.NoReturn:
     argument_spec = get_certificate_argument_spec()
     argument_spec.argument_spec["provider"]["required"] = True
-    add_entrust_provider_to_argument_spec(argument_spec)
     add_ownca_provider_to_argument_spec(argument_spec)
     add_selfsigned_provider_to_argument_spec(argument_spec)
     argument_spec.argument_spec.update(
-        dict(
-            content=dict(type="str"),
-        )
+        {
+            "content": {"type": "str"},
+        }
     )
     module = argument_spec.create_ansible_module(
         supports_check_mode=True,
@@ -203,20 +185,23 @@ def main():
 
     try:
         provider = module.params["provider"]
-        provider_map = {
-            "entrust": EntrustCertificateProvider,
+        provider_map: dict[
+            str,
+            type[OwnCACertificateProvider] | type[SelfSignedCertificateProvider],
+        ] = {
             "ownca": OwnCACertificateProvider,
             "selfsigned": SelfSignedCertificateProvider,
         }
 
-        backend = module.params["select_crypto_backend"]
-        module_backend = select_backend(module, backend, provider_map[provider]())
+        module_backend = select_backend(
+            module=module, provider=provider_map[provider]()
+        )
         certificate = GenericCertificate(module, module_backend)
         certificate.generate(module)
         result = certificate.dump()
         module.exit_json(**result)
     except OpenSSLObjectError as exc:
-        module.fail_json(msg=to_native(exc))
+        module.fail_json(msg=str(exc))
 
 
 if __name__ == "__main__":

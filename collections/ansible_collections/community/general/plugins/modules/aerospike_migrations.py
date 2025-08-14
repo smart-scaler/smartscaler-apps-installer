@@ -29,7 +29,6 @@ options:
   host:
     description:
       - Which host do we use as seed for info connection.
-    required: false
     type: str
     default: localhost
   port:
@@ -70,7 +69,7 @@ options:
     type: bool
   min_cluster_size:
     description:
-      - Check will return bad until cluster size is met or until tries is exhausted.
+      - Check fails until cluster size is met or until tries is exhausted.
     required: false
     type: int
     default: 1
@@ -94,10 +93,10 @@ options:
     default: migrate_rx_partitions_remaining
   target_cluster_size:
     description:
-      - When all aerospike builds in the cluster are greater than version 4.3, then the C(cluster-stable) info command will
-        be used. Inside this command, you can optionally specify what the target cluster size is - but it is not necessary.
+      - When all aerospike builds in the cluster are greater than version 4.3, then the C(cluster-stable) info command is
+        used. Inside this command, you can optionally specify what the target cluster size is - but it is not necessary.
         You can still rely on O(min_cluster_size) if you do not want to use this option.
-      - If this option is specified on a cluster that has at least one host <4.3 then it will be ignored until the min version
+      - If this option is specified on a cluster that has at least one host <4.3 then it is ignored until the min version
         reaches 4.3.
     required: false
     type: int
@@ -180,19 +179,19 @@ else:
 def run_module():
     """run ansible module"""
     module_args = dict(
-        host=dict(type='str', required=False, default='localhost'),
-        port=dict(type='int', required=False, default=3000),
-        connect_timeout=dict(type='int', required=False, default=1000),
-        consecutive_good_checks=dict(type='int', required=False, default=3),
-        sleep_between_checks=dict(type='int', required=False, default=60),
-        tries_limit=dict(type='int', required=False, default=300),
+        host=dict(type='str', default='localhost'),
+        port=dict(type='int', default=3000),
+        connect_timeout=dict(type='int', default=1000),
+        consecutive_good_checks=dict(type='int', default=3),
+        sleep_between_checks=dict(type='int', default=60),
+        tries_limit=dict(type='int', default=300),
         local_only=dict(type='bool', required=True),
-        min_cluster_size=dict(type='int', required=False, default=1),
-        target_cluster_size=dict(type='int', required=False, default=None),
-        fail_on_cluster_change=dict(type='bool', required=False, default=True),
-        migrate_tx_key=dict(type='str', required=False, no_log=False,
+        min_cluster_size=dict(type='int', default=1),
+        target_cluster_size=dict(type='int'),
+        fail_on_cluster_change=dict(type='bool', default=True),
+        migrate_tx_key=dict(type='str', no_log=False,
                             default="migrate_tx_partitions_remaining"),
-        migrate_rx_key=dict(type='str', required=False, no_log=False,
+        migrate_rx_key=dict(type='str', no_log=False,
                             default="migrate_rx_partitions_remaining")
     )
 

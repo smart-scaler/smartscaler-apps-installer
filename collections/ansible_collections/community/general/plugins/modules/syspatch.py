@@ -59,20 +59,6 @@ EXAMPLES = r"""
 """
 
 RETURN = r"""
-rc:
-  description: The command return code (0 means success).
-  returned: always
-  type: int
-stdout:
-  description: C(syspatch) standard output.
-  returned: always
-  type: str
-  sample: "001_rip6cksum"
-stderr:
-  description: C(syspatch) standard error.
-  returned: always
-  type: str
-  sample: "syspatch: need root privileges"
 reboot_needed:
   description: Whether or not a reboot is required after an update.
   returned: always
@@ -103,7 +89,6 @@ def syspatch_run(module):
     cmd = module.get_bin_path('syspatch', True)
     changed = False
     reboot_needed = False
-    warnings = []
 
     # Set safe defaults for run_flag and check_flag
     run_flag = ['-c']
@@ -145,11 +130,11 @@ def syspatch_run(module):
             # Kernel update applied
             reboot_needed = True
         elif out.lower().find('syspatch updated itself') >= 0:
-            warnings.append('Syspatch was updated. Please run syspatch again.')
+            module.warn('Syspatch was updated. Please run syspatch again.')
 
         # If no stdout, then warn user
         if len(out) == 0:
-            warnings.append('syspatch had suggested changes, but stdout was empty.')
+            module.warn('syspatch had suggested changes, but stdout was empty.')
 
         changed = True
     else:
@@ -161,7 +146,6 @@ def syspatch_run(module):
         rc=rc,
         stderr=err,
         stdout=out,
-        warnings=warnings
     )
 
 

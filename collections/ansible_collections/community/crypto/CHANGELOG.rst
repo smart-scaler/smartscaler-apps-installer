@@ -4,8 +4,8 @@ Community Crypto Release Notes
 
 .. contents:: Topics
 
-v2.26.3
-=======
+v3.0.3
+======
 
 Release Summary
 ---------------
@@ -15,24 +15,118 @@ Bugfix release.
 Bugfixes
 --------
 
-- acme_account - make work with CAs that do not accept any account request without External Account Binding data (https://github.com/ansible-collections/community.crypto/issues/918, https://github.com/ansible-collections/community.crypto/pull/919).
+- acme_* modules - also retry on HTTP responses 502 Bad Gateway and 504 Gateway Timeout. The latter is needed for ZeroSSL, which seems to have a lot of 504s (https://github.com/ansible-collections/community.crypto/issues/945, https://github.com/ansible-collections/community.crypto/pull/947).
+- acme_* modules - increase the maximum amount of retries from 10 to 20 to accomodate ZeroSSL's buggy implementation (https://github.com/ansible-collections/community.crypto/pull/949).
 
-v2.26.2
-=======
+v3.0.2
+======
 
 Release Summary
 ---------------
 
-Maintenance release announcing removal of the Entrust content from community.crypto 3.0.0.
+Bugfix release.
+
+Bugfixes
+--------
+
+- Improve error message when loading a private key fails due to correct private key files or wrong passwords. Also include the original cryptography error since it likely contains more helpful information (https://github.com/ansible-collections/community.crypto/issues/936, https://github.com/ansible-collections/community.crypto/pull/939).
+
+v3.0.1
+======
+
+Release Summary
+---------------
+
+Bugfix release.
+
+Bugfixes
+--------
+
+- openssl_csr and openssl_csr_pipe - the idempotency check for ``key_usage`` resulted in a crash if ``Key Agreement``/``keyAgreement`` was not set (https://github.com/ansible-collections/community.crypto/issues/934, https://github.com/ansible-collections/community.crypto/pull/935).
+
+v3.0.0
+======
+
+Release Summary
+---------------
+
+New major release of community.crypto with a lot of code modernization.
+This release drops compatibility for ansible-core before 2.17, for Python
+before 3.7, and for cryptography before 3.3.
+It also removes all Entrust modules, and the Entrust provider for the
+``community.crypto.x509_certificate*`` modules.
+
+See below for a more detailled list of changes.
+
+Minor Changes
+-------------
+
+- No longer provide cryptography's ``backend`` parameter. This will break with cryptography < 3.1 (https://github.com/ansible-collections/community.crypto/pull/878).
+- On cryptography 36.0.0+, always use ``public_bytes()`` for X.509 extension objects instead of using cryptography internals to obtain DER value of extension (https://github.com/ansible-collections/community.crypto/pull/878).
+- Python code modernization: add type hints and type checking (https://github.com/ansible-collections/community.crypto/pull/885).
+- Python code modernization: avoid unnecessary string conversion (https://github.com/ansible-collections/community.crypto/pull/880).
+- Python code modernization: avoid using ``six`` (https://github.com/ansible-collections/community.crypto/pull/884).
+- Python code modernization: remove Python 3 specific code (https://github.com/ansible-collections/community.crypto/pull/877).
+- Python code modernization: update ``__future__`` imports, remove Python 2 specific boilerplates (https://github.com/ansible-collections/community.crypto/pull/876).
+- Python code modernization: use ``unittest.mock`` instead of ``ansible_collections.community.internal_test_tools.tests.unit.compat.mock`` (https://github.com/ansible-collections/community.crypto/pull/881).
+- Python code modernization: use f-strings instead of ``%`` and ``str.format()`` (https://github.com/ansible-collections/community.crypto/pull/875).
+- Remove ``backend`` parameter from internal code whenever possible (https://github.com/ansible-collections/community.crypto/pull/883).
+- Remove various compatibility code for cryptography < 3.3 (https://github.com/ansible-collections/community.crypto/pull/878).
+- Remove various no longer needed abstraction layers for multiple backends (https://github.com/ansible-collections/community.crypto/pull/912).
+- Remove vendored copy of ``distutils.version`` in favor of vendored copy included with ansible-core 2.12+ (https://github.com/ansible-collections/community.crypto/pull/371).
+- Various code refactorings (https://github.com/ansible-collections/community.crypto/pull/905, https://github.com/ansible-collections/community.crypto/pull/909, https://github.com/ansible-collections/community.crypto/pull/911, https://github.com/ansible-collections/community.crypto/pull/913, https://github.com/ansible-collections/community.crypto/pull/914, https://github.com/ansible-collections/community.crypto/pull/917).
+- acme_* modules - improve parsing of ``Retry-After`` reply headers in regular ACME requests (https://github.com/ansible-collections/community.crypto/pull/890).
+- action_module plugin utils - remove compatibility with older ansible-core/ansible-base/Ansible versions (https://github.com/ansible-collections/community.crypto/pull/872).
+- x509_certificate, x509_certificate_pipe - the ``ownca_version`` and ``selfsigned_version`` parameters explicitly only allow the value ``3``. The module already failed for other values in the past, now this is validated as part of the module argument spec (https://github.com/ansible-collections/community.crypto/pull/890).
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- All doc_fragments are now private to the collection and must not be used from other collections or unrelated plugins/modules. Breaking changes in these can happen at any time, even in bugfix releases (https://github.com/ansible-collections/community.crypto/pull/898).
+- All module_utils and plugin_utils are now private to the collection and must not be used from other collections or unrelated plugins/modules. Breaking changes in these can happen at any time, even in bugfix releases (https://github.com/ansible-collections/community.crypto/pull/887).
+- Ignore value of ``select_crypto_backend`` for all modules except acme_* and ..., and always assume the value ``auto``. This ensures that the ``cryptography`` version is always checked (https://github.com/ansible-collections/community.crypto/pull/883).
+- The validation for relative timestamps is now more strict. A string starting with ``+`` or ``-`` must be valid, otherwise validation will fail. In the past such strings were often silently ignored, and in many cases the code which triggered the validation was not able to handle no result (https://github.com/ansible-collections/community.crypto/pull/885).
+- acme.certificates module utils - the ``retrieve_acme_v1_certificate()`` helper function has been removed (https://github.com/ansible-collections/community.crypto/pull/873).
+- get_certificate - the default for ``asn1_base64`` changed from ``false`` to ``true`` (https://github.com/ansible-collections/community.crypto/pull/873).
+- x509_crl - the ``mode`` parameter no longer denotes the update mode, but the CRL file mode. Use ``crl_mode`` instead for the update mode (https://github.com/ansible-collections/community.crypto/pull/873).
 
 Deprecated Features
 -------------------
 
-- The Entrust service in currently being sunsetted after the sale of Entrust's Public Certificates Business to Sectigo; see `the announcement with key dates <https://www.entrust.com/tls-certificate-information-center>`__ and `the migration brief for customers <https://www.sectigo.com/uploads/resources/EOL_Migration-Brief-End-Customer.pdf>`__ for details (https://github.com/ansible-collections/community.crypto/issues/895, https://github.com/ansible-collections/community.crypto/pull/901).
-- ecs_certificate - the module will be removed from community.crypto 3.0.0 (https://github.com/ansible-collections/community.crypto/issues/895, https://github.com/ansible-collections/community.crypto/pull/901).
-- ecs_domain - the module will be removed from community.crypto 3.0.0 (https://github.com/ansible-collections/community.crypto/issues/895, https://github.com/ansible-collections/community.crypto/pull/901).
-- x509_certificate - the ``entrust`` provider will be removed from community.crypto 3.0.0 (https://github.com/ansible-collections/community.crypto/issues/895, https://github.com/ansible-collections/community.crypto/pull/901).
-- x509_certificate_pipe - the ``entrust`` provider will be removed from community.crypto 3.0.0 (https://github.com/ansible-collections/community.crypto/issues/895, https://github.com/ansible-collections/community.crypto/pull/901).
+- acme_certificate - deprecate the ``agreement`` option which has no more effect. It will be removed from community.crypto 4.0.0 (https://github.com/ansible-collections/community.crypto/pull/891).
+- acme_certificate - the option ``modify_account``'s default value ``true`` has been deprecated. It will change to ``false`` in community.crypto 4.0.0. We recommend to set the option to an explicit value to avoid deprecation warnings, and to prefer setting it to ``false`` already now. Better use the ``community.crypto.acme_account`` module instead (https://github.com/ansible-collections/community.crypto/issues/924).
+- openssl_pkcs12 - deprecate the ``maciter_size`` option which has no more effect. It will be removed from community.crypto 4.0.0 (https://github.com/ansible-collections/community.crypto/pull/891).
+
+Removed Features (previously deprecated)
+----------------------------------------
+
+- All Entrust content is being removed since the Entrust service in currently being sunsetted after the sale of Entrust's Public Certificates Business to Sectigo; see `the announcement with key dates <https://www.entrust.com/tls-certificate-information-center>`__ and `the migration brief for customers <https://www.sectigo.com/uploads/resources/EOL_Migration-Brief-End-Customer.pdf>`__ for details. Since this process will be completed in 2025, we decided to remove all Entrust content from community.general 3.0.0 (https://github.com/ansible-collections/community.crypto/issues/895, https://github.com/ansible-collections/community.crypto/pull/901).
+- The collection no longer supports cryptography < 3.3 (https://github.com/ansible-collections/community.crypto/pull/878, https://github.com/ansible-collections/community.crypto/pull/882).
+- acme.acme module utils - the ``get_default_argspec()`` function has been removed. Use ``create_default_argspec()`` instead (https://github.com/ansible-collections/community.crypto/pull/873).
+- acme.backends module utils - the methods ``get_ordered_csr_identifiers()`` and ``get_cert_information()`` of ``CryptoBackend`` now must be implemented (https://github.com/ansible-collections/community.crypto/pull/873).
+- acme.documentation docs fragment - the ``documentation`` docs fragment has been removed. Use both the ``basic`` and ``account`` docs fragments in ``acme`` instead (https://github.com/ansible-collections/community.crypto/pull/873).
+- acme_* modules - support for ACME v1 has been removed (https://github.com/ansible-collections/community.crypto/pull/873).
+- community.crypto no longer supports Ansible 2.9, ansible-base 2.10, and ansible-core versions 2.11, 2.12, 2.13, 2.14, 2.15, and 2.16. While content from this collection might still work with some older versions of ansible-core, it will not work with any Python version before 3.7 (https://github.com/ansible-collections/community.crypto/pull/870).
+- crypto.basic module utils - remove ``CRYPTOGRAPHY_HAS_*`` flags. All tested features are supported since cryptography 3.0 (https://github.com/ansible-collections/community.crypto/pull/878).
+- crypto.cryptography_support module utils - remove ``cryptography_serial_number_of_cert()`` helper function (https://github.com/ansible-collections/community.crypto/pull/878).
+- crypto.module_backends.common module utils - this module utils has been removed. Use the ``argspec`` module utils instead (https://github.com/ansible-collections/community.crypto/pull/873).
+- crypto.support module utils - remove ``pyopenssl`` backend (https://github.com/ansible-collections/community.crypto/pull/874).
+- ecs_certificate - the module has been removed. Please use community.crypto 2.x.y if you need this module (https://github.com/ansible-collections/community.crypto/pull/900).
+- ecs_domain - the module has been removed. Please use community.crypto 2.x.y if you need this module (https://github.com/ansible-collections/community.crypto/pull/900).
+- execution environment dependencies - remove PyOpenSSL dependency (https://github.com/ansible-collections/community.crypto/pull/874).
+- openssl_csr_pipe - the module now ignores check mode and will always behave as if check mode is not active (https://github.com/ansible-collections/community.crypto/pull/873).
+- openssl_pkcs12 - support for the ``pyopenssl`` backend has been removed (https://github.com/ansible-collections/community.crypto/pull/873).
+- openssl_privatekey_pipe - the module now ignores check mode and will always behave as if check mode is not active (https://github.com/ansible-collections/community.crypto/pull/873).
+- time module utils - remove ``pyopenssl`` backend (https://github.com/ansible-collections/community.crypto/pull/874).
+- x509_certificate - the ``entrust`` provider has been removed. Please use community.crypto 2.x.y if you need this provider (https://github.com/ansible-collections/community.crypto/pull/900).
+- x509_certificate_pipe - the ``entrust`` provider has been removed. Please use community.crypto 2.x.y if you need this provider (https://github.com/ansible-collections/community.crypto/pull/900).
+- x509_certificate_pipe - the module now ignores check mode and will always behave as if check mode is not active (https://github.com/ansible-collections/community.crypto/pull/873).
+
+Bugfixes
+--------
+
+- acme_account - make work with CAs that do not accept any account request without External Account Binding data (https://github.com/ansible-collections/community.crypto/issues/918, https://github.com/ansible-collections/community.crypto/pull/919).
+- openssl_csr, openssl_csr_pipe - avoid accessing internal members of cryptography's ``KeyUsage`` extension object (https://github.com/ansible-collections/community.crypto/pull/910).
 
 v2.26.1
 =======

@@ -18,8 +18,8 @@ short_description: Create, update, or delete GitLab merge requests
 version_added: 7.1.0
 description:
   - Creates a merge request if it does not exist.
-  - When a single merge request does exist, it will be updated if the provided parameters are different.
-  - When a single merge request does exist and O(state=absent), the merge request will be deleted.
+  - When a single merge request does exist, it is updated if the provided parameters are different.
+  - When a single merge request does exist and O(state=absent), the merge request is deleted.
   - When multiple merge requests are detected, the task fails.
   - Existing merge requests are matched based on O(title), O(source_branch), O(target_branch), and O(state_filter) filters.
 author:
@@ -287,13 +287,13 @@ def main():
         source_branch=dict(type='str', required=True),
         target_branch=dict(type='str', required=True),
         title=dict(type='str', required=True),
-        description=dict(type='str', required=False),
-        labels=dict(type='str', default="", required=False),
-        description_path=dict(type='path', required=False),
-        remove_source_branch=dict(type='bool', default=False, required=False),
+        description=dict(type='str'),
+        labels=dict(type='str', default=""),
+        description_path=dict(type='path'),
+        remove_source_branch=dict(type='bool', default=False),
         state_filter=dict(type='str', default="opened", choices=["opened", "closed", "locked", "merged"]),
-        assignee_ids=dict(type='str', required=False),
-        reviewer_ids=dict(type='str', required=False),
+        assignee_ids=dict(type='str'),
+        reviewer_ids=dict(type='str'),
         state=dict(type='str', default="present", choices=["absent", "present"]),
     )
 

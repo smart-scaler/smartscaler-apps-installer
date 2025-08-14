@@ -59,11 +59,11 @@ options:
   version:
     description:
       - Version of the plugin to be installed.
-      - If plugin exists with previous version, plugin will B(not) be updated unless O(force) is set to V(true).
+      - If the plugin is installed with in a previous version, it is B(not) updated unless O(force=true).
     type: str
   force:
     description:
-      - Delete and re-install the plugin. Can be useful for plugins update.
+      - Delete and re-install the plugin. It can be useful for plugins update.
     type: bool
     default: false
   allow_root:
@@ -107,14 +107,6 @@ url:
   type: str
 timeout:
   description: The timeout for plugin download.
-  returned: success
-  type: str
-stdout:
-  description: The command stdout.
-  returned: success
-  type: str
-stderr:
-  description: The command stderr.
   returned: success
   type: str
 state:
@@ -236,11 +228,11 @@ def main():
         argument_spec=dict(
             name=dict(required=True),
             state=dict(default="present", choices=list(PACKAGE_STATE_MAP.keys())),
-            url=dict(default=None),
+            url=dict(),
             timeout=dict(default="1m"),
             plugin_bin=dict(default="/opt/kibana/bin/kibana", type="path"),
             plugin_dir=dict(default="/opt/kibana/installedPlugins/", type="path"),
-            version=dict(default=None),
+            version=dict(),
             force=dict(default=False, type="bool"),
             allow_root=dict(default=False, type="bool"),
         ),

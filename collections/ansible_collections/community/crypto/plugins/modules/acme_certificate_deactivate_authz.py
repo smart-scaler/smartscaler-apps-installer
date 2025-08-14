@@ -1,14 +1,9 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2016 Michael Gruener <michael.gruener@chaosmoon.net>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -26,10 +21,10 @@ description:
 seealso:
   - module: community.crypto.acme_certificate
 extends_documentation_fragment:
-  - community.crypto.acme.basic
-  - community.crypto.acme.account
-  - community.crypto.attributes
-  - community.crypto.attributes.actiongroup_acme
+  - community.crypto._acme.basic
+  - community.crypto._acme.account
+  - community.crypto._attributes
+  - community.crypto._attributes.actiongroup_acme
 attributes:
   check_mode:
     support: full
@@ -56,41 +51,41 @@ EXAMPLES = r"""
 
 RETURN = """#"""
 
-from ansible_collections.community.crypto.plugins.module_utils.acme.account import (
+import typing as t
+
+from ansible_collections.community.crypto.plugins.module_utils._acme.account import (
     ACMEAccount,
 )
-from ansible_collections.community.crypto.plugins.module_utils.acme.acme import (
+from ansible_collections.community.crypto.plugins.module_utils._acme.acme import (
     ACMEClient,
     create_backend,
     create_default_argspec,
 )
-from ansible_collections.community.crypto.plugins.module_utils.acme.errors import (
+from ansible_collections.community.crypto.plugins.module_utils._acme.errors import (
     ModuleFailException,
 )
-from ansible_collections.community.crypto.plugins.module_utils.acme.orders import Order
+from ansible_collections.community.crypto.plugins.module_utils._acme.orders import Order
 
 
-def main():
+def main() -> t.NoReturn:
     argument_spec = create_default_argspec()
     argument_spec.update_argspec(
-        order_uri=dict(type="str", required=True),
+        order_uri={"type": "str", "required": True},
     )
     module = argument_spec.create_ansible_module(supports_check_mode=True)
-    if module.params["acme_version"] == 1:
-        module.fail_json("The module does not support acme_version=1")
 
-    backend = create_backend(module, False)
+    backend = create_backend(module, needs_acme_v2=False)
 
     try:
-        client = ACMEClient(module, backend)
-        account = ACMEAccount(client)
+        client = ACMEClient(module=module, backend=backend)
+        account = ACMEAccount(client=client)
 
         dummy, account_data = account.setup_account(allow_creation=False)
         if account_data is None:
             raise ModuleFailException(msg="Account does not exist or is deactivated.")
 
-        order = Order.from_url(client, module.params["order_uri"])
-        order.load_authorizations(client)
+        order = Order.from_url(client=client, url=module.params["order_uri"])
+        order.load_authorizations(client=client)
 
         changed = False
         for authz in order.authorizations.values():
@@ -100,18 +95,16 @@ def main():
             if module.check_mode:
                 continue
             try:
-                authz.deactivate(client)
+                authz.deactivate(client=client)
             except Exception:
                 # ignore errors
                 pass
             if authz.status != "deactivated":
-                module.warn(
-                    warning="Could not deactivate authz object {0}.".format(authz.url)
-                )
+                module.warn(warning=f"Could not deactivate authz object {authz.url}.")
 
         module.exit_json(changed=changed)
     except ModuleFailException as e:
-        e.do_fail(module)
+        e.do_fail(module=module)
 
 
 if __name__ == "__main__":

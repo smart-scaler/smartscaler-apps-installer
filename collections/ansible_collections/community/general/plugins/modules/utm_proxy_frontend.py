@@ -30,7 +30,7 @@ options:
   name:
     type: str
     description:
-      - The name of the object. Will be used to identify the entry.
+      - The name of the object that identifies the entry.
     required: true
   add_content_type_header:
     description:
@@ -76,12 +76,12 @@ options:
     default: []
   htmlrewrite:
     description:
-      - Whether to enable html rewrite or not.
+      - Whether to enable HTML rewrite or not.
     type: bool
     default: false
   htmlrewrite_cookies:
     description:
-      - Whether to enable html rewrite cookie or not.
+      - Whether to enable HTML rewrite cookie or not.
     type: bool
     default: false
   implicitredirect:
@@ -204,7 +204,7 @@ result:
       description: List of associated proxy exceptions.
       type: list
     htmlrewrite:
-      description: State of html rewrite.
+      description: State of HTML rewrite.
       type: bool
     htmlrewrite_cookies:
       description: Whether the HTML rewrite cookie is set.
@@ -251,26 +251,26 @@ def main():
     module = UTMModule(
         argument_spec=dict(
             name=dict(type='str', required=True),
-            add_content_type_header=dict(type='bool', required=False, default=False),
-            address=dict(type='str', required=False, default="REF_DefaultInternalAddress"),
-            allowed_networks=dict(type='list', elements='str', required=False, default=["REF_NetworkAny"]),
-            certificate=dict(type='str', required=False, default=""),
-            comment=dict(type='str', required=False, default=""),
-            disable_compression=dict(type='bool', required=False, default=False),
-            domain=dict(type='list', elements='str', required=False),
-            exceptions=dict(type='list', elements='str', required=False, default=[]),
-            htmlrewrite=dict(type='bool', required=False, default=False),
-            htmlrewrite_cookies=dict(type='bool', required=False, default=False),
-            implicitredirect=dict(type='bool', required=False, default=False),
-            lbmethod=dict(type='str', required=False, default="bybusyness",
+            add_content_type_header=dict(type='bool', default=False),
+            address=dict(type='str', default="REF_DefaultInternalAddress"),
+            allowed_networks=dict(type='list', elements='str', default=["REF_NetworkAny"]),
+            certificate=dict(type='str', default=""),
+            comment=dict(type='str', default=""),
+            disable_compression=dict(type='bool', default=False),
+            domain=dict(type='list', elements='str'),
+            exceptions=dict(type='list', elements='str', default=[]),
+            htmlrewrite=dict(type='bool', default=False),
+            htmlrewrite_cookies=dict(type='bool', default=False),
+            implicitredirect=dict(type='bool', default=False),
+            lbmethod=dict(type='str', default="bybusyness",
                           choices=['bybusyness', 'bytraffic', 'byrequests', '']),
-            locations=dict(type='list', elements='str', required=False, default=[]),
-            port=dict(type='int', required=False, default=80),
-            preservehost=dict(type='bool', required=False, default=False),
-            profile=dict(type='str', required=False, default=""),
-            status=dict(type='bool', required=False, default=True),
-            type=dict(type='str', required=False, default="http", choices=['http', 'https']),
-            xheaders=dict(type='bool', required=False, default=False),
+            locations=dict(type='list', elements='str', default=[]),
+            port=dict(type='int', default=80),
+            preservehost=dict(type='bool', default=False),
+            profile=dict(type='str', default=""),
+            status=dict(type='bool', default=True),
+            type=dict(type='str', default="http", choices=['http', 'https']),
+            xheaders=dict(type='bool', default=False),
         )
     )
     try:

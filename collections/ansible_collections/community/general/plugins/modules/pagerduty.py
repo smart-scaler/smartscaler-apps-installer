@@ -13,7 +13,7 @@ DOCUMENTATION = r"""
 module: pagerduty
 short_description: Create PagerDuty maintenance windows
 description:
-  - This module will let you create PagerDuty maintenance windows.
+  - This module lets you create PagerDuty maintenance windows.
 author:
   - "Andrew Newdigate (@suprememoocow)"
   - "Dylan Silva (@thaumos)"
@@ -79,8 +79,8 @@ options:
     default: Created by Ansible
   validate_certs:
     description:
-      - If V(false), SSL certificates will not be validated. This should only be used on personally controlled sites using
-        self-signed certificates.
+      - If V(false), SSL certificates are not validated. This should only be used on personally controlled sites using self-signed
+        certificates.
     type: bool
     default: true
 """
@@ -203,7 +203,7 @@ class PagerDutyRequest(object):
         return False, json_out, True
 
     def _create_services_payload(self, service):
-        if (isinstance(service, list)):
+        if isinstance(service, list):
             return [{'id': s, 'type': 'service_reference'} for s in service]
         else:
             return [{'id': service, 'type': 'service_reference'}]
@@ -242,15 +242,15 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             state=dict(required=True, choices=['running', 'started', 'ongoing', 'absent']),
-            name=dict(required=False),
-            user=dict(required=False),
+            name=dict(),
+            user=dict(),
             token=dict(required=True, no_log=True),
-            service=dict(required=False, type='list', elements='str', aliases=["services"]),
-            window_id=dict(required=False),
-            requester_id=dict(required=False),
-            hours=dict(default='1', required=False),   # @TODO change to int?
-            minutes=dict(default='0', required=False),   # @TODO change to int?
-            desc=dict(default='Created by Ansible', required=False),
+            service=dict(type='list', elements='str', aliases=["services"]),
+            window_id=dict(),
+            requester_id=dict(),
+            hours=dict(default='1'),   # @TODO change to int?
+            minutes=dict(default='0'),   # @TODO change to int?
+            desc=dict(default='Created by Ansible'),
             validate_certs=dict(default=True, type='bool'),
         )
     )

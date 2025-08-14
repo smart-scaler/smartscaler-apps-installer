@@ -51,7 +51,7 @@ options:
       section:
         type: str
         description:
-          - The name of a section within this item containing the specified field (optional, will search all sections if not
+          - The name of a section within this item containing the specified field (optional, it searches all sections if not
             specified).
       vault:
         type: str
@@ -62,8 +62,7 @@ options:
   auto_login:
     type: dict
     description:
-      - A dictionary containing authentication details. If this is set, M(community.general.onepassword_info) will attempt
-        to sign in to 1Password automatically.
+      - A dictionary containing authentication details. If this is set, the module attempts to sign in to 1Password automatically.
       - Without this option, you must have already logged in using the 1Password CLI before running Ansible.
       - It is B(highly) recommended to store 1Password credentials in an Ansible Vault. Ensure that the key used to encrypt
         the Ansible Vault is equal to or greater in strength than the 1Password master password.
@@ -72,7 +71,7 @@ options:
         type: str
         description:
           - 1Password subdomain name (V(subdomain).1password.com).
-          - If this is not specified, the most recent subdomain will be used.
+          - If this is not specified, the most recent subdomain is used.
       username:
         type: str
         description:
@@ -209,7 +208,7 @@ class OnePasswordInfo(object):
     def _parse_field(self, data_json, item_id, field_name, section_title=None):
         data = json.loads(data_json)
 
-        if ('documentAttributes' in data['details']):
+        if 'documentAttributes' in data['details']:
             # This is actually a document, let's fetch the document data instead!
             document = self._run(["get", "document", data['overview']['title']])
             return {'document': document[1].strip()}
@@ -219,7 +218,7 @@ class OnePasswordInfo(object):
 
             # Some types of 1Password items have a 'password' field directly alongside the 'fields' attribute,
             # not inside it, so we need to check there first.
-            if (field_name in data['details']):
+            if field_name in data['details']:
                 return {field_name: data['details'][field_name]}
 
             # Otherwise we continue looking inside the 'fields' attribute for the specified field.
@@ -375,7 +374,7 @@ def main():
                 username=dict(type='str'),
                 master_password=dict(required=True, type='str', no_log=True),
                 secret_key=dict(type='str', no_log=True),
-            ), default=None),
+            )),
             search_terms=dict(required=True, type='list', elements='dict'),
         ),
         supports_check_mode=True

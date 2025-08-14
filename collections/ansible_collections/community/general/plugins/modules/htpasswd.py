@@ -46,10 +46,13 @@ options:
     description:
       - Hashing scheme to be used. As well as the four choices listed here, you can also use any other hash supported by passlib,
         such as V(portable_apache22) and V(host_apache24); or V(md5_crypt) and V(sha256_crypt), which are Linux passwd hashes.
-        Only some schemes in addition to the four choices below will be compatible with Apache or Nginx, and supported schemes
-        depend on passlib version and its dependencies.
+        Only some schemes in addition to the four choices below are compatible with Apache or Nginx, and supported schemes
+        depend on C(passlib) version and its dependencies.
       - See U(https://passlib.readthedocs.io/en/stable/lib/passlib.apache.html#passlib.apache.HtpasswdFile) parameter C(default_scheme).
       - 'Some of the available choices might be: V(apr_md5_crypt), V(des_crypt), V(ldap_sha1), V(plaintext).'
+      - 'B(WARNING): The module has no mechanism to determine the O(hash_scheme) of an existing entry, therefore, it does
+        not detect whether the O(hash_scheme) has changed. If you want to change the scheme, you must remove the existing
+        entry and then create a new one using the new scheme.'
     aliases: [crypt_scheme]
   state:
     type: str
@@ -63,8 +66,8 @@ options:
     type: bool
     default: true
     description:
-      - Used with O(state=present). If V(true), the file will be created if it does not exist. Conversely, if set to V(false)
-        and the file does not exist it will fail.
+      - Used with O(state=present). If V(true), the file is created if it does not exist. Conversely, if set to V(false) and
+        the file does not exist, it fails.
 notes:
   - This module depends on the C(passlib) Python library, which needs to be installed on all target systems.
   - 'On Debian < 11, Ubuntu <= 20.04, or Fedora: install C(python-passlib).'
@@ -188,9 +191,9 @@ def main():
     arg_spec = dict(
         path=dict(type='path', required=True, aliases=["dest", "destfile"]),
         name=dict(type='str', required=True, aliases=["username"]),
-        password=dict(type='str', required=False, default=None, no_log=True),
-        hash_scheme=dict(type='str', required=False, default="apr_md5_crypt", aliases=["crypt_scheme"]),
-        state=dict(type='str', required=False, default="present", choices=["present", "absent"]),
+        password=dict(type='str', no_log=True),
+        hash_scheme=dict(type='str', default="apr_md5_crypt", aliases=["crypt_scheme"]),
+        state=dict(type='str', default="present", choices=["present", "absent"]),
         create=dict(type='bool', default=True),
 
     )
@@ -238,8 +241,8 @@ def main():
             (msg, changed) = present(path, username, password, hash_scheme, create, check_mode)
         elif state == 'absent':
             if not os.path.exists(path):
-                module.exit_json(msg="%s not present" % username,
-                                 warnings="%s does not exist" % path, changed=False)
+                module.warn("%s does not exist" % path)
+                module.exit_json(msg="%s not present" % username, changed=False)
             (msg, changed) = absent(path, username, check_mode)
         else:
             module.fail_json(msg="Invalid state: %s" % state)

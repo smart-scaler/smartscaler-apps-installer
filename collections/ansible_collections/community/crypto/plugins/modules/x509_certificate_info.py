@@ -1,15 +1,10 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2016-2017, Yanis Guenane <yanis+ansible@guenane.org>
 # Copyright (c) 2017, Markus Teufelberger <mteufelberger+ansible@mgit.at>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -17,24 +12,23 @@ module: x509_certificate_info
 short_description: Provide information of OpenSSL X.509 certificates
 description:
   - This module allows one to query information on OpenSSL certificates.
-  - It uses the cryptography python library to interact with OpenSSL.
+  - It uses the cryptography Python library to interact with OpenSSL.
   - Note that this module was called C(openssl_certificate_info) when included directly in Ansible up to version 2.9. When
     moved to the collection C(community.crypto), it was renamed to M(community.crypto.x509_certificate_info). From Ansible
     2.10 on, it can still be used by the old short name (or by C(ansible.builtin.openssl_certificate_info)), which redirects
     to M(community.crypto.x509_certificate_info). When using FQCNs or when using the
     L(collections,https://docs.ansible.com/ansible/latest/user_guide/collections_using.html#using-collections-in-a-playbook)
     keyword, the new name M(community.crypto.x509_certificate_info) should be used to avoid a deprecation warning.
-requirements:
-  - cryptography >= 1.6
 author:
   - Felix Fontein (@felixfontein)
   - Yanis Guenane (@Spredzy)
   - Markus Teufelberger (@MarkusTeufelberger)
 extends_documentation_fragment:
-  - community.crypto.attributes
-  - community.crypto.attributes.info_module
-  - community.crypto.attributes.idempotent_not_modify_state
-  - community.crypto.name_encoding
+  - community.crypto._attributes
+  - community.crypto._attributes.info_module
+  - community.crypto._attributes.idempotent_not_modify_state
+  - community.crypto._cryptography_dep.minimum
+  - community.crypto._name_encoding
 options:
   path:
     description:
@@ -63,6 +57,9 @@ options:
       - Determines which crypto backend to use.
       - The default choice is V(auto), which tries to use C(cryptography) if available.
       - If set to V(cryptography), will try to use the L(cryptography,https://cryptography.io/) library.
+      - Note that with community.crypto 3.0.0, all values behave the same.
+        This option will be deprecated in a later version.
+        We recommend to not set it explicitly.
     type: str
     default: auto
     choices: [auto, cryptography]
@@ -393,86 +390,88 @@ issuer_uri:
   version_added: 2.9.0
 """
 
+import typing as t
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.common.text.converters import to_native
-from ansible.module_utils.six import string_types
-from ansible_collections.community.crypto.plugins.module_utils.crypto.basic import (
+from ansible.module_utils.common.text.converters import to_text
+from ansible_collections.community.crypto.plugins.module_utils._crypto.basic import (
     OpenSSLObjectError,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.cryptography_support import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.cryptography_support import (
     CRYPTOGRAPHY_TIMEZONE,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.module_backends.certificate_info import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.module_backends.certificate_info import (
     select_backend,
 )
-from ansible_collections.community.crypto.plugins.module_utils.time import (
+from ansible_collections.community.crypto.plugins.module_utils._time import (
     get_relative_time_option,
 )
 
 
-def main():
+def main() -> t.NoReturn:
     module = AnsibleModule(
-        argument_spec=dict(
-            path=dict(type="path"),
-            content=dict(type="str"),
-            valid_at=dict(type="dict"),
-            name_encoding=dict(
-                type="str", default="ignore", choices=["ignore", "idna", "unicode"]
-            ),
-            select_crypto_backend=dict(
-                type="str", default="auto", choices=["auto", "cryptography"]
-            ),
-        ),
+        argument_spec={
+            "path": {"type": "path"},
+            "content": {"type": "str"},
+            "valid_at": {"type": "dict"},
+            "name_encoding": {
+                "type": "str",
+                "default": "ignore",
+                "choices": ["ignore", "idna", "unicode"],
+            },
+            "select_crypto_backend": {
+                "type": "str",
+                "default": "auto",
+                "choices": ["auto", "cryptography"],
+            },
+        },
         required_one_of=(["path", "content"],),
         mutually_exclusive=(["path", "content"],),
         supports_check_mode=True,
     )
 
-    if module.params["content"] is not None:
-        data = module.params["content"].encode("utf-8")
+    content: str | None = module.params["content"]
+    path: str | None = module.params["path"]
+    if content is not None:
+        data = content.encode("utf-8")
     else:
+        if path is None:
+            module.fail_json(msg="One of path and content must be provided")
         try:
-            with open(module.params["path"], "rb") as f:
+            with open(path, "rb") as f:
                 data = f.read()
         except (IOError, OSError) as e:
-            module.fail_json(
-                msg="Error while reading certificate file from disk: {0}".format(e)
-            )
+            module.fail_json(msg=f"Error while reading certificate file from disk: {e}")
 
-    backend, module_backend = select_backend(
-        module, module.params["select_crypto_backend"], data
-    )
+    module_backend = select_backend(module=module, content=data)
 
-    valid_at = module.params["valid_at"]
+    valid_at: dict[str, t.Any] = module.params["valid_at"]
     if valid_at:
         for k, v in valid_at.items():
-            if not isinstance(v, string_types):
+            if not isinstance(v, (str, bytes)):
                 module.fail_json(
-                    msg="The value for valid_at.{0} must be of type string (got {1})".format(
-                        k, type(v)
-                    )
+                    msg=f"The value for valid_at.{k} must be of type string (got {type(v)})"
                 )
             valid_at[k] = get_relative_time_option(
-                v, "valid_at.{0}".format(k), with_timezone=CRYPTOGRAPHY_TIMEZONE
+                to_text(v),
+                input_name=f"valid_at.{k}",
+                with_timezone=CRYPTOGRAPHY_TIMEZONE,
             )
 
     try:
-        result = module_backend.get_info(
-            der_support_enabled=module.params["content"] is None
-        )
+        result = module_backend.get_info(der_support_enabled=content is None)
 
         not_before = module_backend.get_not_before()
         not_after = module_backend.get_not_after()
 
-        result["valid_at"] = dict()
+        result["valid_at"] = {}
         if valid_at:
             for k, v in valid_at.items():
                 result["valid_at"][k] = not_before <= v <= not_after
 
         module.exit_json(**result)
     except OpenSSLObjectError as exc:
-        module.fail_json(msg=to_native(exc))
+        module.fail_json(msg=str(exc))
 
 
 if __name__ == "__main__":

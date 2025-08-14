@@ -1,14 +1,9 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2024 Felix Fontein <felix@fontein.de>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = """
@@ -53,12 +48,12 @@ seealso:
   - module: community.crypto.acme_certificate_deactivate_authz
     description: Allows to deactivate (invalidate) ACME v2 orders.
 extends_documentation_fragment:
-  - community.crypto.acme.basic
-  - community.crypto.acme.account
-  - community.crypto.acme.certificate
-  - community.crypto.attributes
-  - community.crypto.attributes.actiongroup_acme
-  - community.crypto.attributes.files
+  - community.crypto._acme.basic
+  - community.crypto._acme.account
+  - community.crypto._acme.certificate
+  - community.crypto._attributes
+  - community.crypto._attributes.actiongroup_acme
+  - community.crypto._attributes.files
 attributes:
   check_mode:
     support: none
@@ -227,7 +222,6 @@ EXAMPLES = r"""
 - name: Create a challenge for sample.com using a account key file.
   community.crypto.acme_certificate_order_create:
     acme_directory: https://acme-v01.api.letsencrypt.org/directory
-    acme_version: 2
     account_key_src: /etc/pki/cert/private/account.key
     csr: /etc/pki/cert/csr/sample.com.csr
   register: sample_com_challenge
@@ -250,7 +244,6 @@ EXAMPLES = r"""
 - name: Let the challenge be validated
   community.crypto.acme_certificate_order_validate:
     acme_directory: https://acme-v01.api.letsencrypt.org/directory
-    acme_version: 2
     account_key_src: /etc/pki/cert/private/account.key
     order_uri: "{{ sample_com_challenge.order_uri }}"
     challenge: dns-01
@@ -258,7 +251,6 @@ EXAMPLES = r"""
 - name: Retrieve the cert and intermediate certificate
   community.crypto.acme_certificate_order_finalize:
     acme_directory: https://acme-v01.api.letsencrypt.org/directory
-    acme_version: 2
     account_key_src: /etc/pki/cert/private/account.key
     csr: /etc/pki/cert/csr/sample.com.csr
     order_uri: "{{ sample_com_challenge.order_uri }}"
@@ -325,55 +317,63 @@ selected_chain:
       returned: always
 """
 
-from ansible_collections.community.crypto.plugins.module_utils.acme.acme import (
+import typing as t
+
+from ansible_collections.community.crypto.plugins.module_utils._acme.acme import (
     create_backend,
     create_default_argspec,
 )
-from ansible_collections.community.crypto.plugins.module_utils.acme.certificate import (
+from ansible_collections.community.crypto.plugins.module_utils._acme.certificate import (
     ACMECertificateClient,
 )
-from ansible_collections.community.crypto.plugins.module_utils.acme.errors import (
+from ansible_collections.community.crypto.plugins.module_utils._acme.errors import (
     ModuleFailException,
 )
 
 
-def main():
+if t.TYPE_CHECKING:
+    from ansible_collections.community.crypto.plugins.module_utils._acme.certificates import (  # pragma: no cover
+        CertificateChain,
+    )
+
+
+def main() -> t.NoReturn:
     argument_spec = create_default_argspec(with_certificate=True)
     argument_spec.update_argspec(
-        order_uri=dict(type="str", required=True),
-        cert_dest=dict(type="path"),
-        fullchain_dest=dict(type="path"),
-        chain_dest=dict(type="path"),
-        deactivate_authzs=dict(
-            type="str",
-            default="always",
-            choices=["never", "always", "on_error", "on_success"],
-        ),
-        retrieve_all_alternates=dict(type="bool", default=False),
-        select_chain=dict(
-            type="list",
-            elements="dict",
-            options=dict(
-                test_certificates=dict(
-                    type="str", default="all", choices=["first", "last", "all"]
-                ),
-                issuer=dict(type="dict"),
-                subject=dict(type="dict"),
-                subject_key_identifier=dict(type="str"),
-                authority_key_identifier=dict(type="str"),
-            ),
-        ),
+        order_uri={"type": "str", "required": True},
+        cert_dest={"type": "path"},
+        fullchain_dest={"type": "path"},
+        chain_dest={"type": "path"},
+        deactivate_authzs={
+            "type": "str",
+            "default": "always",
+            "choices": ["never", "always", "on_error", "on_success"],
+        },
+        retrieve_all_alternates={"type": "bool", "default": False},
+        select_chain={
+            "type": "list",
+            "elements": "dict",
+            "options": {
+                "test_certificates": {
+                    "type": "str",
+                    "default": "all",
+                    "choices": ["first", "last", "all"],
+                },
+                "issuer": {"type": "dict"},
+                "subject": {"type": "dict"},
+                "subject_key_identifier": {"type": "str"},
+                "authority_key_identifier": {"type": "str"},
+            },
+        },
     )
     module = argument_spec.create_ansible_module()
-    if module.params["acme_version"] == 1:
-        module.fail_json("The module does not support acme_version=1")
 
-    backend = create_backend(module, False)
+    backend = create_backend(module, needs_acme_v2=False)
 
     try:
-        client = ACMECertificateClient(module, backend)
+        client = ACMECertificateClient(module=module, backend=backend)
         select_chain_matcher = client.parse_select_chain(module.params["select_chain"])
-        other = dict()
+        other = {}
         done = False
         order = None
         try:
@@ -385,6 +385,7 @@ def main():
                 or module.params["retrieve_all_alternates"]
             )
             changed = False
+            alternate_chains: list[CertificateChain] | None
             if order.status == "valid":
                 # Step 2 and 3: download certificate(s) and chain(s)
                 cert, alternate_chains = client.download_certificate(
@@ -417,7 +418,8 @@ def main():
                 # Try to select alternate chain depending on criteria
                 if select_chain_matcher:
                     matching_chain = client.find_matching_chain(
-                        [cert] + alternate_chains, select_chain_matcher
+                        chains=[cert] + alternate_chains,
+                        select_chain_matcher=select_chain_matcher,
                     )
                     if matching_chain:
                         cert = matching_chain
@@ -425,7 +427,7 @@ def main():
                         module.debug("Found no matching alternative chain")
 
             if client.write_cert_chain(
-                cert,
+                cert=cert,
                 cert_dest=module.params["cert_dest"],
                 fullchain_dest=module.params["fullchain_dest"],
                 chain_dest=module.params["chain_dest"],
@@ -445,10 +447,10 @@ def main():
             changed=changed,
             account_uri=client.client.account_uri,
             selected_chain=cert.to_json(),
-            **other
+            **other,
         )
     except ModuleFailException as e:
-        e.do_fail(module)
+        e.do_fail(module=module)
 
 
 if __name__ == "__main__":

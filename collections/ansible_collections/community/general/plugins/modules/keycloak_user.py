@@ -101,9 +101,9 @@ options:
   groups:
     description:
       - List of groups for the user.
-        Groups can be referenced by their name, like V(staff), or their path, like V(/staff/engineering).
-        The path syntax allows you to reference subgroups, which is not possible otherwise.
-        This is possible since community.general 10.6.0.
+      - Groups can be referenced by their name, like V(staff), or their path, like V(/staff/engineering). The path syntax
+        allows you to reference subgroups, which is not possible otherwise.
+      - Using the path is possible since community.general 10.6.0.
     type: list
     elements: dict
     default: []
@@ -332,11 +332,6 @@ EXAMPLES = r"""
 """
 
 RETURN = r"""
-msg:
-  description: Message as to what action was taken.
-  returned: always
-  type: str
-  sample: User f18c709c-03d6-11ee-970b-c74bf2721112 created
 proposed:
   description: Representation of the proposed user.
   returned: on success
@@ -349,10 +344,6 @@ end_state:
   description: Representation of the user after module execution.
   returned: on success
   type: dict
-changed:
-  description: Return V(true) if the operation changed the user on the keycloak server, V(false) otherwise.
-  returned: always
-  type: bool
 """
 
 from ansible_collections.community.general.plugins.module_utils.identity.keycloak.keycloak import KeycloakAPI, camel, \
@@ -410,8 +401,8 @@ def main():
 
     module = AnsibleModule(argument_spec=argument_spec,
                            supports_check_mode=True,
-                           required_one_of=([['token', 'auth_realm', 'auth_username', 'auth_password']]),
-                           required_together=([['auth_realm', 'auth_username', 'auth_password']]),
+                           required_one_of=([['token', 'auth_realm', 'auth_username', 'auth_password', 'auth_client_id', 'auth_client_secret']]),
+                           required_together=([['auth_username', 'auth_password']]),
                            required_by={'refresh_token': 'auth_realm'},
                            )
 

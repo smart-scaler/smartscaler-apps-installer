@@ -33,12 +33,12 @@ attributes:
 options:
   id:
     description:
-      - A O(id) of the template you would like to manage. If not set then a new template will be created with the given O(name).
+      - A O(id) of the template you would like to manage. If not set then a new template is created with the given O(name).
     type: int
   name:
     description:
-      - A O(name) of the template you would like to manage. If a template with the given name does not exist it will be created,
-        otherwise it will be managed by this module.
+      - A O(name) of the template you would like to manage. If a template with the given name does not exist it is created,
+        otherwise it is managed by this module.
     type: str
   template:
     description:
@@ -163,11 +163,11 @@ from ansible_collections.community.general.plugins.module_utils.opennebula impor
 class TemplateModule(OpenNebulaModule):
     def __init__(self):
         argument_spec = dict(
-            id=dict(type='int', required=False),
-            name=dict(type='str', required=False),
+            id=dict(type='int'),
+            name=dict(type='str'),
             state=dict(type='str', choices=['present', 'absent'], default='present'),
-            template=dict(type='str', required=False),
-            filter=dict(type='str', required=False, choices=['user_primary_group', 'user', 'all', 'user_groups'], default='user'),
+            template=dict(type='str'),
+            filter=dict(type='str', choices=['user_primary_group', 'user', 'all', 'user_groups'], default='user'),
         )
 
         mutually_exclusive = [

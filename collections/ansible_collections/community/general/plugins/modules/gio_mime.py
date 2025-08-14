@@ -26,12 +26,12 @@ attributes:
 options:
   mime_type:
     description:
-      - MIME type for which a default handler will be set.
+      - MIME type for which a default handler is set.
     type: str
     required: true
   handler:
     description:
-      - Default handler will be set for the MIME type.
+      - Default handler set for the MIME type.
     type: str
     required: true
 notes:
@@ -61,18 +61,6 @@ handler:
   returned: success
   type: str
   sample: google-chrome.desktop
-stdout:
-  description:
-    - The output of the C(gio) command.
-  returned: success
-  type: str
-  sample: Set google-chrome.desktop as the default for x-scheme-handler/https
-stderr:
-  description:
-    - The error output of the C(gio) command.
-  returned: failure
-  type: str
-  sample: 'gio: Failed to load info for handler "never-existed.desktop"'
 version:
   description: Version of gio.
   type: str

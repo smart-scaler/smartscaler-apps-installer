@@ -14,8 +14,33 @@
 
 [sessions]
 
+[sessions.lint]
+run_isort = false
+run_black = false
+run_flake8 = false
+run_pylint = false
+run_yamllint = true
+yamllint_config = ".yamllint"
+# yamllint_config_plugins = ".yamllint-docs"
+# yamllint_config_plugins_examples = ".yamllint-examples"
+run_mypy = false
+
 [sessions.docs_check]
 validate_collection_refs="all"
+codeblocks_restrict_types = [
+    "ansible-output",
+    "console",
+    "ini",
+    "json",
+    "python",
+    "shell",
+    "yaml",
+    "yaml+jinja",
+    "text",
+]
+codeblocks_restrict_type_exact_case = true
+codeblocks_allow_without_type = false
+codeblocks_allow_literal_blocks = false
 
 [sessions.license_check]
 

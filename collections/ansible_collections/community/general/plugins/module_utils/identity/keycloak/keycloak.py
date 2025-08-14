@@ -104,6 +104,7 @@ URL_IDENTITY_PROVIDERS = "{url}/admin/realms/{realm}/identity-provider/instances
 URL_IDENTITY_PROVIDER = "{url}/admin/realms/{realm}/identity-provider/instances/{alias}"
 URL_IDENTITY_PROVIDER_MAPPERS = "{url}/admin/realms/{realm}/identity-provider/instances/{alias}/mappers"
 URL_IDENTITY_PROVIDER_MAPPER = "{url}/admin/realms/{realm}/identity-provider/instances/{alias}/mappers/{id}"
+URL_IDENTITY_PROVIDER_IMPORT = "{url}/admin/realms/{realm}/identity-provider/import-config"
 
 URL_COMPONENTS = "{url}/admin/realms/{realm}/components"
 URL_COMPONENT = "{url}/admin/realms/{realm}/components/{id}"
@@ -248,6 +249,29 @@ def _request_token_using_refresh_token(module_params):
     return _token_request(module_params, payload)
 
 
+def _request_token_using_client_credentials(module_params):
+    """ Obtains connection header with token for the authentication,
+    using the provided auth_client_id and auth_client_secret by grant_type
+    client_credentials. Ensure that the used client uses client authorization
+    with service account roles enabled and required service roles assigned.
+    :param module_params: parameters of the module. Must include 'auth_client_id'
+    and 'auth_client_secret'..
+    :return: connection header
+    """
+    client_id = module_params.get('auth_client_id')
+    client_secret = module_params.get('auth_client_secret')
+
+    temp_payload = {
+        'grant_type': 'client_credentials',
+        'client_id': client_id,
+        'client_secret': client_secret,
+    }
+    # Remove empty items, for instance missing client_secret
+    payload = {k: v for k, v in temp_payload.items() if v is not None}
+
+    return _token_request(module_params, payload)
+
+
 def get_token(module_params):
     """ Obtains connection header with token for the authentication,
     token already given or obtained from credentials
@@ -257,7 +281,13 @@ def get_token(module_params):
     token = module_params.get('token')
 
     if token is None:
-        token = _request_token_using_credentials(module_params)
+        auth_client_id = module_params.get('auth_client_id')
+        auth_client_secret = module_params.get('auth_client_secret')
+        auth_username = module_params.get('auth_username')
+        if auth_client_id is not None and auth_client_secret is not None and auth_username is None:
+            token = _request_token_using_client_credentials(module_params)
+        else:
+            token = _request_token_using_credentials(module_params)
 
     return {
         'Authorization': 'Bearer ' + token,
@@ -386,6 +416,21 @@ class KeycloakAPI(object):
                 self.restheaders['Authorization'] = 'Bearer ' + token
 
                 r = make_request_catching_401()
+
+        if isinstance(r, Exception):
+            # Try to re-auth with client_id and client_secret, if available
+            auth_client_id = self.module.params.get('auth_client_id')
+            auth_client_secret = self.module.params.get('auth_client_secret')
+            if auth_client_id is not None and auth_client_secret is not None:
+                try:
+                    token = _request_token_using_client_credentials(self.module.params)
+                    self.restheaders['Authorization'] = 'Bearer ' + token
+
+                    r = make_request_catching_401()
+                except KeycloakError as e:
+                    # Token refresh returns 400 if token is expired/invalid, so continue on if we get a 400
+                    if e.authError is not None and e.authError.code != 400:
+                        raise e
 
         if isinstance(r, Exception):
             # Either no re-auth options were available, or they all failed
@@ -1917,7 +1962,7 @@ class KeycloakAPI(object):
                             and composite["name"] == existing_composite["name"]):
                         composite_found = True
                         break
-            if (not composite_found and ('state' not in composite or composite['state'] == 'present')):
+            if not composite_found and ('state' not in composite or composite['state'] == 'present'):
                 if "client_id" in composite and composite['client_id'] is not None:
                     client_roles = self.get_client_roles(clientid=composite['client_id'], realm=realm)
                     for client_role in client_roles:
@@ -2535,6 +2580,23 @@ class KeycloakAPI(object):
         except Exception as e:
             self.fail_request(e, msg='Could not obtain list of identity provider mappers for idp %s in realm %s: %s'
                                      % (alias, realm, str(e)))
+
+    def fetch_idp_endpoints_import_config_url(self, fromUrl, providerId='oidc', realm='master'):
+        """ Import an identity provider configuration through Keycloak server from a well-known URL.
+        :param fromUrl: URL to import the identity provider configuration from.
+        "param providerId: Provider ID of the identity provider to import, default 'oidc'.
+        :param realm: Realm
+        :return: IDP endpoins.
+        """
+        try:
+            payload = {
+                "providerId": providerId,
+                "fromUrl": fromUrl
+            }
+            idps_url = URL_IDENTITY_PROVIDER_IMPORT.format(url=self.baseurl, realm=realm)
+            return self._request_and_deserialize(idps_url, method='POST', data=json.dumps(payload))
+        except Exception as e:
+            self.fail_request(e, msg='Could not import the IdP config in realm %s: %s' % (realm, str(e)))
 
     def get_identity_provider_mapper(self, mid, alias, realm='master'):
         """ Fetch identity provider representation from a realm using the idp's alias.

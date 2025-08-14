@@ -83,7 +83,7 @@ options:
     default: false
     version_added: 9.0.0
 notes:
-  - When used with a C(loop:) each package will be processed individually, it is much more efficient to pass the list directly
+  - When used with a C(loop:) each package is processed individually, it is much more efficient to pass the list directly
     to the O(name) option.
 """
 
@@ -173,7 +173,7 @@ changed_pkgs:
     - List of package names which are changed after module run.
   returned: success
   type: list
-  sample: ['git', 'git-cola']
+  sample: ["git", "git-cola"]
   version_added: '0.2.0'
 """
 
@@ -807,13 +807,11 @@ def main():
         argument_spec=dict(
             name=dict(
                 aliases=["pkg", "package", "formula"],
-                required=False,
                 type='list',
                 elements='str',
             ),
             path=dict(
                 default="/usr/local/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin",
-                required=False,
                 type='path',
             ),
             state=dict(
@@ -835,13 +833,11 @@ def main():
                 type='bool',
             ),
             install_options=dict(
-                default=None,
                 aliases=['options'],
                 type='list',
                 elements='str',
             ),
             upgrade_options=dict(
-                default=None,
                 type='list',
                 elements='str',
             ),

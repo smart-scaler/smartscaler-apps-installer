@@ -1,14 +1,9 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2017, Thom Wiggers  <ansible@thomwiggers.nl>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -22,14 +17,14 @@ description:
   - The module can use the cryptography Python library, or the C(openssl) executable. By default, it tries to detect which
     one is available. This can be overridden with the O(select_crypto_backend) option.
 requirements:
-  - Either cryptography >= 2.0
+  - Either cryptography >= 3.3
   - Or OpenSSL binary C(openssl)
 author:
   - Thom Wiggers (@thomwiggers)
 extends_documentation_fragment:
   - ansible.builtin.files
-  - community.crypto.attributes
-  - community.crypto.attributes.files
+  - community.crypto._attributes
+  - community.crypto._attributes.files
 attributes:
   check_mode:
     support: full
@@ -137,25 +132,28 @@ import abc
 import os
 import re
 import tempfile
-import traceback
+import typing as t
 
-from ansible.module_utils.basic import AnsibleModule, missing_required_lib
-from ansible.module_utils.common.text.converters import to_native
-from ansible_collections.community.crypto.plugins.module_utils.crypto.math import (
+from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.common.text.converters import to_text
+from ansible_collections.community.crypto.plugins.module_utils._crypto.math import (
     count_bits,
 )
-from ansible_collections.community.crypto.plugins.module_utils.io import (
+from ansible_collections.community.crypto.plugins.module_utils._cryptography_dep import (
+    COLLECTION_MINIMUM_CRYPTOGRAPHY_VERSION,
+    assert_required_cryptography_version,
+)
+from ansible_collections.community.crypto.plugins.module_utils._io import (
     load_file_if_exists,
     write_file,
 )
-from ansible_collections.community.crypto.plugins.module_utils.version import (
+from ansible_collections.community.crypto.plugins.module_utils._version import (
     LooseVersion,
 )
 
 
-MINIMAL_CRYPTOGRAPHY_VERSION = "2.0"
+MINIMAL_CRYPTOGRAPHY_VERSION = COLLECTION_MINIMUM_CRYPTOGRAPHY_VERSION
 
-CRYPTOGRAPHY_IMP_ERR = None
 try:
     import cryptography
     import cryptography.exceptions
@@ -165,7 +163,6 @@ try:
 
     CRYPTOGRAPHY_VERSION = LooseVersion(cryptography.__version__)
 except ImportError:
-    CRYPTOGRAPHY_IMP_ERR = traceback.format_exc()
     CRYPTOGRAPHY_FOUND = False
 else:
     CRYPTOGRAPHY_FOUND = True
@@ -175,25 +172,23 @@ class DHParameterError(Exception):
     pass
 
 
-class DHParameterBase(object):
-
-    def __init__(self, module):
-        self.state = module.params["state"]
-        self.path = module.params["path"]
-        self.size = module.params["size"]
-        self.force = module.params["force"]
+class DHParameterBase:
+    def __init__(self, module: AnsibleModule) -> None:
+        self.state: t.Literal["absent", "present"] = module.params["state"]
+        self.path: str = module.params["path"]
+        self.size: int = module.params["size"]
+        self.force: bool = module.params["force"]
         self.changed = False
-        self.return_content = module.params["return_content"]
+        self.return_content: bool = module.params["return_content"]
 
-        self.backup = module.params["backup"]
-        self.backup_file = None
+        self.backup: bool = module.params["backup"]
+        self.backup_file: str | None = None
 
     @abc.abstractmethod
-    def _do_generate(self, module):
+    def _do_generate(self, module: AnsibleModule) -> None:
         """Actually generate the DH params."""
-        pass
 
-    def generate(self, module):
+    def generate(self, module: AnsibleModule) -> None:
         """Generate DH params."""
         changed = False
 
@@ -210,37 +205,36 @@ class DHParameterBase(object):
 
         self.changed = changed
 
-    def remove(self, module):
+    def remove(self, module: AnsibleModule) -> None:
         if self.backup:
             self.backup_file = module.backup_local(self.path)
         try:
             os.remove(self.path)
             self.changed = True
         except OSError as exc:
-            module.fail_json(msg=to_native(exc))
+            module.fail_json(msg=str(exc))
 
-    def check(self, module):
+    def check(self, module: AnsibleModule) -> bool:
         """Ensure the resource is in its desired state."""
         if self.force:
             return False
         return self._check_params_valid(module) and self._check_fs_attributes(module)
 
     @abc.abstractmethod
-    def _check_params_valid(self, module):
+    def _check_params_valid(self, module: AnsibleModule) -> bool:
         """Check if the params are in the correct state"""
-        pass
 
-    def _check_fs_attributes(self, module):
+    def _check_fs_attributes(self, module: AnsibleModule) -> bool:
         """Checks (and changes if not in check mode!) fs attributes"""
         file_args = module.load_file_common_arguments(module.params)
         if module.check_file_absent_if_check_mode(file_args["path"]):
             return False
         return not module.set_fs_attributes_if_different(file_args, False)
 
-    def dump(self):
+    def dump(self) -> dict[str, t.Any]:
         """Serialize the object into a dictionary."""
 
-        result = {
+        result: dict[str, t.Any] = {
             "size": self.size,
             "filename": self.path,
             "changed": self.changed,
@@ -248,33 +242,30 @@ class DHParameterBase(object):
         if self.backup_file:
             result["backup_file"] = self.backup_file
         if self.return_content:
-            content = load_file_if_exists(self.path, ignore_errors=True)
+            content = load_file_if_exists(path=self.path, ignore_errors=True)
             result["dhparams"] = content.decode("utf-8") if content else None
 
         return result
 
 
 class DHParameterAbsent(DHParameterBase):
+    def __init__(self, module: AnsibleModule) -> None:
+        super().__init__(module)
 
-    def __init__(self, module):
-        super(DHParameterAbsent, self).__init__(module)
-
-    def _do_generate(self, module):
+    def _do_generate(self, module: AnsibleModule) -> None:
         """Actually generate the DH params."""
-        pass
 
-    def _check_params_valid(self, module):
+    def _check_params_valid(self, module: AnsibleModule) -> bool:
         """Check if the params are in the correct state"""
-        pass
+        return False
 
 
 class DHParameterOpenSSL(DHParameterBase):
-
-    def __init__(self, module):
-        super(DHParameterOpenSSL, self).__init__(module)
+    def __init__(self, module: AnsibleModule) -> None:
+        super().__init__(module)
         self.openssl_bin = module.get_bin_path("openssl", True)
 
-    def _do_generate(self, module):
+    def _do_generate(self, module: AnsibleModule) -> None:
         """Actually generate the DH params."""
         # create a tempfile
         fd, tmpsrc = tempfile.mkstemp()
@@ -284,15 +275,15 @@ class DHParameterOpenSSL(DHParameterBase):
         command = [self.openssl_bin, "dhparam", "-out", tmpsrc, str(self.size)]
         rc, dummy, err = module.run_command(command, check_rc=False)
         if rc != 0:
-            raise DHParameterError(to_native(err))
+            raise DHParameterError(str(err))
         if self.backup:
             self.backup_file = module.backup_local(self.path)
         try:
             module.atomic_move(os.path.abspath(tmpsrc), os.path.abspath(self.path))
         except Exception as e:
-            module.fail_json(msg="Failed to write to file %s: %s" % (self.path, str(e)))
+            module.fail_json(msg=f"Failed to write to file {self.path}: {str(e)}")
 
-    def _check_params_valid(self, module):
+    def _check_params_valid(self, module: AnsibleModule) -> bool:
         """Check if the params are in the correct state"""
         command = [
             self.openssl_bin,
@@ -304,7 +295,7 @@ class DHParameterOpenSSL(DHParameterBase):
             self.path,
         ]
         rc, out, err = module.run_command(command, check_rc=False)
-        result = to_native(out)
+        result = to_text(out)
         if rc != 0:
             # If the call failed the file probably does not exist or is
             # unreadable
@@ -317,25 +308,22 @@ class DHParameterOpenSSL(DHParameterBase):
         bits = int(match.group(1))
 
         # if output contains "WARNING" we've got a problem
-        if "WARNING" in result or "WARNING" in to_native(err):
+        if "WARNING" in result or "WARNING" in to_text(err):
             return False
 
         return bits == self.size
 
 
 class DHParameterCryptography(DHParameterBase):
+    def __init__(self, module: AnsibleModule) -> None:
+        super().__init__(module)
 
-    def __init__(self, module):
-        super(DHParameterCryptography, self).__init__(module)
-        self.crypto_backend = cryptography.hazmat.backends.default_backend()
-
-    def _do_generate(self, module):
+    def _do_generate(self, module: AnsibleModule) -> None:
         """Actually generate the DH params."""
         # Generate parameters
         params = cryptography.hazmat.primitives.asymmetric.dh.generate_parameters(
             generator=2,
             key_size=self.size,
-            backend=self.crypto_backend,
         )
         # Serialize parameters
         result = params.parameter_bytes(
@@ -345,16 +333,16 @@ class DHParameterCryptography(DHParameterBase):
         # Write result
         if self.backup:
             self.backup_file = module.backup_local(self.path)
-        write_file(module, result)
+        write_file(module=module, content=result)
 
-    def _check_params_valid(self, module):
+    def _check_params_valid(self, module: AnsibleModule) -> bool:
         """Check if the params are in the correct state"""
         # Load parameters
         try:
             with open(self.path, "rb") as f:
                 data = f.read()
             params = cryptography.hazmat.primitives.serialization.load_pem_parameters(
-                data, backend=self.crypto_backend
+                data
             )
         except Exception:
             return False
@@ -363,21 +351,27 @@ class DHParameterCryptography(DHParameterBase):
         return bits == self.size
 
 
-def main():
+def main() -> t.NoReturn:
     """Main function"""
 
     module = AnsibleModule(
-        argument_spec=dict(
-            state=dict(type="str", default="present", choices=["absent", "present"]),
-            size=dict(type="int", default=4096),
-            force=dict(type="bool", default=False),
-            path=dict(type="path", required=True),
-            backup=dict(type="bool", default=False),
-            select_crypto_backend=dict(
-                type="str", default="auto", choices=["auto", "cryptography", "openssl"]
-            ),
-            return_content=dict(type="bool", default=False),
-        ),
+        argument_spec={
+            "state": {
+                "type": "str",
+                "default": "present",
+                "choices": ["absent", "present"],
+            },
+            "size": {"type": "int", "default": 4096},
+            "force": {"type": "bool", "default": False},
+            "path": {"type": "path", "required": True},
+            "backup": {"type": "bool", "default": False},
+            "select_crypto_backend": {
+                "type": "str",
+                "default": "auto",
+                "choices": ["auto", "cryptography", "openssl"],
+            },
+            "return_content": {"type": "bool", "default": False},
+        },
         supports_check_mode=True,
         add_file_common_args=True,
     )
@@ -386,10 +380,10 @@ def main():
     if not os.path.isdir(base_dir):
         module.fail_json(
             name=base_dir,
-            msg="The directory '%s' does not exist or the file is not a directory"
-            % base_dir,
+            msg=f"The directory '{base_dir}' does not exist or the file is not a directory",
         )
 
+    dhparam: DHParameterOpenSSL | DHParameterCryptography | DHParameterAbsent
     if module.params["state"] == "present":
         backend = module.params["select_crypto_backend"]
         if backend == "auto":
@@ -410,24 +404,19 @@ def main():
             if backend == "auto":
                 module.fail_json(
                     msg=(
-                        "Cannot detect either the required Python library cryptography (>= {0}) "
-                        "or the OpenSSL binary openssl"
-                    ).format(MINIMAL_CRYPTOGRAPHY_VERSION)
+                        f"Cannot detect either the required Python library cryptography (>= {MINIMAL_CRYPTOGRAPHY_VERSION}) or the OpenSSL binary openssl"
+                    )
                 )
 
         if backend == "openssl":
             dhparam = DHParameterOpenSSL(module)
         elif backend == "cryptography":
-            if not CRYPTOGRAPHY_FOUND:
-                module.fail_json(
-                    msg=missing_required_lib(
-                        "cryptography >= {0}".format(MINIMAL_CRYPTOGRAPHY_VERSION)
-                    ),
-                    exception=CRYPTOGRAPHY_IMP_ERR,
-                )
+            assert_required_cryptography_version(
+                module, minimum_cryptography_version=MINIMAL_CRYPTOGRAPHY_VERSION
+            )
             dhparam = DHParameterCryptography(module)
         else:
-            raise AssertionError("Internal error: unknown backend")
+            raise AssertionError("Internal error: unknown backend")  # pragma: no cover
 
         if module.check_mode:
             result = dhparam.dump()
@@ -437,7 +426,7 @@ def main():
         try:
             dhparam.generate(module)
         except DHParameterError as exc:
-            module.fail_json(msg=to_native(exc))
+            module.fail_json(msg=str(exc))
     else:
         dhparam = DHParameterAbsent(module)
 
@@ -450,7 +439,7 @@ def main():
             try:
                 dhparam.remove(module)
             except Exception as exc:
-                module.fail_json(msg=to_native(exc))
+                module.fail_json(msg=str(exc))
 
     result = dhparam.dump()
 

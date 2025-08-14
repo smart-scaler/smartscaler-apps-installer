@@ -1,14 +1,9 @@
 #!/usr/bin/python
-# coding: utf-8 -*-
-
 # Copyright (c) Ansible Project
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -18,11 +13,10 @@ short_description: Get a certificate from a host:port
 description:
   - Makes a secure connection and returns information about the presented certificate.
   - The module uses the cryptography Python library.
-  - Support SNI (L(Server Name Indication,https://en.wikipedia.org/wiki/Server_Name_Indication)) only with Python 2.7 and
-    newer.
 extends_documentation_fragment:
-  - community.crypto.attributes
-  - community.crypto.attributes.idempotent_not_modify_state
+  - community.crypto._attributes
+  - community.crypto._attributes.idempotent_not_modify_state
+  - community.crypto._cryptography_dep.minimum
 attributes:
   check_mode:
     support: none
@@ -82,6 +76,9 @@ options:
       - Determines which crypto backend to use.
       - The default choice is V(auto), which tries to use C(cryptography) if available.
       - If set to V(cryptography), will try to use the L(cryptography,https://cryptography.io/) library.
+      - Note that with community.crypto 3.0.0, all values behave the same.
+        This option will be deprecated in a later version.
+        We recommend to not set it explicitly.
     type: str
     default: auto
     choices: [auto, cryptography]
@@ -100,8 +97,9 @@ options:
       - Whether to encode the ASN.1 values in the RV(extensions) return value with Base64 or not.
       - The documentation claimed for a long time that the values are Base64 encoded, but they never were. For compatibility
         this option is set to V(false).
-      - The default value V(false) is B(deprecated) and will change to V(true) in community.crypto 3.0.0.
+      - The default value was changed from V(false) to V(true) incommunity.crypto 3.0.0.
     type: bool
+    default: true
     version_added: 2.12.0
   tls_ctx_options:
     description:
@@ -126,8 +124,7 @@ options:
 notes:
   - When using ca_cert on OS X it has been reported that in some conditions the validate will always succeed.
 requirements:
-  - "Python >= 2.7 when using O(proxy_host), and Python >= 3.10 when O(get_certificate_chain=true)"
-  - "cryptography >= 1.6"
+  - "Python >= 3.10 when O(get_certificate_chain=true)"
 
 seealso:
   - plugin: community.crypto.to_serial
@@ -271,56 +268,45 @@ import atexit
 import base64
 import ssl
 import sys
-import traceback
+import typing as t
 from os.path import isfile
 from socket import create_connection, setdefaulttimeout, socket
-from ssl import CERT_NONE, CERT_REQUIRED, DER_cert_to_PEM_cert, get_server_certificate
+from ssl import (
+    CERT_NONE,
+    CERT_REQUIRED,
+    DER_cert_to_PEM_cert,
+    create_default_context,
+)
 
-from ansible.module_utils.basic import AnsibleModule, missing_required_lib
-from ansible.module_utils.common.text.converters import to_bytes, to_native
-from ansible.module_utils.six import string_types
-from ansible_collections.community.crypto.plugins.module_utils.crypto.cryptography_support import (
+from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.common.text.converters import to_bytes, to_text
+from ansible_collections.community.crypto.plugins.module_utils._crypto.cryptography_support import (
     CRYPTOGRAPHY_TIMEZONE,
     cryptography_get_extensions_from_cert,
     cryptography_oid_to_name,
     get_not_valid_after,
     get_not_valid_before,
 )
-from ansible_collections.community.crypto.plugins.module_utils.time import (
+from ansible_collections.community.crypto.plugins.module_utils._cryptography_dep import (
+    COLLECTION_MINIMUM_CRYPTOGRAPHY_VERSION,
+    assert_required_cryptography_version,
+)
+from ansible_collections.community.crypto.plugins.module_utils._time import (
     get_now_datetime,
 )
-from ansible_collections.community.crypto.plugins.module_utils.version import (
-    LooseVersion,
-)
 
 
-MINIMAL_CRYPTOGRAPHY_VERSION = "1.6"
+MINIMAL_CRYPTOGRAPHY_VERSION = COLLECTION_MINIMUM_CRYPTOGRAPHY_VERSION
 
-CREATE_DEFAULT_CONTEXT_IMP_ERR = None
-try:
-    from ssl import create_default_context
-except ImportError:
-    CREATE_DEFAULT_CONTEXT_IMP_ERR = traceback.format_exc()
-    HAS_CREATE_DEFAULT_CONTEXT = False
-else:
-    HAS_CREATE_DEFAULT_CONTEXT = True
-
-CRYPTOGRAPHY_IMP_ERR = None
 try:
     import cryptography
     import cryptography.exceptions
     import cryptography.x509
-    from cryptography.hazmat.backends import default_backend as cryptography_backend
-
-    CRYPTOGRAPHY_VERSION = LooseVersion(cryptography.__version__)
 except ImportError:
-    CRYPTOGRAPHY_IMP_ERR = traceback.format_exc()
-    CRYPTOGRAPHY_FOUND = False
-else:
-    CRYPTOGRAPHY_FOUND = True
+    pass
 
 
-def send_starttls_packet(sock, server_type):
+def send_starttls_packet(sock: socket, server_type: t.Literal["mysql"]) -> None:
     if server_type == "mysql":
         ssl_request_packet = (
             b"\x20\x00\x00\x01\x85\xae\x7f\x00"
@@ -336,89 +322,55 @@ def send_starttls_packet(sock, server_type):
         sock.send(ssl_request_packet)
 
 
-def main():
+def main() -> t.NoReturn:
     module = AnsibleModule(
-        argument_spec=dict(
-            ca_cert=dict(type="path"),
-            host=dict(type="str", required=True),
-            port=dict(type="int", required=True),
-            proxy_host=dict(type="str"),
-            proxy_port=dict(type="int", default=8080),
-            server_name=dict(type="str"),
-            timeout=dict(type="int", default=10),
-            select_crypto_backend=dict(
-                type="str", choices=["auto", "cryptography"], default="auto"
-            ),
-            starttls=dict(type="str", choices=["mysql"]),
-            ciphers=dict(type="list", elements="str"),
-            asn1_base64=dict(type="bool"),
-            tls_ctx_options=dict(type="list", elements="raw"),
-            get_certificate_chain=dict(type="bool", default=False),
-        ),
+        argument_spec={
+            "ca_cert": {"type": "path"},
+            "host": {"type": "str", "required": True},
+            "port": {"type": "int", "required": True},
+            "proxy_host": {"type": "str"},
+            "proxy_port": {"type": "int", "default": 8080},
+            "server_name": {"type": "str"},
+            "timeout": {"type": "int", "default": 10},
+            "select_crypto_backend": {
+                "type": "str",
+                "default": "auto",
+                "choices": ["auto", "cryptography"],
+            },
+            "starttls": {"type": "str", "choices": ["mysql"]},
+            "ciphers": {"type": "list", "elements": "str"},
+            "asn1_base64": {"type": "bool", "default": True},
+            "tls_ctx_options": {"type": "list", "elements": "raw"},
+            "get_certificate_chain": {"type": "bool", "default": False},
+        },
     )
 
-    ca_cert = module.params.get("ca_cert")
-    host = module.params.get("host")
-    port = module.params.get("port")
-    proxy_host = module.params.get("proxy_host")
-    proxy_port = module.params.get("proxy_port")
-    timeout = module.params.get("timeout")
-    server_name = module.params.get("server_name")
-    start_tls_server_type = module.params.get("starttls")
-    ciphers = module.params.get("ciphers")
-    asn1_base64 = module.params["asn1_base64"]
-    tls_ctx_options = module.params["tls_ctx_options"]
-    get_certificate_chain = module.params["get_certificate_chain"]
-
-    if asn1_base64 is None:
-        module.deprecate(
-            "The default value `false` for asn1_base64 is deprecated and will change to `true` in "
-            "community.crypto 3.0.0. If you need this value, it is best to set the value explicitly "
-            "and adjust your roles/playbooks to use `asn1_base64=true` as soon as possible",
-            version="3.0.0",
-            collection_name="community.crypto",
-        )
-        asn1_base64 = False
+    ca_cert: str | None = module.params.get("ca_cert")
+    host: str = module.params.get("host")
+    port: int = module.params.get("port")
+    proxy_host: str | None = module.params.get("proxy_host")
+    proxy_port: int | None = module.params.get("proxy_port")
+    timeout: int = module.params.get("timeout")
+    server_name: str | None = module.params.get("server_name")
+    start_tls_server_type: t.Literal["mysql"] | None = module.params.get("starttls")
+    ciphers: list[str] | None = module.params.get("ciphers")
+    asn1_base64: bool = module.params["asn1_base64"]
+    tls_ctx_options: list[str | bytes | int] | None = module.params["tls_ctx_options"]
+    get_certificate_chain: bool = module.params["get_certificate_chain"]
 
     if get_certificate_chain and sys.version_info < (3, 10):
         module.fail_json(
             msg="get_certificate_chain=true can only be used with Python 3.10 (Python 3.13+ officially supports this). "
-            "The Python version used to run the get_certificate module is %s"
-            % sys.version
+            f"The Python version used to run the get_certificate module is {sys.version}"
         )
 
-    backend = module.params.get("select_crypto_backend")
-    if backend == "auto":
-        # Detection what is possible
-        can_use_cryptography = (
-            CRYPTOGRAPHY_FOUND
-            and CRYPTOGRAPHY_VERSION >= LooseVersion(MINIMAL_CRYPTOGRAPHY_VERSION)
-        )
-
-        # Try cryptography
-        if can_use_cryptography:
-            backend = "cryptography"
-
-        # Success?
-        if backend == "auto":
-            module.fail_json(
-                msg=(
-                    "Cannot detect the required Python library " "cryptography (>= {0})"
-                ).format(MINIMAL_CRYPTOGRAPHY_VERSION)
-            )
-
-    if backend == "cryptography":
-        if not CRYPTOGRAPHY_FOUND:
-            module.fail_json(
-                msg=missing_required_lib(
-                    "cryptography >= {0}".format(MINIMAL_CRYPTOGRAPHY_VERSION)
-                ),
-                exception=CRYPTOGRAPHY_IMP_ERR,
-            )
-
-    result = dict(
-        changed=False,
+    assert_required_cryptography_version(
+        module, minimum_cryptography_version=MINIMAL_CRYPTOGRAPHY_VERSION
     )
+
+    result: dict[str, t.Any] = {
+        "changed": False,
+    }
 
     if timeout:
         setdefaulttimeout(timeout)
@@ -430,223 +382,188 @@ def main():
     verified_chain = None
     unverified_chain = None
 
-    if not HAS_CREATE_DEFAULT_CONTEXT:
-        # Python < 2.7.9
+    try:
         if proxy_host:
-            module.fail_json(
-                msg="To use proxy_host, you must run the get_certificate module with Python 2.7 or newer.",
-                exception=CREATE_DEFAULT_CONTEXT_IMP_ERR,
-            )
+            connect = f"CONNECT {host}:{port} HTTP/1.0\r\n\r\n"
+            sock = socket()
+            atexit.register(sock.close)
+            sock.connect((proxy_host, proxy_port))
+            sock.send(connect.encode())
+            sock.recv(8192)
+        else:
+            sock = create_connection((host, port))
+            atexit.register(sock.close)
+
+        if ca_cert:
+            ctx = create_default_context(cafile=ca_cert)
+            ctx.check_hostname = False
+            ctx.verify_mode = CERT_REQUIRED
+        else:
+            ctx = create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = CERT_NONE
+
+        if start_tls_server_type is not None:
+            send_starttls_packet(sock, start_tls_server_type)
+
         if ciphers is not None:
-            module.fail_json(
-                msg="To use ciphers, you must run the get_certificate module with Python 2.7 or newer.",
-                exception=CREATE_DEFAULT_CONTEXT_IMP_ERR,
-            )
+            ciphers_joined = ":".join(ciphers)
+            ctx.set_ciphers(ciphers_joined)
+
         if tls_ctx_options is not None:
-            module.fail_json(
-                msg="To use tls_ctx_options, you must run the get_certificate module with Python 2.7 or newer.",
-                exception=CREATE_DEFAULT_CONTEXT_IMP_ERR,
-            )
-        try:
-            # Note: get_server_certificate does not support SNI!
-            cert = get_server_certificate((host, port), ca_certs=ca_cert)
-        except Exception as e:
-            module.fail_json(
-                msg="Failed to get cert from {0}:{1}, error: {2}".format(host, port, e)
-            )
-    else:
-        # Python >= 2.7.9
-        try:
-            if proxy_host:
-                connect = "CONNECT %s:%s HTTP/1.0\r\n\r\n" % (host, port)
-                sock = socket()
-                atexit.register(sock.close)
-                sock.connect((proxy_host, proxy_port))
-                sock.send(connect.encode())
-                sock.recv(8192)
-            else:
-                sock = create_connection((host, port))
-                atexit.register(sock.close)
+            # Clear default ctx options
+            ctx.options = 0  # type: ignore
 
-            if ca_cert:
-                ctx = create_default_context(cafile=ca_cert)
-                ctx.check_hostname = False
-                ctx.verify_mode = CERT_REQUIRED
-            else:
-                ctx = create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = CERT_NONE
-
-            if start_tls_server_type is not None:
-                send_starttls_packet(sock, start_tls_server_type)
-
-            if ciphers is not None:
-                ciphers_joined = ":".join(ciphers)
-                ctx.set_ciphers(ciphers_joined)
-
-            if tls_ctx_options is not None:
-                # Clear default ctx options
-                ctx.options = 0
-
-                # For each item in the tls_ctx_options list
-                for tls_ctx_option in tls_ctx_options:
-                    # If the item is a string_type
-                    if isinstance(tls_ctx_option, string_types):
-                        # Convert tls_ctx_option to a native string
-                        tls_ctx_option_str = to_native(tls_ctx_option)
-                        # Get the tls_ctx_option_str attribute from ssl
-                        tls_ctx_option_attr = getattr(ssl, tls_ctx_option_str, None)
-                        # If tls_ctx_option_attr is an integer
-                        if isinstance(tls_ctx_option_attr, int):
-                            # Set tls_ctx_option_int to the attribute value
-                            tls_ctx_option_int = tls_ctx_option_attr
-                        # If tls_ctx_option_attr is not an integer
-                        else:
-                            module.fail_json(
-                                msg="Failed to determine the numeric value for {0}".format(
-                                    tls_ctx_option_str
-                                )
-                            )
-                    # If the item is an integer
-                    elif isinstance(tls_ctx_option, int):
-                        # Set tls_ctx_option_int to the item value
-                        tls_ctx_option_int = tls_ctx_option
-                    # If the item is not a string nor integer
+            # For each item in the tls_ctx_options list
+            for tls_ctx_option in tls_ctx_options:
+                # If the item is a string_type
+                if isinstance(tls_ctx_option, (str, bytes)):
+                    # Convert tls_ctx_option to a native string
+                    tls_ctx_option_str = to_text(tls_ctx_option)
+                    # Get the tls_ctx_option_str attribute from ssl
+                    tls_ctx_option_attr = getattr(ssl, tls_ctx_option_str, None)
+                    # If tls_ctx_option_attr is an integer
+                    if isinstance(tls_ctx_option_attr, int):
+                        # Set tls_ctx_option_int to the attribute value
+                        tls_ctx_option_int = tls_ctx_option_attr
+                    # If tls_ctx_option_attr is not an integer
                     else:
                         module.fail_json(
-                            msg="tls_ctx_options must be a string or integer, got {0!r}".format(
-                                tls_ctx_option
-                            )
+                            msg=f"Failed to determine the numeric value for {tls_ctx_option_str}"
                         )
-                        tls_ctx_option_int = (
-                            0  # make pylint happy; this code is actually unreachable
-                        )
-
-                    try:
-                        # Add the int value of the item to ctx options
-                        ctx.options |= tls_ctx_option_int
-                    except Exception:
-                        module.fail_json(
-                            msg="Failed to add {0} to CTX options".format(
-                                tls_ctx_option_str or tls_ctx_option_int
-                            )
-                        )
-
-            tls_sock = ctx.wrap_socket(sock, server_hostname=server_name or host)
-            cert = tls_sock.getpeercert(True)
-            cert = DER_cert_to_PEM_cert(cert)
-
-            if get_certificate_chain:
-                if sys.version_info < (3, 13):
-                    # The official way to access this has been added in https://github.com/python/cpython/pull/109113/files.
-                    # We are basically doing the same for older Python versions. The internal API needed for this was added
-                    # in https://github.com/python/cpython/commit/666991fc598bc312d72aff0078ecb553f0a968f1, which was first
-                    # released in Python 3.10.0.
-                    def _convert_chain(chain):
-                        if not chain:
-                            return []
-                        return [c.public_bytes(ssl._ssl.ENCODING_DER) for c in chain]
-
-                    ssl_obj = tls_sock._sslobj  # This is of type ssl._ssl._SSLSocket
-                    verified_der_chain = _convert_chain(ssl_obj.get_verified_chain())
-                    unverified_der_chain = _convert_chain(
-                        ssl_obj.get_unverified_chain()
-                    )
+                # If the item is an integer
+                elif isinstance(tls_ctx_option, int):
+                    # Set tls_ctx_option_int to the item value
+                    tls_ctx_option_int = tls_ctx_option
+                # If the item is not a string nor integer
                 else:
-                    # This works with Python 3.13+
-
-                    # Unfortunately due to a bug (https://github.com/python/cpython/issues/118658) some early pre-releases of
-                    # Python 3.13 do not return lists of byte strings, but lists of _ssl.Certificate objects. This is going to
-                    # be fixed by https://github.com/python/cpython/pull/118669. For now we convert the certificates ourselves
-                    # if they are not byte strings to work around this.
-                    def _convert_chain(chain):
-                        return [
-                            (
-                                c
-                                if isinstance(c, bytes)
-                                else c.public_bytes(ssl._ssl.ENCODING_DER)
-                            )
-                            for c in chain
-                        ]
-
-                    verified_der_chain = _convert_chain(tls_sock.get_verified_chain())
-                    unverified_der_chain = _convert_chain(
-                        tls_sock.get_unverified_chain()
+                    module.fail_json(
+                        msg=f"tls_ctx_options must be a string or integer, got {tls_ctx_option!r}"
+                    )
+                    tls_ctx_option_int = (  # type: ignore[unreachable]
+                        0  # make pylint happy; this code is actually unreachable
                     )
 
-                verified_chain = [DER_cert_to_PEM_cert(c) for c in verified_der_chain]
-                unverified_chain = [
-                    DER_cert_to_PEM_cert(c) for c in unverified_der_chain
-                ]
-
-        except Exception as e:
-            if proxy_host:
-                module.fail_json(
-                    msg="Failed to get cert via proxy {0}:{1} from {2}:{3}, error: {4}".format(
-                        proxy_host, proxy_port, host, port, e
+                try:
+                    # Add the int value of the item to ctx options
+                    # (pylint does not yet notice that module.fail_json cannot return)
+                    ctx.options |= tls_ctx_option_int  # pylint: disable=possibly-used-before-assignment
+                except Exception:
+                    module.fail_json(
+                        msg=f"Failed to add {tls_ctx_option_str or tls_ctx_option_int} to CTX options"
                     )
-                )
+
+        tls_sock = ctx.wrap_socket(sock, server_hostname=server_name or host)
+        cert_der = tls_sock.getpeercert(True)
+        if cert_der is None:
+            raise Exception("Unexpected error: no peer certificate has been returned")
+        cert: str = DER_cert_to_PEM_cert(cert_der)
+
+        if get_certificate_chain:
+            if sys.version_info < (3, 13):
+                # The official way to access this has been added in https://github.com/python/cpython/pull/109113/files.
+                # We are basically doing the same for older Python versions. The internal API needed for this was added
+                # in https://github.com/python/cpython/commit/666991fc598bc312d72aff0078ecb553f0a968f1, which was first
+                # released in Python 3.10.0.
+                def _convert_chain(chain):
+                    if not chain:
+                        return []
+                    return [
+                        c.public_bytes(
+                            ssl._ssl.ENCODING_DER  # pylint: disable=protected-access
+                        )
+                        for c in chain
+                    ]
+
+                ssl_obj = (
+                    tls_sock._sslobj  # pylint: disable=protected-access
+                )  # This is of type ssl._ssl._SSLSocket
+                verified_der_chain = _convert_chain(ssl_obj.get_verified_chain())
+                unverified_der_chain = _convert_chain(ssl_obj.get_unverified_chain())
             else:
-                module.fail_json(
-                    msg="Failed to get cert from {0}:{1}, error: {2}".format(
-                        host, port, e
-                    )
-                )
+                # This works with Python 3.13+
+
+                # Unfortunately due to a bug (https://github.com/python/cpython/issues/118658) some early pre-releases of
+                # Python 3.13 do not return lists of byte strings, but lists of _ssl.Certificate objects. This is going to
+                # be fixed by https://github.com/python/cpython/pull/118669. For now we convert the certificates ourselves
+                # if they are not byte strings to work around this.
+                def _convert_chain(chain: list[bytes]) -> list[bytes]:
+                    return [
+                        (
+                            c
+                            if isinstance(c, bytes)
+                            else c.public_bytes(
+                                ssl._ssl.ENCODING_DER  # pylint: disable=protected-access
+                            )
+                        )
+                        for c in chain
+                    ]
+
+                verified_der_chain = _convert_chain(tls_sock.get_verified_chain())
+                unverified_der_chain = _convert_chain(tls_sock.get_unverified_chain())
+
+            verified_chain = [DER_cert_to_PEM_cert(c) for c in verified_der_chain]
+            unverified_chain = [DER_cert_to_PEM_cert(c) for c in unverified_der_chain]
+
+    except Exception as e:
+        if proxy_host:
+            module.fail_json(
+                msg=f"Failed to get cert via proxy {proxy_host}:{proxy_port} from {host}:{port}, error: {e}"
+            )
+        else:
+            module.fail_json(msg=f"Failed to get cert from {host}:{port}, error: {e}")
 
     result["cert"] = cert
 
-    if backend == "cryptography":
-        x509 = cryptography.x509.load_pem_x509_certificate(
-            to_bytes(cert), cryptography_backend()
-        )
-        result["subject"] = {}
-        for attribute in x509.subject:
-            result["subject"][cryptography_oid_to_name(attribute.oid, short=True)] = (
-                attribute.value
-            )
-
-        result["expired"] = get_not_valid_after(x509) < get_now_datetime(
-            with_timezone=CRYPTOGRAPHY_TIMEZONE
+    x509 = cryptography.x509.load_pem_x509_certificate(to_bytes(cert))
+    result["subject"] = {}
+    for attribute in x509.subject:
+        result["subject"][cryptography_oid_to_name(attribute.oid, short=True)] = (
+            attribute.value
         )
 
-        result["extensions"] = []
-        for dotted_number, entry in cryptography_get_extensions_from_cert(x509).items():
-            oid = cryptography.x509.oid.ObjectIdentifier(dotted_number)
-            ext = {
-                "critical": entry["critical"],
-                "asn1_data": entry["value"],
-                "name": cryptography_oid_to_name(oid, short=True),
-            }
-            if not asn1_base64:
-                ext["asn1_data"] = base64.b64decode(ext["asn1_data"])
-            result["extensions"].append(ext)
+    result["expired"] = get_not_valid_after(x509) < get_now_datetime(
+        with_timezone=CRYPTOGRAPHY_TIMEZONE
+    )
 
-        result["issuer"] = {}
-        for attribute in x509.issuer:
-            result["issuer"][cryptography_oid_to_name(attribute.oid, short=True)] = (
-                attribute.value
-            )
+    result["extensions"] = []
+    for dotted_number, entry in cryptography_get_extensions_from_cert(x509).items():
+        oid = cryptography.x509.oid.ObjectIdentifier(dotted_number)
+        ext: dict[str, t.Any] = {
+            "critical": entry["critical"],
+            "asn1_data": entry["value"],
+            "name": cryptography_oid_to_name(oid, short=True),
+        }
+        if not asn1_base64:
+            ext["asn1_data"] = base64.b64decode(entry["value"])  # type: ignore
+        result["extensions"].append(ext)
 
-        result["not_after"] = get_not_valid_after(x509).strftime("%Y%m%d%H%M%SZ")
-        result["not_before"] = get_not_valid_before(x509).strftime("%Y%m%d%H%M%SZ")
-
-        result["serial_number"] = x509.serial_number
-        result["signature_algorithm"] = cryptography_oid_to_name(
-            x509.signature_algorithm_oid
+    result["issuer"] = {}
+    for attribute in x509.issuer:
+        result["issuer"][cryptography_oid_to_name(attribute.oid, short=True)] = (
+            attribute.value
         )
 
-        # We need the -1 offset to get the same values as pyOpenSSL
-        if x509.version == cryptography.x509.Version.v1:
-            result["version"] = 1 - 1
-        elif x509.version == cryptography.x509.Version.v3:
-            result["version"] = 3 - 1
-        else:
-            result["version"] = "unknown"
+    result["not_after"] = get_not_valid_after(x509).strftime("%Y%m%d%H%M%SZ")
+    result["not_before"] = get_not_valid_before(x509).strftime("%Y%m%d%H%M%SZ")
 
-        if verified_chain is not None:
-            result["verified_chain"] = verified_chain
-        if unverified_chain is not None:
-            result["unverified_chain"] = unverified_chain
+    result["serial_number"] = x509.serial_number
+    result["signature_algorithm"] = cryptography_oid_to_name(
+        x509.signature_algorithm_oid
+    )
+
+    # We need the -1 offset to get the same values as pyOpenSSL
+    if x509.version == cryptography.x509.Version.v1:
+        result["version"] = 1 - 1
+    elif x509.version == cryptography.x509.Version.v3:
+        result["version"] = 3 - 1
+    else:
+        result["version"] = "unknown"  # type: ignore[unreachable]
+
+    if verified_chain is not None:
+        result["verified_chain"] = verified_chain
+    if unverified_chain is not None:
+        result["unverified_chain"] = unverified_chain
 
     module.exit_json(**result)
 

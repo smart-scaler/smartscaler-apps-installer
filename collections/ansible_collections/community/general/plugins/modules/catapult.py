@@ -16,6 +16,12 @@ module: catapult
 short_description: Send a sms / mms using the catapult bandwidth API
 description:
   - Allows notifications to be sent using SMS / MMS using the catapult bandwidth API.
+deprecated:
+  removed_in: 13.0.0
+  why: >-
+    DNS fails to resolve the API endpoint used by the module since Oct 2024.
+    See L(the associated issue, https://github.com/ansible-collections/community.general/issues/10318) for details.
+  alternative: There is none.
 extends_documentation_fragment:
   - community.general.attributes
 attributes:
@@ -89,14 +95,6 @@ EXAMPLES = r"""
     api_secret: "{{ api_secret }}"
 """
 
-RETURN = r"""
-changed:
-  description: Whether the API accepted the message.
-  returned: always
-  type: bool
-  sample: true
-"""
-
 
 import json
 
@@ -132,7 +130,7 @@ def main():
             user_id=dict(required=True),
             api_token=dict(required=True, no_log=True),
             api_secret=dict(required=True, no_log=True),
-            media=dict(default=None, required=False),
+            media=dict(),
         ),
     )
 

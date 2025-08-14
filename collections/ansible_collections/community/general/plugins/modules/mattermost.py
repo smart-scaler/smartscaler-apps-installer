@@ -38,7 +38,7 @@ options:
     type: str
     description:
       - Mattermost webhook API key. Log into your Mattermost site, go to Menu -> Integration -> Incoming Webhook -> Add Incoming
-        Webhook. This will give you full URL. O(api_key) is the last part. U(http://mattermost.example.com/hooks/API_KEY).
+        Webhook. This gives you a full URL. O(api_key) is the last part. U(http://mattermost.example.com/hooks/API_KEY).
     required: true
   text:
     type: str
@@ -75,8 +75,8 @@ options:
     version_added: 10.0.0
   validate_certs:
     description:
-      - If V(false), SSL certificates will not be validated. This should only be used on personally controlled sites using
-        self-signed certificates.
+      - If V(false), SSL certificates are not validated. This should only be used on personally controlled sites using self-signed
+        certificates.
     default: true
     type: bool
 """
@@ -137,10 +137,10 @@ def main():
             url=dict(type='str', required=True),
             api_key=dict(type='str', required=True, no_log=True),
             text=dict(type='str'),
-            channel=dict(type='str', default=None),
+            channel=dict(type='str'),
             username=dict(type='str', default='Ansible'),
             icon_url=dict(type='str', default='https://docs.ansible.com/favicon.ico'),
-            priority=dict(type='str', default=None, choices=['important', 'urgent']),
+            priority=dict(type='str', choices=['important', 'urgent']),
             validate_certs=dict(default=True, type='bool'),
             attachments=dict(type='list', elements='dict'),
         ),

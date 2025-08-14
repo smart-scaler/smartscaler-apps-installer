@@ -14,8 +14,7 @@ author:
   - Cliff Hults (@BongoEADGC6) <cliff.hults@gmail.com>
 description:
   - Get inventory hosts from the Icinga2 API.
-  - "Uses a configuration file as an inventory source, it must end in
-    C(.icinga2.yml) or C(.icinga2.yaml)."
+  - Uses a configuration file as an inventory source, it must end in C(.icinga2.yml) or C(.icinga2.yaml).
 extends_documentation_fragment:
   - constructed
 options:
@@ -46,7 +45,7 @@ options:
     required: true
   host_filter:
     description:
-      - An Icinga2 API valid host filter. Leave blank for no filtering
+      - An Icinga2 API valid host filter. Leave blank for no filtering.
     type: string
     required: false
   validate_certs:
@@ -291,11 +290,11 @@ class InventoryModule(BaseInventoryPlugin, Constructable):
         self.group_by_hostgroups = self.get_option('group_by_hostgroups')
 
         if self.templar.is_template(self.icinga2_url):
-            self.icinga2_url = self.templar.template(variable=self.icinga2_url, disable_lookups=False)
+            self.icinga2_url = self.templar.template(variable=self.icinga2_url)
         if self.templar.is_template(self.icinga2_user):
-            self.icinga2_user = self.templar.template(variable=self.icinga2_user, disable_lookups=False)
+            self.icinga2_user = self.templar.template(variable=self.icinga2_user)
         if self.templar.is_template(self.icinga2_password):
-            self.icinga2_password = self.templar.template(variable=self.icinga2_password, disable_lookups=False)
+            self.icinga2_password = self.templar.template(variable=self.icinga2_password)
 
         self.icinga2_url = f"{self.icinga2_url.rstrip('/')}/v1"
 

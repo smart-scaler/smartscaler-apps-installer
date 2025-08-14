@@ -49,7 +49,7 @@ options:
   host:
     description:
       - The endpoint this configuration is valid for.
-      - Can be an actual address on the internet or an alias that will connect to the value of O(hostname).
+      - It can be an actual address on the internet or an alias that connects to the value of O(hostname).
     required: true
     type: str
   hostname:
@@ -66,7 +66,7 @@ options:
     type: str
   identity_file:
     description:
-      - The path to an identity file (SSH private key) that will be used when connecting to this host.
+      - The path to an identity file (SSH private key) that is used when connecting to this host.
       - File need to exist and have mode V(0600) to be valid.
     type: path
   identities_only:
@@ -141,7 +141,7 @@ options:
     version_added: 10.1.0
   other_options:
     description:
-      - Provides the option to specify arbitrary SSH config entry options via a dictionary.
+      - Allows specifying arbitrary SSH config entry options using a dictionary.
       - The key names must be lower case. Keys with upper case values are rejected.
       - The values must be strings. Other values are rejected.
     type: dict
@@ -161,6 +161,15 @@ EXAMPLES = r"""
     state: present
     other_options:
       serveraliveinterval: '30'
+
+- name: Add SSH config with key auto-added to agent
+  community.general.ssh_config:
+    user: devops
+    host: "example.com"
+    hostname: "staging.example.com"
+    identity_file: "/home/devops/.ssh/id_rsa"
+    add_keys_to_agent: true
+    state: present
 
 - name: Delete a host from the configuration
   community.general.ssh_config:
@@ -189,22 +198,27 @@ hosts_change_diff:
   description: A list of host diff changes.
   returned: on change
   type: list
-  sample: [
-    {
-      "example.com": {
-        "new": {
-          "hostname": "github.com",
-          "identityfile": ["/tmp/test_ssh_config/fake_id_rsa"],
-          "port": "2224"
-        },
-        "old": {
-          "hostname": "github.com",
-          "identityfile": ["/tmp/test_ssh_config/fake_id_rsa"],
-          "port": "2224"
+  sample:
+    [
+      {
+        "example.com": {
+          "new": {
+            "hostname": "github.com",
+            "identityfile": [
+              "/tmp/test_ssh_config/fake_id_rsa"
+            ],
+            "port": "2224"
+          },
+          "old": {
+            "hostname": "github.com",
+            "identityfile": [
+              "/tmp/test_ssh_config/fake_id_rsa"
+            ],
+            "port": "2224"
+          }
         }
       }
-    }
-  ]
+    ]
 """
 
 import os
@@ -376,7 +390,7 @@ class SSHConfig(object):
 def main():
     module = AnsibleModule(
         argument_spec=dict(
-            group=dict(default=None, type='str'),
+            group=dict(type='str'),
             host=dict(type='str', required=True),
             hostname=dict(type='str'),
             host_key_algorithms=dict(type='str', no_log=False),
@@ -384,24 +398,20 @@ def main():
             identities_only=dict(type='bool'),
             other_options=dict(type='dict'),
             port=dict(type='str'),
-            proxycommand=dict(type='str', default=None),
-            proxyjump=dict(type='str', default=None),
+            proxycommand=dict(type='str'),
+            proxyjump=dict(type='str'),
             forward_agent=dict(type='bool'),
             add_keys_to_agent=dict(type='bool'),
             remote_user=dict(type='str'),
-            ssh_config_file=dict(default=None, type='path'),
+            ssh_config_file=dict(type='path'),
             state=dict(type='str', default='present', choices=['present', 'absent']),
-            strict_host_key_checking=dict(
-                type='str',
-                default=None,
-                choices=['yes', 'no', 'ask', 'accept-new'],
-            ),
-            controlmaster=dict(type='str', default=None, choices=['yes', 'no', 'ask', 'auto', 'autoask']),
-            controlpath=dict(type='str', default=None),
-            controlpersist=dict(type='str', default=None),
+            strict_host_key_checking=dict(type='str', choices=['yes', 'no', 'ask', 'accept-new']),
+            controlmaster=dict(type='str', choices=['yes', 'no', 'ask', 'auto', 'autoask']),
+            controlpath=dict(type='str'),
+            controlpersist=dict(type='str'),
             dynamicforward=dict(type='str'),
-            user=dict(default=None, type='str'),
-            user_known_hosts_file=dict(type='str', default=None),
+            user=dict(type='str'),
+            user_known_hosts_file=dict(type='str'),
         ),
         supports_check_mode=True,
         mutually_exclusive=[

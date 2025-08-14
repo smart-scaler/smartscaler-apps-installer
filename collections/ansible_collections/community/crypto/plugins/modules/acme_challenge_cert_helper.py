@@ -1,14 +1,9 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2018 Felix Fontein <felix@fontein.de>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -26,10 +21,9 @@ seealso:
   - name: ACME TLS ALPN Challenge Extension
     description: The specification of the C(tls-alpn-01) challenge (RFC 8737).
     link: https://www.rfc-editor.org/rfc/rfc8737.html
-requirements:
-  - "cryptography >= 1.3"
 extends_documentation_fragment:
-  - community.crypto.attributes
+  - community.crypto._attributes
+  - community.crypto._cryptography_dep.minimum
 attributes:
   check_mode:
     support: none
@@ -83,6 +77,7 @@ EXAMPLES = r"""
     challenge: tls-alpn-01
     csr: /etc/pki/cert/csr/sample.com.csr
     dest: /etc/httpd/ssl/sample.com.crt
+    modify_account: false
   register: sample_com_challenge
 
 - name: Create certificates for challenges
@@ -116,6 +111,7 @@ EXAMPLES = r"""
     csr: /etc/pki/cert/csr/sample.com.csr
     dest: /etc/httpd/ssl/sample.com.crt
     data: "{{ sample_com_challenge }}"
+    modify_account: false
 """
 
 RETURN = r"""
@@ -154,103 +150,85 @@ regular_certificate:
 
 import base64
 import datetime
-import sys
-import traceback
+import ipaddress
+import typing as t
 
-from ansible.module_utils.basic import AnsibleModule, missing_required_lib
+from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.text.converters import to_bytes, to_text
-from ansible_collections.community.crypto.plugins.module_utils.acme.errors import (
+from ansible_collections.community.crypto.plugins.module_utils._acme.errors import (
     ModuleFailException,
 )
-from ansible_collections.community.crypto.plugins.module_utils.acme.io import read_file
-from ansible_collections.community.crypto.plugins.module_utils.crypto.cryptography_support import (
+from ansible_collections.community.crypto.plugins.module_utils._acme.io import read_file
+from ansible_collections.community.crypto.plugins.module_utils._crypto.cryptography_support import (
     CRYPTOGRAPHY_TIMEZONE,
     set_not_valid_after,
     set_not_valid_before,
 )
-from ansible_collections.community.crypto.plugins.module_utils.time import (
+from ansible_collections.community.crypto.plugins.module_utils._cryptography_dep import (
+    COLLECTION_MINIMUM_CRYPTOGRAPHY_VERSION,
+    assert_required_cryptography_version,
+)
+from ansible_collections.community.crypto.plugins.module_utils._time import (
     get_now_datetime,
 )
-from ansible_collections.community.crypto.plugins.module_utils.version import (
-    LooseVersion,
-)
 
 
-CRYPTOGRAPHY_IMP_ERR = None
 try:
-    import ipaddress
-
     import cryptography
     import cryptography.hazmat.backends
+    import cryptography.hazmat.primitives.asymmetric.dh
     import cryptography.hazmat.primitives.asymmetric.ec
     import cryptography.hazmat.primitives.asymmetric.padding
     import cryptography.hazmat.primitives.asymmetric.rsa
     import cryptography.hazmat.primitives.asymmetric.utils
+    import cryptography.hazmat.primitives.asymmetric.x448
+    import cryptography.hazmat.primitives.asymmetric.x25519
     import cryptography.hazmat.primitives.hashes
     import cryptography.hazmat.primitives.serialization
     import cryptography.x509
     import cryptography.x509.oid
-
-    HAS_CRYPTOGRAPHY = LooseVersion(cryptography.__version__) >= LooseVersion("1.3")
-    _cryptography_backend = cryptography.hazmat.backends.default_backend()
 except ImportError:
-    CRYPTOGRAPHY_IMP_ERR = traceback.format_exc()
-    HAS_CRYPTOGRAPHY = False
+    pass
 
 
 # Convert byte string to ASN1 encoded octet string
-if sys.version_info[0] >= 3:
-
-    def encode_octet_string(octet_string):
-        if len(octet_string) >= 128:
-            raise ModuleFailException(
-                "Cannot handle octet strings with more than 128 bytes"
-            )
-        return bytes([0x4, len(octet_string)]) + octet_string
-
-else:
-
-    def encode_octet_string(octet_string):
-        if len(octet_string) >= 128:
-            raise ModuleFailException(
-                "Cannot handle octet strings with more than 128 bytes"
-            )
-        return b"\x04" + chr(len(octet_string)) + octet_string
+def encode_octet_string(octet_string: bytes) -> bytes:
+    if len(octet_string) >= 128:
+        raise ModuleFailException(
+            "Cannot handle octet strings with more than 128 bytes"
+        )
+    return bytes([0x4, len(octet_string)]) + octet_string
 
 
-def main():
+def main() -> t.NoReturn:
     module = AnsibleModule(
-        argument_spec=dict(
-            challenge=dict(type="str", required=True, choices=["tls-alpn-01"]),
-            challenge_data=dict(type="dict", required=True),
-            private_key_src=dict(type="path"),
-            private_key_content=dict(type="str", no_log=True),
-            private_key_passphrase=dict(type="str", no_log=True),
-        ),
+        argument_spec={
+            "challenge": {"type": "str", "required": True, "choices": ["tls-alpn-01"]},
+            "challenge_data": {"type": "dict", "required": True},
+            "private_key_src": {"type": "path"},
+            "private_key_content": {"type": "str", "no_log": True},
+            "private_key_passphrase": {"type": "str", "no_log": True},
+        },
         required_one_of=(["private_key_src", "private_key_content"],),
         mutually_exclusive=(["private_key_src", "private_key_content"],),
     )
-    if not HAS_CRYPTOGRAPHY:
-        # Some callbacks die when exception is provided with value None
-        if CRYPTOGRAPHY_IMP_ERR:
-            module.fail_json(
-                msg=missing_required_lib("cryptography >= 1.3"),
-                exception=CRYPTOGRAPHY_IMP_ERR,
-            )
-        module.fail_json(msg=missing_required_lib("cryptography >= 1.3"))
+
+    assert_required_cryptography_version(
+        module, minimum_cryptography_version=COLLECTION_MINIMUM_CRYPTOGRAPHY_VERSION
+    )
 
     try:
         # Get parameters
-        challenge = module.params["challenge"]
-        challenge_data = module.params["challenge_data"]
+        challenge: t.Literal["tls-alpn-01"] = module.params["challenge"]
+        challenge_data: dict[str, t.Any] = module.params["challenge_data"]
 
         # Get hold of private key
-        private_key_content = module.params.get("private_key_content")
-        private_key_passphrase = module.params.get("private_key_passphrase")
-        if private_key_content is None:
+        private_key_content_str: str | None = module.params["private_key_content"]
+        private_key_passphrase: str | None = module.params["private_key_passphrase"]
+        if private_key_content_str is None:
             private_key_content = read_file(module.params["private_key_src"])
         else:
-            private_key_content = to_bytes(private_key_content)
+            private_key_content = to_bytes(private_key_content_str)
         try:
             private_key = (
                 cryptography.hazmat.primitives.serialization.load_pem_private_key(
@@ -260,11 +238,21 @@ def main():
                         if private_key_passphrase is not None
                         else None
                     ),
-                    backend=_cryptography_backend,
                 )
             )
         except Exception as e:
-            raise ModuleFailException("Error while loading private key: {0}".format(e))
+            raise ModuleFailException(f"Error while loading private key: {e}") from e
+        if isinstance(
+            private_key,
+            (
+                cryptography.hazmat.primitives.asymmetric.dh.DHPrivateKey,
+                cryptography.hazmat.primitives.asymmetric.x25519.X25519PrivateKey,
+                cryptography.hazmat.primitives.asymmetric.x448.X448PrivateKey,
+            ),
+        ):
+            raise ModuleFailException(
+                f"Cannot use private key type {type(private_key)}"
+            )
 
         # Some common attributes
         domain = to_text(challenge_data["resource"])
@@ -275,13 +263,14 @@ def main():
         now = get_now_datetime(with_timezone=CRYPTOGRAPHY_TIMEZONE)
         not_valid_before = now
         not_valid_after = now + datetime.timedelta(days=10)
+        san: cryptography.x509.GeneralName
         if identifier_type == "dns":
             san = cryptography.x509.DNSName(identifier)
         elif identifier_type == "ip":
             san = cryptography.x509.IPAddress(ipaddress.ip_address(identifier))
         else:
             raise ModuleFailException(
-                'Unsupported identifier type "{0}"'.format(identifier_type)
+                f'Unsupported identifier type "{identifier_type}"'
             )
 
         # Generate regular self-signed certificate
@@ -301,7 +290,6 @@ def main():
         regular_certificate = cert_builder.sign(
             private_key,
             cryptography.hazmat.primitives.hashes.SHA256(),
-            _cryptography_backend,
         )
 
         # Process challenge
@@ -330,8 +318,9 @@ def main():
             challenge_certificate = cert_builder.sign(
                 private_key,
                 cryptography.hazmat.primitives.hashes.SHA256(),
-                _cryptography_backend,
             )
+        else:
+            raise AssertionError("Can never be reached")  # pragma: no cover
 
         module.exit_json(
             changed=True,
@@ -346,7 +335,7 @@ def main():
             ),
         )
     except ModuleFailException as e:
-        e.do_fail(module)
+        e.do_fail(module=module)
 
 
 if __name__ == "__main__":

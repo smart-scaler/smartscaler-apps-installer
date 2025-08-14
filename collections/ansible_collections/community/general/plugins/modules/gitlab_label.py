@@ -12,8 +12,8 @@ module: gitlab_label
 short_description: Creates/updates/deletes GitLab Labels belonging to project or group
 version_added: 8.3.0
 description:
-  - When a label does not exist, it will be created.
-  - When a label does exist, its value will be updated when the values are different.
+  - When a label does not exist, it is created.
+  - When a label does exist, its value is updated when the values are different.
   - Labels can be purged.
 author:
   - "Gabriele Pongelli (@gpongelli)"
@@ -197,22 +197,22 @@ labels:
       description: A list of labels which were created.
       returned: always
       type: list
-      sample: ['abcd', 'label-one']
+      sample: ["abcd", "label-one"]
     untouched:
       description: A list of labels which exist.
       returned: always
       type: list
-      sample: ['defg', 'new-label']
+      sample: ["defg", "new-label"]
     removed:
       description: A list of labels which were deleted.
       returned: always
       type: list
-      sample: ['defg', 'new-label']
+      sample: ["defg", "new-label"]
     updated:
       description: A list pre-existing labels whose values have been set.
       returned: always
       type: list
-      sample: ['defg', 'new-label']
+      sample: ["defg", "new-label"]
 labels_obj:
   description: API object.
   returned: success
@@ -410,16 +410,16 @@ def main():
     argument_spec = basic_auth_argument_spec()
     argument_spec.update(auth_argument_spec())
     argument_spec.update(
-        project=dict(type='str', required=False, default=None),
-        group=dict(type='str', required=False, default=None),
-        purge=dict(type='bool', required=False, default=False),
-        labels=dict(type='list', elements='dict', required=False, default=list(),
+        project=dict(type='str'),
+        group=dict(type='str'),
+        purge=dict(type='bool', default=False),
+        labels=dict(type='list', elements='dict', default=list(),
                     options=dict(
                         name=dict(type='str', required=True),
-                        color=dict(type='str', required=False),
-                        description=dict(type='str', required=False),
-                        priority=dict(type='int', required=False),
-                        new_name=dict(type='str', required=False),)
+                        color=dict(type='str'),
+                        description=dict(type='str'),
+                        priority=dict(type='int'),
+                        new_name=dict(type='str'),)
                     ),
         state=dict(type='str', default="present", choices=["absent", "present"]),
     )

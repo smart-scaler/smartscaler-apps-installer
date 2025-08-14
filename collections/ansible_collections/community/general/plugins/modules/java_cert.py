@@ -32,7 +32,7 @@ options:
   cert_port:
     description:
       - Port to connect to URL.
-      - This will be used to create server URL:PORT.
+      - This is used to create server URL:PORT.
     type: int
     default: 443
   cert_path:
@@ -98,8 +98,8 @@ options:
   state:
     description:
       - Defines action which can be either certificate import or removal.
-      - When state is present, the certificate will always idempotently be inserted into the keystore, even if there already
-        exists a cert alias that is different.
+      - When O(state=present), the certificate is always inserted into the keystore, even if there already exists a cert alias
+        that is different.
     type: str
     choices: [absent, present]
     default: present
@@ -197,18 +197,6 @@ EXAMPLES = r"""
 """
 
 RETURN = r"""
-msg:
-  description: Output from stdout of keytool command after execution of given command.
-  returned: success
-  type: str
-  sample: "Module require existing keystore at keystore_path '/tmp/test/cacerts'"
-
-rc:
-  description: Keytool command execution return value.
-  returned: success
-  type: int
-  sample: "0"
-
 cmd:
   description: Executed command to get action done.
   returned: success

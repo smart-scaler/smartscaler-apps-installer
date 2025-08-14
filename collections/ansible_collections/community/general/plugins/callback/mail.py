@@ -11,7 +11,7 @@ name: mail
 type: notification
 short_description: Sends failure events through email
 description:
-  - This callback will report failures through email.
+  - This callback reports failures through email.
 author:
   - Dag Wieers (@dagwieers)
 requirements:
@@ -212,7 +212,8 @@ class CallbackModule(CallbackBase):
         if self.itembody:
             body += self.itembody
         elif result._result.get('failed_when_result') is True:
-            fail_cond = self.indent('failed_when:\n- ' + '\n- '.join(result._task.failed_when))
+            fail_cond_list = '\n- '.join(result._task.failed_when)
+            fail_cond = self.indent(f"failed_when:\n- {fail_cond_list}")
             body += f"due to the following condition:\n\n{fail_cond}\n\n"
         elif result._result.get('msg'):
             body += self.body_blob(result._result['msg'], 'message')

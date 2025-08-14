@@ -16,7 +16,7 @@ short_description: Manage Solaris SVR4 packages
 description:
   - Manages SVR4 packages on Solaris 10 and 11.
   - These were the native packages on Solaris <= 10 and are available as a legacy feature in Solaris 11.
-  - Note that this is a very basic packaging system. It will not enforce dependencies on install or remove.
+  - Note that this is a very basic packaging system. It does not enforce dependencies on install or remove.
 author: "Boyd Adamson (@brontitall)"
 extends_documentation_fragment:
   - community.general.attributes
@@ -192,10 +192,10 @@ def main():
         argument_spec=dict(
             name=dict(required=True),
             state=dict(required=True, choices=['present', 'absent']),
-            src=dict(default=None),
-            proxy=dict(default=None),
-            response_file=dict(default=None),
-            zone=dict(required=False, default='all', choices=['current', 'all']),
+            src=dict(),
+            proxy=dict(),
+            response_file=dict(),
+            zone=dict(default='all', choices=['current', 'all']),
             category=dict(default=False, type='bool')
         ),
         supports_check_mode=True

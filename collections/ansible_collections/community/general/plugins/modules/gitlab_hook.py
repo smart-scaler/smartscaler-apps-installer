@@ -45,8 +45,8 @@ options:
     type: str
   state:
     description:
-      - When V(present) the hook will be updated to match the input or created if it does not exist.
-      - When V(absent) hook will be deleted if it exists.
+      - When V(present) the hook is updated to match the input or created if it does not exist.
+      - When V(absent) hook is deleted if it exists.
     default: present
     type: str
     choices: ["present", "absent"]
@@ -103,15 +103,15 @@ options:
     version_added: '8.4.0'
   hook_validate_certs:
     description:
-      - Whether GitLab will do SSL verification when triggering the hook.
+      - Whether GitLab performs SSL verification when triggering the hook.
     type: bool
     default: false
     aliases: [enable_ssl_verification]
   token:
     description:
       - Secret token to validate hook messages at the receiver.
-      - If this is present it will always result in a change as it cannot be retrieved from GitLab.
-      - Will show up in the X-GitLab-Token HTTP request header.
+      - If this is present it always results in a change as it cannot be retrieved from GitLab.
+      - It shows up in the C(X-GitLab-Token) HTTP request header.
     required: false
     type: str
 """
@@ -271,7 +271,7 @@ class GitLabHook(object):
     '''
     def find_hook(self, project, hook_url):
         for hook in project.hooks.list(**list_all_kwargs):
-            if (hook.url == hook_url):
+            if hook.url == hook_url:
                 return hook
 
     '''
@@ -307,7 +307,7 @@ def main():
         job_events=dict(type='bool', default=False),
         pipeline_events=dict(type='bool', default=False),
         wiki_page_events=dict(type='bool', default=False),
-        releases_events=dict(type='bool', default=None),
+        releases_events=dict(type='bool'),
         hook_validate_certs=dict(type='bool', default=False, aliases=['enable_ssl_verification']),
         token=dict(type='str', no_log=True),
     ))

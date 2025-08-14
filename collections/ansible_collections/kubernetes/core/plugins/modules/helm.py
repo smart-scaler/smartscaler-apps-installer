@@ -237,6 +237,20 @@ options:
     default: False
     aliases: [ skip_tls_certs_check ]
     version_added: 5.3.0
+  plain_http:
+    description:
+      - Use HTTP instead of HTTPS when working with OCI registries
+      - Requires Helm >= 3.13.0
+    type: bool
+    default: False
+    version_added: 6.1.0
+  take_ownership:
+    description:
+      - When upgrading, Helm will ignore the check for helm annotations and take ownership of the existing resources
+      - This feature requires helm >= 3.17.0
+    type: bool
+    default: False
+    version_added: 6.1.0
 extends_documentation_fragment:
   - kubernetes.core.helm_common_options
 """
@@ -318,6 +332,12 @@ EXAMPLES = r"""
     name: test
     chart_ref: "https://github.com/grafana/helm-charts/releases/download/grafana-5.6.0/grafana-5.6.0.tgz"
     release_namespace: monitoring
+
+- name: Deploy Bitnami's MongoDB latest chart from OCI registry
+  kubernetes.core.helm:
+    name: test
+    chart_ref: "oci://registry-1.docker.io/bitnamicharts/mongodb"
+    release_namespace: database
 
 # Using complex Values
 - name: Deploy new-relic client chart
@@ -495,7 +515,9 @@ def run_dep_update(module, chart_ref):
     rc, out, err = module.run_helm_command(dep_update)
 
 
-def fetch_chart_info(module, command, chart_ref, insecure_skip_tls_verify=False):
+def fetch_chart_info(
+    module, command, chart_ref, insecure_skip_tls_verify=False, plain_http=False
+):
     """
     Get chart info
     """
@@ -503,6 +525,17 @@ def fetch_chart_info(module, command, chart_ref, insecure_skip_tls_verify=False)
 
     if insecure_skip_tls_verify:
         inspect_command += " --insecure-skip-tls-verify"
+
+    if plain_http:
+        helm_version = module.get_helm_version()
+        if LooseVersion(helm_version) < LooseVersion("3.13.0"):
+            module.fail_json(
+                msg="plain_http requires helm >= 3.13.0, current version is {0}".format(
+                    helm_version
+                )
+            )
+        else:
+            inspect_command += " --plain-http"
 
     rc, out, err = module.run_helm_command(inspect_command)
 
@@ -533,6 +566,8 @@ def deploy(
     reset_values=True,
     reset_then_reuse_values=False,
     insecure_skip_tls_verify=False,
+    plain_http=False,
+    take_ownership=False,
 ):
     """
     Install/upgrade/rollback release chart
@@ -546,6 +581,8 @@ def deploy(
         deploy_command = command + " upgrade -i"  # install/upgrade
         if reset_values:
             deploy_command += " --reset-values"
+        if take_ownership:
+            deploy_command += " --take-ownership"
 
     if reuse_values is not None:
         deploy_command += " --reuse-values=" + str(reuse_values)
@@ -594,6 +631,9 @@ def deploy(
             )
         else:
             deploy_command += " --insecure-skip-tls-verify"
+
+    if plain_http:
+        deploy_command += " --plain-http"
 
     if values_files:
         for value_file in values_files:
@@ -690,6 +730,7 @@ def helmdiff_check(
     reset_values=True,
     reset_then_reuse_values=False,
     insecure_skip_tls_verify=False,
+    plain_http=False,
 ):
     """
     Use helm diff to determine if a release would change by upgrading a chart.
@@ -744,6 +785,17 @@ def helmdiff_check(
 
     if insecure_skip_tls_verify:
         cmd += " --insecure-skip-tls-verify"
+
+    if plain_http:
+        helm_version = module.get_helm_version()
+        if LooseVersion(helm_version) < LooseVersion("3.13.0"):
+            module.fail_json(
+                msg="plain_http requires helm >= 3.13.0, current version is {0}".format(
+                    helm_version
+                )
+            )
+        else:
+            cmd += " --plain-http"
 
     rc, out, err = module.run_helm_command(cmd)
     return (len(out.strip()) > 0, out.strip())
@@ -808,6 +860,8 @@ def argument_spec():
             insecure_skip_tls_verify=dict(
                 type="bool", default=False, aliases=["skip_tls_certs_check"]
             ),
+            plain_http=dict(type="bool", default=False),
+            take_ownership=dict(type="bool", default=False),
         )
     )
     return arg_spec
@@ -862,6 +916,8 @@ def main():
     reset_values = module.params.get("reset_values")
     reset_then_reuse_values = module.params.get("reset_then_reuse_values")
     insecure_skip_tls_verify = module.params.get("insecure_skip_tls_verify")
+    plain_http = module.params.get("plain_http")
+    take_ownership = module.params.get("take_ownership")
 
     if update_repo_cache:
         run_repo_update(module)
@@ -871,6 +927,24 @@ def main():
     release_status = get_release_status(module, release_name, all_status=all_status)
 
     helm_cmd = module.get_helm_binary()
+
+    if plain_http:
+        helm_version = module.get_helm_version()
+        if LooseVersion(helm_version) < LooseVersion("3.13.0"):
+            module.fail_json(
+                msg="plain_http requires helm >= 3.13.0, current version is {0}".format(
+                    helm_version
+                )
+            )
+    if take_ownership:
+        helm_version = module.get_helm_version()
+        if LooseVersion(helm_version) < LooseVersion("3.17.0"):
+            module.fail_json(
+                msg="take_ownership requires helm >= 3.17.0, current version is {0}".format(
+                    helm_version
+                )
+            )
+
     opt_result = {}
     if release_state == "absent" and release_status is not None:
         # skip release statuses 'uninstalled' and 'uninstalling'
@@ -900,7 +974,7 @@ def main():
 
         # Fetch chart info to have real version and real name for chart_ref from archive, folder or url
         chart_info = fetch_chart_info(
-            module, helm_cmd, chart_ref, insecure_skip_tls_verify
+            module, helm_cmd, chart_ref, insecure_skip_tls_verify, plain_http
         )
 
         if dependency_update:
@@ -962,6 +1036,7 @@ def main():
                 reset_values=reset_values,
                 reset_then_reuse_values=reset_then_reuse_values,
                 insecure_skip_tls_verify=insecure_skip_tls_verify,
+                plain_http=plain_http,
             )
             changed = True
 
@@ -989,6 +1064,7 @@ def main():
                     reset_values=reset_values,
                     reset_then_reuse_values=reset_then_reuse_values,
                     insecure_skip_tls_verify=insecure_skip_tls_verify,
+                    plain_http=plain_http,
                 )
                 if would_change and module._diff:
                     opt_result["diff"] = {"prepared": prepared}
@@ -1026,6 +1102,8 @@ def main():
                     reset_values=reset_values,
                     reset_then_reuse_values=reset_then_reuse_values,
                     insecure_skip_tls_verify=insecure_skip_tls_verify,
+                    plain_http=plain_http,
+                    take_ownership=take_ownership,
                 )
                 changed = True
 

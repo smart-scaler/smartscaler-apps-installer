@@ -19,19 +19,26 @@ Ansible-based installer for Smart Scaler components and Kubernetes cluster deplo
 
 ## 1. Prerequisites for Deploying K8s Cluster
 
+### Deployment Options
+
+This installer supports two Kubernetes deployment methods:
+
+1. **Kubespray (Full Kubernetes)** - Traditional Kubernetes deployment with full feature set
+2. **K3s (Lightweight Kubernetes)** - Lightweight Kubernetes distribution for edge, IoT, and resource-constrained environments
+
 ### System Requirements
 
 #### Control Plane Nodes (Master)
 
-- **CPU**: 8 cores minimum
-- **RAM**: 16GB minimum
+- **CPU**: 8 cores minimum (Kubespray) / 2 cores minimum (K3s)
+- **RAM**: 16GB minimum (Kubespray) / 2GB minimum (K3s)
 - **Storage**: 500GB minimum (Depends on NIM Profile Requirements for loading Image/Nim Cache PVC Requirements)
 - **OS**: Ubuntu 22.04+ or compatible Linux distribution
 
 #### Worker Nodes (Optional)
 
-- **CPU**: 8 cores minimum
-- **RAM**: 16GB minimum
+- **CPU**: 8 cores minimum (Kubespray) / 2 cores minimum (K3s)
+- **RAM**: 16GB minimum (Kubespray) / 2GB minimum (K3s)
 - **Storage**: 500GB minimum (Depends on NIM Profile Requirements for loading Image/Nim Cache PVC Requirements)
 - **OS**: Same as control plane nodes
 
@@ -95,6 +102,7 @@ This section defines the settings required to enable and configure a Kubernetes 
 #### 🔧 **Note**: Replace placeholders with actual values before running the playbook.
 
 ```yaml
+# For Kubespray (Full Kubernetes)
 kubernetes_deployment:
   enabled: true  # Enable Kubernetes deployment via Ansible
 
@@ -115,6 +123,16 @@ kubernetes_deployment:
       ansible_become_method: "sudo"
       ansible_become_user: "root"
       private_ip: "PRIVATE_IP"        # Internal/private IP
+
+# For K3s (Lightweight Kubernetes) - Alternative to kubespray
+k3s_deployment:
+  enabled: true  # Enable K3s deployment via k3s-ansible
+  k3s_version: "v1.28.0+k3s1"
+  k3s_config:
+    service_cidr: "10.43.0.0/16"
+    cluster_cidr: "10.42.0.0/16"
+    cni: "flannel"
+    use_external_database: false
 
 ```
 
@@ -153,13 +171,32 @@ If you're deploying on a **single node** and running the command from the **same
 
 ### Step 2.4: Deploy Kubernetes Cluster
 
+#### Option A: Deploy with Kubespray (Full Kubernetes)
+
 ```bash
 # Make the script executable
 chmod +x setup_kubernetes.sh
 
 # Run the installation script with sudo
- ./setup_kubernetes.sh
+./setup_kubernetes.sh
 ```
+
+#### Option B: Deploy with K3s (Lightweight Kubernetes)
+
+**Method 1: Setup and Deploy (Recommended)**
+```bash
+# Setup, validate, and deploy in one command
+chmod +x setup_k3s.sh
+./setup_k3s.sh
+```
+
+**Method 2: Using Generated Playbooks**
+```bash
+# Deploy K3s cluster using integrated playbook
+ansible-playbook k3s.yml
+```
+
+**Note**: K3s deployment uses the same node configuration as kubespray from the `kubernetes_deployment` section.
 
 ### Step 2.5 Change ownership of the smartscaler working directory
 
@@ -167,7 +204,9 @@ chmod +x setup_kubernetes.sh
 sudo chown $(whoami):$(whoami) -R .
 
 # Set the KUBECONFIG environment variable
-export KUBECONFIG=output/kubeconfig
+# For Kubespray: export KUBECONFIG=output/kubeconfig
+# For K3s: export KUBECONFIG=output/k3s-kubeconfig
+export KUBECONFIG=output/kubeconfig  # or output/k3s-kubeconfig for K3s
 
 # Verify cluster access and node status
 kubectl get nodes

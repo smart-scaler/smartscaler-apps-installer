@@ -39,8 +39,8 @@ options:
     default: http://localhost:8080
   validate_certs:
     description:
-      - If set to V(false), the SSL certificates will not be validated. This should only set to V(false) used on personally
-        controlled sites using self-signed certificates as it avoids verifying the source site.
+      - If set to V(false), the SSL certificates are not validated. This should only set to V(false) used on personally controlled
+        sites using self-signed certificates as it avoids verifying the source site.
     type: bool
     default: true
   user:
@@ -142,12 +142,12 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             script=dict(required=True, type="str"),
-            url=dict(required=False, type="str", default="http://localhost:8080"),
-            validate_certs=dict(required=False, type="bool", default=True),
-            user=dict(required=False, type="str", default=None),
-            password=dict(required=False, no_log=True, type="str", default=None),
-            timeout=dict(required=False, type="int", default=10),
-            args=dict(required=False, type="dict", default=None)
+            url=dict(type="str", default="http://localhost:8080"),
+            validate_certs=dict(type="bool", default=True),
+            user=dict(type="str"),
+            password=dict(no_log=True, type="str"),
+            timeout=dict(type="int", default=10),
+            args=dict(type="dict")
         )
     )
 

@@ -35,7 +35,7 @@ options:
     type: str
   label:
     description:
-      - Label for the key. If you keep it empty, it will be read from key string.
+      - Label for the key. If you keep it empty, it is read from key string.
     type: str
     aliases: [name]
   id:
@@ -85,11 +85,6 @@ EXAMPLES = r"""
 """
 
 RETURN = r"""
-changed:
-  description: True if a sshkey was created or removed.
-  type: bool
-  sample: true
-  returned: always
 sshkeys:
   description: Information about sshkeys that were created/removed.
   type: list

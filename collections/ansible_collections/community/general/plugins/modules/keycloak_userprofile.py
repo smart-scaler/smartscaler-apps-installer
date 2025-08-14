@@ -33,9 +33,8 @@ options:
   state:
     description:
       - State of the User Profile provider.
-      - On V(present), the User Profile provider will be created if it does not yet exist, or updated with the parameters
-        you provide.
-      - On V(absent), the User Profile provider will be removed if it exists.
+      - On V(present), the User Profile provider is created if it does not yet exist, or updated with the parameters you provide.
+      - On V(absent), the User Profile provider is removed if it exists.
     default: 'present'
     type: str
     choices:
@@ -171,7 +170,7 @@ options:
 
               group:
                 description:
-                  - Specifies the User Profile group where this attribute will be added.
+                  - Specifies the User Profile group where this attribute is added.
                 type: str
 
               permissions:
@@ -406,7 +405,6 @@ data:
   description: The data returned by the Keycloak API.
   returned: when state is present
   type: dict
-  sample: {'...': '...'}
 """
 
 from ansible_collections.community.general.plugins.module_utils.identity.keycloak.keycloak import KeycloakAPI, camel, \
@@ -456,7 +454,6 @@ def main():
         ),
         config=dict(
             type='dict',
-            required=False,
             options={
                 'kc_user_profile_config': dict(
                     type='list',
@@ -466,7 +463,6 @@ def main():
                         'attributes': dict(
                             type='list',
                             elements='dict',
-                            required=False,
                             options={
                                 'name': dict(type='str', required=True),
                                 'display_name': dict(type='str', aliases=['displayName'], required=True),
@@ -476,17 +472,17 @@ def main():
                                         'length': dict(
                                             type='dict',
                                             options={
-                                                'min': dict(type='int', required=False),
+                                                'min': dict(type='int'),
                                                 'max': dict(type='int', required=True)
                                             }
                                         ),
-                                        'email': dict(type='dict', required=False),
-                                        'username_prohibited_characters': dict(type='dict', aliases=['usernameProhibitedCharacters'], required=False),
-                                        'up_username_not_idn_homograph': dict(type='dict', aliases=['upUsernameNotIdnHomograph'], required=False),
-                                        'person_name_prohibited_characters': dict(type='dict', aliases=['personNameProhibitedCharacters'], required=False),
-                                        'uri': dict(type='dict', required=False),
-                                        'pattern': dict(type='dict', required=False),
-                                        'options': dict(type='dict', required=False)
+                                        'email': dict(type='dict'),
+                                        'username_prohibited_characters': dict(type='dict', aliases=['usernameProhibitedCharacters']),
+                                        'up_username_not_idn_homograph': dict(type='dict', aliases=['upUsernameNotIdnHomograph']),
+                                        'person_name_prohibited_characters': dict(type='dict', aliases=['personNameProhibitedCharacters']),
+                                        'uri': dict(type='dict'),
+                                        'pattern': dict(type='dict'),
+                                        'options': dict(type='dict')
                                     }
                                 ),
                                 'annotations': dict(type='dict'),
@@ -513,15 +509,15 @@ def main():
                             options={
                                 'name': dict(type='str', required=True),
                                 'display_header': dict(type='str', aliases=['displayHeader'], required=True),
-                                'display_description': dict(type='str', aliases=['displayDescription'], required=False),
-                                'annotations': dict(type='dict', required=False)
+                                'display_description': dict(type='str', aliases=['displayDescription']),
+                                'annotations': dict(type='dict')
                             }
                         ),
                         'unmanaged_attribute_policy': dict(
                             type='str',
                             aliases=['unmanagedAttributePolicy'],
                             choices=['ENABLED', 'ADMIN_EDIT', 'ADMIN_VIEW'],
-                            required=False
+
                         )
                     }
                 )
@@ -533,8 +529,8 @@ def main():
 
     module = AnsibleModule(argument_spec=argument_spec,
                            supports_check_mode=True,
-                           required_one_of=([['token', 'auth_realm', 'auth_username', 'auth_password']]),
-                           required_together=([['auth_realm', 'auth_username', 'auth_password']]),
+                           required_one_of=([['token', 'auth_realm', 'auth_username', 'auth_password', 'auth_client_id', 'auth_client_secret']]),
+                           required_together=([['auth_username', 'auth_password']]),
                            required_by={'refresh_token': 'auth_realm'},
                            )
 

@@ -56,8 +56,7 @@ options:
   state:
     description:
       - The desired state for the target VLAN.
-      - V(readonly) ensures that the state is only ever read, not modified (the module will fail if the resource does not
-        exist).
+      - V(readonly) ensures that the state is only ever read, not modified (the module fails if the resource does not exist).
     choices: [present, absent, readonly]
     default: present
     type: str
@@ -65,7 +64,7 @@ options:
     description:
       - Permit expansion of the target VLAN's network if the module parameters specify a larger network than the VLAN currently
         possesses.
-      - If V(false), the module will fail under these conditions.
+      - If V(false), the module fails under these conditions.
       - This is intended to prevent accidental expansion of a VLAN's network (since this operation is not reversible).
     type: bool
     default: false
@@ -187,7 +186,7 @@ class DimensionDataVlanModule(DimensionDataModule):
                     network_domain=dict(required=True, type='str'),
                     private_ipv4_base_address=dict(default='', type='str'),
                     private_ipv4_prefix_size=dict(default=0, type='int'),
-                    allow_expand=dict(required=False, default=False, type='bool'),
+                    allow_expand=dict(default=False, type='bool'),
                     state=dict(default='present', choices=['present', 'absent', 'readonly'])
                 ),
                 required_together=DimensionDataModule.required_together()

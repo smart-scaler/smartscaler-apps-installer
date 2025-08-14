@@ -1,15 +1,10 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2017, Yanis Guenane <yanis+ansible@guenane.org>
 # Copyright (c) 2020, Felix Fontein <felix@fontein.de>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -23,16 +18,13 @@ author:
   - Yanis Guenane (@Spredzy)
   - Felix Fontein (@felixfontein)
 extends_documentation_fragment:
-  - community.crypto.attributes
-  - community.crypto.module_csr
+  - community.crypto._attributes
+  - community.crypto._module_csr
 attributes:
   check_mode:
     support: full
     details:
-      - Currently in check mode, private keys will not be (re-)generated, only the changed status is set. This will change
-        in community.crypto 3.0.0.
-      - From community.crypto 3.0.0 on, the module will ignore check mode and always behave as if check mode is not active.
-        If you think this breaks your use-case of this module, please create an issue in the community.crypto repository.
+      - Since community.crypto 3.0.0, the module ignores check mode and always behaves as if check mode is not active.
 options:
   content:
     description:
@@ -135,43 +127,44 @@ csr:
   type: str
 """
 
-from ansible.module_utils.common.text.converters import to_native
-from ansible_collections.community.crypto.plugins.module_utils.crypto.basic import (
+import typing as t
+
+from ansible_collections.community.crypto.plugins.module_utils._crypto.basic import (
     OpenSSLObjectError,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.module_backends.csr import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.module_backends.csr import (
     get_csr_argument_spec,
     select_backend,
 )
 
 
-class CertificateSigningRequestModule(object):
-    def __init__(self, module, module_backend):
+if t.TYPE_CHECKING:
+    from ansible.module_utils.basic import AnsibleModule  # pragma: no cover
+    from ansible_collections.community.crypto.plugins.module_utils._crypto.module_backends.csr import (  # pragma: no cover
+        CertificateSigningRequestBackend,
+    )
+
+
+class CertificateSigningRequestModule:
+    def __init__(
+        self, module: AnsibleModule, module_backend: CertificateSigningRequestBackend
+    ) -> None:
         self.check_mode = module.check_mode
         self.module = module
         self.module_backend = module_backend
         self.changed = False
         if module.params["content"] is not None:
-            self.module_backend.set_existing(module.params["content"].encode("utf-8"))
+            self.module_backend.set_existing(
+                csr_bytes=module.params["content"].encode("utf-8")
+            )
 
-    def generate(self, module):
+    def generate(self, module: AnsibleModule) -> None:
         """Generate the certificate signing request."""
         if self.module_backend.needs_regeneration():
-            if not self.check_mode:
-                self.module_backend.generate_csr()
-            else:
-                self.module.deprecate(
-                    "Check mode support for openssl_csr_pipe will change in community.crypto 3.0.0"
-                    " to behave the same as without check mode. You can get that behavior right now"
-                    " by adding `check_mode: false` to the openssl_csr_pipe task. If you think this"
-                    " breaks your use-case of this module, please create an issue in the"
-                    " community.crypto repository",
-                    version="3.0.0",
-                    collection_name="community.crypto",
-                )
+            self.module_backend.generate_csr()
             self.changed = True
 
-    def dump(self):
+    def dump(self) -> dict[str, t.Any]:
         """Serialize the object into a dictionary."""
         result = self.module_backend.dump(include_csr=True)
         result.update(
@@ -182,27 +175,26 @@ class CertificateSigningRequestModule(object):
         return result
 
 
-def main():
+def main() -> t.NoReturn:
     argument_spec = get_csr_argument_spec()
     argument_spec.argument_spec.update(
-        dict(
-            content=dict(type="str"),
-        )
+        {
+            "content": {"type": "str"},
+        }
     )
     module = argument_spec.create_ansible_module(
         supports_check_mode=True,
     )
 
     try:
-        backend = module.params["select_crypto_backend"]
-        backend, module_backend = select_backend(module, backend)
+        module_backend = select_backend(module)
 
         csr = CertificateSigningRequestModule(module, module_backend)
         csr.generate(module)
         result = csr.dump()
         module.exit_json(**result)
     except OpenSSLObjectError as exc:
-        module.fail_json(msg=to_native(exc))
+        module.fail_json(msg=str(exc))
 
 
 if __name__ == "__main__":

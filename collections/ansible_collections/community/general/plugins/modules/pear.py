@@ -47,14 +47,14 @@ options:
     description:
       - List of regular expressions that can be used to detect prompts during pear package installation to answer the expected
         question.
-      - Prompts will be processed in the same order as the packages list.
+      - Prompts are processed in the same order as the packages list.
       - You can optionally specify an answer to any question in the list.
-      - If no answer is provided, the list item will only contain the regular expression.
-      - "To specify an answer, the item will be a dict with the regular expression as key and the answer as value C(my_regular_expression:
+      - If no answer is provided, the list item must contain only the regular expression.
+      - "To specify an answer, the item must be a dictionary with the regular expression as key and the answer as value C(my_regular_expression:
         'an_answer')."
       - You can provide a list containing items with or without answer.
-      - A prompt list can be shorter or longer than the packages list but will issue a warning.
-      - If you want to specify that a package will not need prompts in the middle of a list, V(null).
+      - A prompt list can be shorter or longer than the packages list but it issues a warning.
+      - If you want to specify that a package does not need prompts in the middle of a list, V(null).
     type: list
     elements: raw
     version_added: 0.2.0
@@ -151,33 +151,32 @@ def get_repository_version(pear_output):
     return None
 
 
-def query_package(module, name, state="present"):
+def query_package(module, name):
     """Query the package status in both the local system and the repository.
     Returns a boolean to indicate if the package is installed,
     and a second boolean to indicate if the package is up-to-date."""
-    if state == "present":
-        lcmd = "%s info %s" % (_get_pear_path(module), name)
-        lrc, lstdout, lstderr = module.run_command(lcmd, check_rc=False)
-        if lrc != 0:
-            # package is not installed locally
-            return False, False
-
-        rcmd = "%s remote-info %s" % (_get_pear_path(module), name)
-        rrc, rstdout, rstderr = module.run_command(rcmd, check_rc=False)
-
-        # get the version installed locally (if any)
-        lversion = get_local_version(rstdout)
-
-        # get the version in the repository
-        rversion = get_repository_version(rstdout)
-
-        if rrc == 0:
-            # Return True to indicate that the package is installed locally,
-            # and the result of the version number comparison
-            # to determine if the package is up-to-date.
-            return True, (lversion == rversion)
-
+    lcmd = [_get_pear_path(module), "info", name]
+    lrc, lstdout, lstderr = module.run_command(lcmd, check_rc=False)
+    if lrc != 0:
+        # package is not installed locally
         return False, False
+
+    rcmd = [_get_pear_path(module), "remote-info", name]
+    rrc, rstdout, rstderr = module.run_command(rcmd, check_rc=False)
+
+    # get the version installed locally (if any)
+    lversion = get_local_version(rstdout)
+
+    # get the version in the repository
+    rversion = get_repository_version(rstdout)
+
+    if rrc == 0:
+        # Return True to indicate that the package is installed locally,
+        # and the result of the version number comparison
+        # to determine if the package is up-to-date.
+        return True, (lversion == rversion)
+
+    return False, False
 
 
 def remove_packages(module, packages):
@@ -189,7 +188,7 @@ def remove_packages(module, packages):
         if not installed:
             continue
 
-        cmd = "%s uninstall %s" % (_get_pear_path(module), package)
+        cmd = [_get_pear_path(module), "uninstall", package]
         rc, stdout, stderr = module.run_command(cmd, check_rc=False)
 
         if rc != 0:
@@ -258,7 +257,7 @@ def install_packages(module, state, packages, prompts):
             prompt_regex = None
             data = default_stdin
 
-        cmd = "%s %s %s" % (_get_pear_path(module), command, package)
+        cmd = [_get_pear_path(module), command, package]
         rc, stdout, stderr = module.run_command(cmd, check_rc=False, prompt_regex=prompt_regex, data=data, binary_data=True)
         if rc != 0:
             module.fail_json(msg="failed to install %s: %s" % (package, to_text(stdout + stderr)))
@@ -293,8 +292,8 @@ def main():
         argument_spec=dict(
             name=dict(aliases=['pkg'], required=True),
             state=dict(default='present', choices=['present', 'installed', "latest", 'absent', 'removed']),
-            executable=dict(default=None, required=False, type='path'),
-            prompts=dict(default=None, required=False, type='list', elements='raw'),
+            executable=dict(type='path'),
+            prompts=dict(type='list', elements='raw'),
         ),
         supports_check_mode=True)
 

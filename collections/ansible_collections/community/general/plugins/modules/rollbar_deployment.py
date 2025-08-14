@@ -61,7 +61,7 @@ options:
     default: 'https://api.rollbar.com/api/1/deploy/'
   validate_certs:
     description:
-      - If V(false), SSL certificates for the target URL will not be validated. This should only be used on personally controlled
+      - If V(false), SSL certificates for the target URL are not validated. This should only be used on personally controlled
         sites using self-signed certificates.
     required: false
     default: true
@@ -100,13 +100,10 @@ def main():
             token=dict(required=True, no_log=True),
             environment=dict(required=True),
             revision=dict(required=True),
-            user=dict(required=False),
-            rollbar_user=dict(required=False),
-            comment=dict(required=False),
-            url=dict(
-                required=False,
-                default='https://api.rollbar.com/api/1/deploy/'
-            ),
+            user=dict(),
+            rollbar_user=dict(),
+            comment=dict(),
+            url=dict(default='https://api.rollbar.com/api/1/deploy/'),
             validate_certs=dict(default=True, type='bool'),
         ),
         supports_check_mode=True

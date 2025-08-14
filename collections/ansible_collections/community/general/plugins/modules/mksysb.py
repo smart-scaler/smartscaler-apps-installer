@@ -77,7 +77,7 @@ options:
   storage_path:
     type: str
     description:
-      - Storage path where the mksysb will stored.
+      - Storage path where the mksysb backup is stored.
     required: true
   use_snapshot:
     description:
@@ -96,10 +96,6 @@ EXAMPLES = r"""
 """
 
 RETURN = r"""
-changed:
-  description: Return changed for mksysb actions as true or false.
-  returned: always
-  type: bool
 msg:
   description: Return message regarding the action.
   returned: always

@@ -1,14 +1,9 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2024 Felix Fontein <felix@fontein.de>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = """
@@ -45,12 +40,12 @@ seealso:
   - module: community.crypto.acme_certificate_deactivate_authz
     description: Allows to deactivate (invalidate) ACME v2 orders.
 extends_documentation_fragment:
-  - community.crypto.acme.basic
-  - community.crypto.acme.account
-  - community.crypto.attributes
-  - community.crypto.attributes.actiongroup_acme
-  - community.crypto.attributes.idempotent_not_modify_state
-  - community.crypto.attributes.info_module
+  - community.crypto._acme.basic
+  - community.crypto._acme.account
+  - community.crypto._attributes
+  - community.crypto._attributes.actiongroup_acme
+  - community.crypto._attributes.idempotent_not_modify_state
+  - community.crypto._attributes.info_module
 options:
   order_uri:
     description:
@@ -180,10 +175,10 @@ order:
     replaces:
       description:
         - If the order was created to replace an existing certificate using the C(replaces) mechanism from
-          L(draft-ietf-acme-ari, https://datatracker.ietf.org/doc/draft-ietf-acme-ari/), this provides the
+          L(RFC 9773, https://www.rfc-editor.org/rfc/rfc9773.html), this provides the
           certificate ID of the certificate that will be replaced by this order.
       type: str
-      returned: when the certificate order is replacing a certificate through draft-ietf-acme-ari
+      returned: when the certificate order is replacing a certificate through RFC 9773
     profile:
       description:
         - If the ACME CA supports profiles through the L(draft-aaron-acme-profiles,
@@ -362,34 +357,34 @@ authorizations_by_status:
       returned: always
 """
 
-from ansible_collections.community.crypto.plugins.module_utils.acme.acme import (
+import typing as t
+
+from ansible_collections.community.crypto.plugins.module_utils._acme.acme import (
     create_backend,
     create_default_argspec,
 )
-from ansible_collections.community.crypto.plugins.module_utils.acme.certificate import (
+from ansible_collections.community.crypto.plugins.module_utils._acme.certificate import (
     ACMECertificateClient,
 )
-from ansible_collections.community.crypto.plugins.module_utils.acme.errors import (
+from ansible_collections.community.crypto.plugins.module_utils._acme.errors import (
     ModuleFailException,
 )
 
 
-def main():
+def main() -> t.NoReturn:
     argument_spec = create_default_argspec(with_certificate=False)
     argument_spec.update_argspec(
-        order_uri=dict(type="str", required=True),
+        order_uri={"type": "str", "required": True},
     )
     module = argument_spec.create_ansible_module(supports_check_mode=True)
-    if module.params["acme_version"] == 1:
-        module.fail_json("The module does not support acme_version=1")
 
-    backend = create_backend(module, False)
+    backend = create_backend(module, needs_acme_v2=False)
 
     try:
-        client = ACMECertificateClient(module, backend)
+        client = ACMECertificateClient(module=module, backend=backend)
         order = client.load_order()
-        authorizations_by_identifier = dict()
-        authorizations_by_status = {
+        authorizations_by_identifier: dict[str, dict[str, t.Any]] = {}
+        authorizations_by_status: dict[str, list[str]] = {
             "pending": [],
             "invalid": [],
             "valid": [],
@@ -399,7 +394,8 @@ def main():
         }
         for identifier, authz in order.authorizations.items():
             authorizations_by_identifier[identifier] = authz.to_json()
-            authorizations_by_status[authz.status].append(identifier)
+            if authz.status is not None:
+                authorizations_by_status[authz.status].append(identifier)
         module.exit_json(
             changed=False,
             account_uri=client.client.account_uri,
@@ -409,7 +405,7 @@ def main():
             authorizations_by_status=authorizations_by_status,
         )
     except ModuleFailException as e:
-        e.do_fail(module)
+        e.do_fail(module=module)
 
 
 if __name__ == "__main__":

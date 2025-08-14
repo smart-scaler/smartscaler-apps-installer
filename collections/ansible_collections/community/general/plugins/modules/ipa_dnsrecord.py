@@ -45,33 +45,31 @@ options:
       - Manage DNS record name with this value.
       - Mutually exclusive with O(record_values), and exactly one of O(record_value) and O(record_values) has to be specified.
       - Use O(record_values) if you need to specify multiple values.
-      - In the case of V(A) or V(AAAA) record types, this will be the IP address.
-      - In the case of V(A6) record type, this will be the A6 Record data.
-      - In the case of V(CNAME) record type, this will be the hostname.
-      - In the case of V(DNAME) record type, this will be the DNAME target.
-      - In the case of V(NS) record type, this will be the name server hostname. Hostname must already have a valid A or AAAA
-        record.
-      - In the case of V(PTR) record type, this will be the hostname.
-      - In the case of V(TXT) record type, this will be a text.
-      - In the case of V(SRV) record type, this will be a service record.
-      - In the case of V(MX) record type, this will be a mail exchanger record.
-      - In the case of V(SSHFP) record type, this will be an SSH fingerprint record.
+      - In the case of V(A) or V(AAAA) record types, this is the IP address.
+      - In the case of V(A6) record type, this is the A6 Record data.
+      - In the case of V(CNAME) record type, this is the hostname.
+      - In the case of V(DNAME) record type, this is the DNAME target.
+      - In the case of V(NS) record type, this is the name server hostname. Hostname must already have a valid A or AAAA record.
+      - In the case of V(PTR) record type, this is the hostname.
+      - In the case of V(TXT) record type, this is a text.
+      - In the case of V(SRV) record type, this is a service record.
+      - In the case of V(MX) record type, this is a mail exchanger record.
+      - In the case of V(SSHFP) record type, this is an SSH fingerprint record.
     type: str
   record_values:
     description:
       - Manage DNS record name with this value.
       - Mutually exclusive with O(record_value), and exactly one of O(record_value) and O(record_values) has to be specified.
-      - In the case of V(A) or V(AAAA) record types, this will be the IP address.
-      - In the case of V(A6) record type, this will be the A6 Record data.
-      - In the case of V(CNAME) record type, this will be the hostname.
-      - In the case of V(DNAME) record type, this will be the DNAME target.
-      - In the case of V(NS) record type, this will be the name server hostname. Hostname must already have a valid A or AAAA
-        record.
-      - In the case of V(PTR) record type, this will be the hostname.
-      - In the case of V(TXT) record type, this will be a text.
-      - In the case of V(SRV) record type, this will be a service record.
-      - In the case of V(MX) record type, this will be a mail exchanger record.
-      - In the case of V(SSHFP) record type, this will be an SSH fingerprint record.
+      - In the case of V(A) or V(AAAA) record types, this is the IP address.
+      - In the case of V(A6) record type, this is the A6 Record data.
+      - In the case of V(CNAME) record type, this is the hostname.
+      - In the case of V(DNAME) record type, this is the DNAME target.
+      - In the case of V(NS) record type, this is the name server hostname. Hostname must already have a valid A or AAAA record.
+      - In the case of V(PTR) record type, this is the hostname.
+      - In the case of V(TXT) record type, this is a text.
+      - In the case of V(SRV) record type, this is a service record.
+      - In the case of V(MX) record type, this is a mail exchanger record.
+      - In the case of V(SSHFP) record type, this is an SSH fingerprint record.
     type: list
     elements: str
   record_ttl:
@@ -88,6 +86,7 @@ options:
     type: str
 extends_documentation_fragment:
   - community.general.ipa.documentation
+  - community.general.ipa.connection_notes
   - community.general.attributes
 """
 
@@ -167,7 +166,7 @@ EXAMPLES = r"""
     state: absent
 
 - name: Ensure an NS record for a subdomain is present
-  community,general.ipa_dnsrecord:
+  community.general.ipa_dnsrecord:
     name: subdomain
     zone_name: example.com
     record_type: 'NS'
@@ -355,7 +354,7 @@ def main():
         record_value=dict(type='str'),
         record_values=dict(type='list', elements='str'),
         state=dict(type='str', default='present', choices=['present', 'absent']),
-        record_ttl=dict(type='int', required=False),
+        record_ttl=dict(type='int'),
     )
 
     module = AnsibleModule(

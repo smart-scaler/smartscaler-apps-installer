@@ -55,8 +55,8 @@ options:
     default: false
   state:
     description:
-      - When V(present) the deploy key added to the project if it does not exist.
-      - When V(absent) it will be removed from the project if it exists.
+      - When V(present) the deploy key is added to the project if it does not exist.
+      - When V(absent) it is removed from the project if it exists.
     default: present
     type: str
     choices: ["present", "absent"]
@@ -208,7 +208,7 @@ class GitLabDeployKey(object):
     '''
     def find_deploy_key(self, project, key_title):
         for deploy_key in project.keys.list(**list_all_kwargs):
-            if (deploy_key.title == key_title):
+            if deploy_key.title == key_title:
                 return deploy_key
 
     '''

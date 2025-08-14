@@ -30,12 +30,17 @@ options:
     choices:
       - ams1
       - EMEA-NL-EVS
+      - ams2
+      - ams3
       - par1
       - EMEA-FR-PAR1
       - par2
       - EMEA-FR-PAR2
+      - par3
       - waw1
       - EMEA-PL-WAW1
+      - waw2
+      - waw3
 """
 
 EXAMPLES = r"""
@@ -57,7 +62,7 @@ scaleway_volume_info:
   type: list
   elements: dict
   sample:
-    "scaleway_volume_info": [
+    [
       {
         "creation_date": "2018-08-14T20:56:24.949660+00:00",
         "export_uri": null,

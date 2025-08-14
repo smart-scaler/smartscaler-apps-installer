@@ -30,12 +30,17 @@ options:
     choices:
       - ams1
       - EMEA-NL-EVS
+      - ams2
+      - ams3
       - par1
       - EMEA-FR-PAR1
       - par2
       - EMEA-FR-PAR2
+      - par3
       - waw1
       - EMEA-PL-WAW1
+      - waw2
+      - waw3
 """
 
 EXAMPLES = r"""
@@ -57,7 +62,7 @@ scaleway_image_info:
   type: list
   elements: dict
   sample:
-    "scaleway_image_info": [
+    [
       {
         "arch": "x86_64",
         "creation_date": "2018-07-17T16:18:49.276456+00:00",

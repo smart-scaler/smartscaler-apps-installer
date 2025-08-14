@@ -1,15 +1,10 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2016-2017, Yanis Guenane <yanis+ansible@guenane.org>
 # Copyright (c) 2017, Markus Teufelberger <mteufelberger+ansible@mgit.at>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -19,16 +14,15 @@ description:
   - This module allows one to query information on OpenSSL Certificate Signing Requests (CSR).
   - In case the CSR signature cannot be validated, the module will fail. In this case, all return variables are still returned.
   - It uses the cryptography python library to interact with OpenSSL.
-requirements:
-  - cryptography >= 1.3
 author:
   - Felix Fontein (@felixfontein)
   - Yanis Guenane (@Spredzy)
 extends_documentation_fragment:
-  - community.crypto.attributes
-  - community.crypto.attributes.info_module
-  - community.crypto.name_encoding
-  - community.crypto.attributes.idempotent_not_modify_state
+  - community.crypto._attributes
+  - community.crypto._attributes.info_module
+  - community.crypto._attributes.idempotent_not_modify_state
+  - community.crypto._cryptography_dep.minimum
+  - community.crypto._name_encoding
 options:
   path:
     description:
@@ -46,6 +40,9 @@ options:
       - Determines which crypto backend to use.
       - The default choice is V(auto), which tries to use C(cryptography) if available.
       - If set to V(cryptography), will try to use the L(cryptography,https://cryptography.io/) library.
+      - Note that with community.crypto 3.0.0, all values behave the same.
+        This option will be deprecated in a later version.
+        We recommend to not set it explicitly.
     type: str
     default: auto
     choices: [auto, cryptography]
@@ -311,54 +308,60 @@ authority_cert_serial_number:
   sample: 12345
 """
 
+import typing as t
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.common.text.converters import to_native
-from ansible_collections.community.crypto.plugins.module_utils.crypto.basic import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.basic import (
     OpenSSLObjectError,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.module_backends.csr_info import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.module_backends.csr_info import (
     select_backend,
 )
 
 
-def main():
+def main() -> t.NoReturn:
     module = AnsibleModule(
-        argument_spec=dict(
-            path=dict(type="path"),
-            content=dict(type="str"),
-            name_encoding=dict(
-                type="str", default="ignore", choices=["ignore", "idna", "unicode"]
-            ),
-            select_crypto_backend=dict(
-                type="str", default="auto", choices=["auto", "cryptography"]
-            ),
-        ),
+        argument_spec={
+            "path": {"type": "path"},
+            "content": {"type": "str"},
+            "name_encoding": {
+                "type": "str",
+                "default": "ignore",
+                "choices": ["ignore", "idna", "unicode"],
+            },
+            "select_crypto_backend": {
+                "type": "str",
+                "default": "auto",
+                "choices": ["auto", "cryptography"],
+            },
+        },
         required_one_of=(["path", "content"],),
         mutually_exclusive=(["path", "content"],),
         supports_check_mode=True,
     )
 
-    if module.params["content"] is not None:
-        data = module.params["content"].encode("utf-8")
+    content: str | None = module.params["content"]
+    path: str | None = module.params["path"]
+    if content is not None:
+        data = content.encode("utf-8")
     else:
+        if path is None:
+            module.fail_json(msg="One of content and path must be provided")
         try:
-            with open(module.params["path"], "rb") as f:
+            with open(path, "rb") as f:
                 data = f.read()
         except (IOError, OSError) as e:
-            module.fail_json(
-                msg="Error while reading CSR file from disk: {0}".format(e)
-            )
+            module.fail_json(msg=f"Error while reading CSR file from disk: {e}")
 
-    backend, module_backend = select_backend(
-        module, module.params["select_crypto_backend"], data, validate_signature=True
+    module_backend = select_backend(
+        module=module, content=data, validate_signature=True
     )
 
     try:
         result = module_backend.get_info()
         module.exit_json(**result)
     except OpenSSLObjectError as exc:
-        module.fail_json(msg=to_native(exc))
+        module.fail_json(msg=str(exc))
 
 
 if __name__ == "__main__":

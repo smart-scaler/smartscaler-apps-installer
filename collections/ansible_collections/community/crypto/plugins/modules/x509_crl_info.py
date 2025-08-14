@@ -1,14 +1,9 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2020, Felix Fontein <felix@fontein.de>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -17,15 +12,14 @@ version_added: '1.0.0'
 short_description: Retrieve information on Certificate Revocation Lists (CRLs)
 description:
   - This module allows one to retrieve information on Certificate Revocation Lists (CRLs).
-requirements:
-  - cryptography >= 1.2
 author:
   - Felix Fontein (@felixfontein)
 extends_documentation_fragment:
-  - community.crypto.attributes
-  - community.crypto.attributes.info_module
-  - community.crypto.attributes.idempotent_not_modify_state
-  - community.crypto.name_encoding
+  - community.crypto._attributes
+  - community.crypto._attributes.info_module
+  - community.crypto._attributes.idempotent_not_modify_state
+  - community.crypto._cryptography_dep.minimum
+  - community.crypto._name_encoding
 options:
   path:
     description:
@@ -106,7 +100,9 @@ last_update:
   type: str
   sample: '20190413202428Z'
 next_update:
-  description: The point in time from which a new CRL will be issued and the client has to check for it as ASN.1 TIME.
+  description:
+    - The point in time from which a new CRL will be issued and the client has to check for it as ASN.1 TIME.
+    - Will be C(none) if no such timestamp is present.
   returned: success
   type: str
   sample: '20190413202428Z'
@@ -178,62 +174,65 @@ revoked_certificates:
 
 import base64
 import binascii
+import typing as t
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.common.text.converters import to_native
-from ansible_collections.community.crypto.plugins.module_utils.crypto.basic import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.basic import (
     OpenSSLObjectError,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.module_backends.crl_info import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.module_backends.crl_info import (
     get_crl_info,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.pem import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.pem import (
     identify_pem_format,
 )
 
 
-def main():
+def main() -> t.NoReturn:
     module = AnsibleModule(
-        argument_spec=dict(
-            path=dict(type="path"),
-            content=dict(type="str"),
-            list_revoked_certificates=dict(type="bool", default=True),
-            name_encoding=dict(
-                type="str", default="ignore", choices=["ignore", "idna", "unicode"]
-            ),
-        ),
+        argument_spec={
+            "path": {"type": "path"},
+            "content": {"type": "str"},
+            "list_revoked_certificates": {"type": "bool", "default": True},
+            "name_encoding": {
+                "type": "str",
+                "default": "ignore",
+                "choices": ["ignore", "idna", "unicode"],
+            },
+        },
         required_one_of=(["path", "content"],),
         mutually_exclusive=(["path", "content"],),
         supports_check_mode=True,
     )
 
-    if module.params["content"] is None:
+    content: str | None = module.params["content"]
+    path: str | None = module.params["path"]
+    if content is None:
+        if path is None:
+            module.fail_json(msg="One of content and path must be provided")
         try:
-            with open(module.params["path"], "rb") as f:
+            with open(path, "rb") as f:
                 data = f.read()
         except (IOError, OSError) as e:
-            module.fail_json(
-                msg="Error while reading CRL file from disk: {0}".format(e)
-            )
+            module.fail_json(msg=f"Error while reading CRL file from disk: {e}")
     else:
-        data = module.params["content"].encode("utf-8")
+        data = content.encode("utf-8")
         if not identify_pem_format(data):
             try:
-                data = base64.b64decode(module.params["content"])
+                data = base64.b64decode(content)
             except (binascii.Error, TypeError) as e:
-                module.fail_json(
-                    msg="Error while Base64 decoding content: {0}".format(e)
-                )
+                module.fail_json(msg=f"Error while Base64 decoding content: {e}")
 
+    list_revoked_certificates: bool = module.params["list_revoked_certificates"]
     try:
         result = get_crl_info(
-            module,
-            data,
-            list_revoked_certificates=module.params["list_revoked_certificates"],
+            module=module,
+            content=data,
+            list_revoked_certificates=list_revoked_certificates,
         )
         module.exit_json(**result)
     except OpenSSLObjectError as e:
-        module.fail_json(msg=to_native(e))
+        module.fail_json(msg=str(e))
 
 
 if __name__ == "__main__":

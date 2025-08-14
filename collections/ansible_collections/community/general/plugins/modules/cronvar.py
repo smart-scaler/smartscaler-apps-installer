@@ -43,12 +43,12 @@ options:
     type: str
   insertafter:
     description:
-      - If specified, the variable will be inserted after the variable specified.
+      - If specified, the variable is inserted after the variable specified.
       - Used with O(state=present).
     type: str
   insertbefore:
     description:
-      - Used with O(state=present). If specified, the variable will be inserted just before the variable specified.
+      - Used with O(state=present). If specified, the variable is inserted just before the variable specified.
     type: str
   state:
     description:
@@ -135,6 +135,9 @@ class CronVar(object):
                 self.cron_file = cron_file
             else:
                 self.cron_file = os.path.join('/etc/cron.d', cron_file)
+            parent_dir = os.path.dirname(self.cron_file)
+            if parent_dir and not os.path.isdir(parent_dir):
+                module.fail_json(msg="Parent directory '{}' does not exist for cron_file: '{}'".format(parent_dir, cron_file))
         else:
             self.cron_file = None
 
@@ -393,6 +396,8 @@ def main():
     old_value = cronvar.find_variable(name)
 
     if ensure_present:
+        if value == "" and old_value != "":
+            value = '""'
         if old_value is None:
             cronvar.add_variable(name, value, insertbefore, insertafter)
             changed = True

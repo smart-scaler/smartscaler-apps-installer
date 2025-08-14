@@ -11,11 +11,11 @@ from __future__ import annotations
 DOCUMENTATION = r"""
 author: Rui Lopes (@rgl) <ruilopes.com>
 name: wsl
-short_description: Run tasks in WSL distribution using wsl.exe CLI via SSH
+short_description: Run tasks in WSL distribution using wsl.exe CLI using SSH
 requirements:
   - paramiko
 description:
-  - Run commands or put/fetch files to an existing WSL distribution using wsl.exe CLI via SSH.
+  - Run commands or put/fetch files to an existing WSL distribution using wsl.exe CLI using SSH.
   - Uses the Python SSH implementation (Paramiko) to connect to the WSL host.
 version_added: "10.6.0"
 options:
@@ -50,7 +50,7 @@ options:
   remote_user:
     description:
       - User to login/authenticate as.
-      - Can be set from the CLI via the C(--user) or C(-u) options.
+      - Can be set from the CLI with the C(--user) or C(-u) options.
     type: string
     vars:
       - name: ansible_user
@@ -69,7 +69,7 @@ options:
   password:
     description:
       - Secret used to either login the SSH server or as a passphrase for SSH keys that require it.
-      - Can be set from the CLI via the C(--ask-pass) option.
+      - Can be set from the CLI with the C(--ask-pass) option.
     type: string
     vars:
       - name: ansible_password
@@ -109,7 +109,7 @@ options:
   proxy_command:
     default: ""
     description:
-      - Proxy information for running the connection via a jumphost.
+      - Proxy information for running the connection through a jumphost.
       - This option is supported by paramiko version 1.9.0 or newer.
     type: string
     env:
@@ -128,7 +128,8 @@ options:
         key: record_host_keys
     type: boolean
   host_key_checking:
-    description: "Set this to V(false) if you want to avoid host key checking by the underlying tools Ansible uses to connect to the host."
+    description: "Set this to V(false) if you want to avoid host key checking by the underlying tools Ansible uses to connect
+      to the host."
     type: boolean
     default: true
     env:
@@ -157,8 +158,7 @@ options:
     type: float
     default: 30
     description:
-      - Configures, in seconds, the amount of time to wait for the SSH
-        banner to be presented.
+      - Configures, in seconds, the amount of time to wait for the SSH banner to be presented.
       - This option is supported by paramiko version 1.15.0 or newer.
     ini:
       - section: paramiko_connection
@@ -227,20 +227,20 @@ options:
       - name: ansible_paramiko_user_known_hosts_file
   wsl_distribution:
     description:
-      - WSL distribution name
+      - WSL distribution name.
     type: string
     required: true
     vars:
       - name: wsl_distribution
   wsl_user:
     description:
-      - WSL distribution user
+      - WSL distribution user.
     type: string
     vars:
       - name: wsl_user
   become_user:
     description:
-      - WSL distribution user
+      - WSL distribution user.
     type: string
     default: root
     vars:
@@ -248,7 +248,7 @@ options:
       - name: ansible_become_user
   become:
     description:
-      - whether to use the user defined by ansible_become_user.
+      - Whether to use the user defined by O(become_user).
     type: bool
     default: false
     vars:
@@ -315,6 +315,7 @@ import pathlib
 import shlex
 import socket
 import tempfile
+import traceback
 import typing as t
 
 from ansible.errors import (
@@ -323,9 +324,8 @@ from ansible.errors import (
     AnsibleError,
 )
 from ansible_collections.community.general.plugins.module_utils._filelock import FileLock, LockTimeout
+from ansible_collections.community.general.plugins.module_utils.version import LooseVersion
 from ansible.module_utils.common.text.converters import to_bytes, to_native, to_text
-from ansible.module_utils.compat.paramiko import PARAMIKO_IMPORT_ERR, paramiko
-from ansible.module_utils.compat.version import LooseVersion
 from ansible.playbook.play_context import PlayContext
 from ansible.plugins.connection import ConnectionBase
 from ansible.utils.display import Display
@@ -333,8 +333,15 @@ from ansible.utils.path import makedirs_safe
 from binascii import hexlify
 from subprocess import list2cmdline
 
+try:
+    import paramiko
+    PARAMIKO_IMPORT_ERR = None
+except ImportError:
+    paramiko = None
+    PARAMIKO_IMPORT_ERR = traceback.format_exc()
 
-if t.TYPE_CHECKING and paramiko:
+
+if t.TYPE_CHECKING and PARAMIKO_IMPORT_ERR is None:
     from paramiko import MissingHostKeyPolicy
     from paramiko.client import SSHClient
     from paramiko.pkey import PKey
@@ -437,7 +444,7 @@ class Connection(ConnectionBase):
     def _connect(self) -> Connection:
         """ activates the connection object """
 
-        if paramiko is None:
+        if PARAMIKO_IMPORT_ERR is not None:
             raise AnsibleError(f'paramiko is not installed: {to_native(PARAMIKO_IMPORT_ERR)}')
 
         port = self.get_option('port')
@@ -522,8 +529,10 @@ class Connection(ConnectionBase):
             if u'PID check failed' in msg:
                 raise AnsibleError('paramiko version issue, please upgrade paramiko on the machine running ansible')
             elif u'Private key file is encrypted' in msg:
-                msg = f'ssh {self.get_option("remote_user")}@{self.get_options("remote_addr")}:{port} : ' + \
+                msg = (
+                    f'ssh {self.get_option("remote_user")}@{self.get_options("remote_addr")}:{port} : '
                     f'{msg}\nTo connect as a different user, use -u <username>.'
+                )
                 raise AnsibleConnectionFailure(msg)
             else:
                 raise AnsibleConnectionFailure(msg)
@@ -656,7 +665,7 @@ class Connection(ConnectionBase):
                 chan.shutdown_write()
 
         except socket.timeout:
-            raise AnsibleError('ssh timed out waiting for privilege escalation.\n' + to_text(become_output))
+            raise AnsibleError(f'ssh timed out waiting for privilege escalation.\n{to_text(become_output)}')
 
         stdout = b''.join(chan.makefile('rb', bufsize))
         stderr = b''.join(chan.makefile_stderr('rb', bufsize))

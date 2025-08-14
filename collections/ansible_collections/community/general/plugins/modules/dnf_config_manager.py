@@ -120,7 +120,7 @@ changed_repos:
   returned: success
   type: list
   elements: str
-  sample: ['crb']
+  sample: ["crb"]
 """
 
 from ansible.module_utils.basic import AnsibleModule
@@ -175,8 +175,8 @@ def pack_repo_states_for_return(states):
 
 def main():
     module_args = dict(
-        name=dict(type='list', elements='str', required=False, default=[]),
-        state=dict(type='str', required=False, choices=['enabled', 'disabled'], default='enabled')
+        name=dict(type='list', elements='str', default=[]),
+        state=dict(type='str', choices=['enabled', 'disabled'], default='enabled')
     )
 
     result = dict(

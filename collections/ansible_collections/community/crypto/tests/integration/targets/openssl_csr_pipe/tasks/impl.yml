@@ -64,17 +64,17 @@
   register: generate_csr_changed_check
 
 - name: "({{ select_crypto_backend }}) Validate CSR (test - privatekey modulus)"
-  ansible.builtin.shell: '{{ openssl_binary }} rsa -noout -modulus -in {{ remote_tmp_dir }}/privatekey.pem'
+  ansible.builtin.command: '{{ openssl_binary }} rsa -noout -modulus -in {{ remote_tmp_dir }}/privatekey.pem'
   register: privatekey_modulus
 
 - name: "({{ select_crypto_backend }}) Validate CSR (test - Common Name)"
-  ansible.builtin.shell: "{{ openssl_binary }} req -noout -subject -in /dev/stdin -nameopt oneline,-space_eq"
+  ansible.builtin.command: "{{ openssl_binary }} req -noout -subject -in /dev/stdin -nameopt oneline,-space_eq"
   args:
     stdin: "{{ generate_csr.csr }}"
   register: csr_cn
 
 - name: "({{ select_crypto_backend }}) Validate CSR (test - csr modulus)"
-  ansible.builtin.shell: '{{ openssl_binary }} req -noout -modulus -in /dev/stdin'
+  ansible.builtin.command: '{{ openssl_binary }} req -noout -modulus -in /dev/stdin'
   args:
     stdin: "{{ generate_csr.csr }}"
   register: csr_modulus

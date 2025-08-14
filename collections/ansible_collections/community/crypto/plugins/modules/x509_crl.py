@@ -1,14 +1,9 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2019, Felix Fontein <felix@fontein.de>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -19,15 +14,14 @@ description:
   - This module allows one to (re)generate or update Certificate Revocation Lists (CRLs).
   - Certificates on the revocation list can be either specified by serial number and (optionally) their issuer, or as a path
     to a certificate file in PEM format.
-requirements:
-  - cryptography >= 1.2
 author:
   - Felix Fontein (@felixfontein)
 extends_documentation_fragment:
   - ansible.builtin.files
-  - community.crypto.attributes
-  - community.crypto.attributes.files
-  - community.crypto.name_encoding
+  - community.crypto._attributes
+  - community.crypto._attributes.files
+  - community.crypto._cryptography_dep.minimum
+  - community.crypto._name_encoding
 attributes:
   check_mode:
     support: full
@@ -59,17 +53,9 @@ options:
       - This parameter was called O(mode) before community.crypto 2.13.0. It has been renamed to avoid a collision with the
         common O(mode) parameter for setting the CRL file's access mode.
     type: str
-        # default: generate
+    default: generate
     choices: [generate, update]
     version_added: 2.13.0
-  mode:
-    description:
-      - This parameter has been renamed to O(crl_mode). The old name O(mode) is now deprecated and will be removed in community.crypto
-        3.0.0. Replace usage of this parameter with O(crl_mode).
-      - Note that from community.crypto 3.0.0 on, O(mode) will be used for the CRL file's mode.
-    type: str
-        # default: generate
-    choices: [generate, update]
 
   force:
     description:
@@ -439,16 +425,16 @@ crl:
 
 import base64
 import os
-import traceback
+import typing as t
 
-from ansible.module_utils.basic import AnsibleModule, missing_required_lib
-from ansible.module_utils.common.text.converters import to_native, to_text
+from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.common.text.converters import to_text
 from ansible.module_utils.common.validation import check_type_int, check_type_str
-from ansible_collections.community.crypto.plugins.module_utils.crypto.basic import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.basic import (
     OpenSSLBadPassphraseError,
     OpenSSLObjectError,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.cryptography_crl import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.cryptography_crl import (
     CRYPTOGRAPHY_TIMEZONE_INVALIDITY_DATE,
     REVOCATION_REASON_MAP,
     TIMESTAMP_FORMAT,
@@ -461,48 +447,45 @@ from ansible_collections.community.crypto.plugins.module_utils.crypto.cryptograp
     set_next_update,
     set_revocation_date,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.cryptography_support import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.cryptography_support import (
     CRYPTOGRAPHY_TIMEZONE,
     cryptography_decode_name,
     cryptography_get_name,
     cryptography_key_needs_digest_for_signing,
     cryptography_name_to_oid,
     cryptography_oid_to_name,
-    cryptography_serial_number_of_cert,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.module_backends.crl_info import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.module_backends.crl_info import (
     get_crl_info,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.pem import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.pem import (
     identify_pem_format,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.support import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.support import (
     OpenSSLObject,
     load_certificate,
-    load_privatekey,
+    load_certificate_issuer_privatekey,
     parse_name_field,
     parse_ordered_name_field,
     select_message_digest,
 )
-from ansible_collections.community.crypto.plugins.module_utils.io import write_file
-from ansible_collections.community.crypto.plugins.module_utils.serial import (
+from ansible_collections.community.crypto.plugins.module_utils._cryptography_dep import (
+    COLLECTION_MINIMUM_CRYPTOGRAPHY_VERSION,
+    assert_required_cryptography_version,
+)
+from ansible_collections.community.crypto.plugins.module_utils._io import write_file
+from ansible_collections.community.crypto.plugins.module_utils._serial import (
     parse_serial,
 )
-from ansible_collections.community.crypto.plugins.module_utils.time import (
+from ansible_collections.community.crypto.plugins.module_utils._time import (
     get_relative_time_option,
 )
-from ansible_collections.community.crypto.plugins.module_utils.version import (
-    LooseVersion,
-)
 
 
-MINIMAL_CRYPTOGRAPHY_VERSION = "1.2"
+MINIMAL_CRYPTOGRAPHY_VERSION = COLLECTION_MINIMUM_CRYPTOGRAPHY_VERSION
 
-CRYPTOGRAPHY_IMP_ERR = None
 try:
-    import cryptography
     from cryptography import x509
-    from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives.serialization import Encoding
     from cryptography.x509 import (
         CertificateRevocationListBuilder,
@@ -510,13 +493,11 @@ try:
         NameAttribute,
         RevokedCertificateBuilder,
     )
-
-    CRYPTOGRAPHY_VERSION = LooseVersion(cryptography.__version__)
 except ImportError:
-    CRYPTOGRAPHY_IMP_ERR = traceback.format_exc()
-    CRYPTOGRAPHY_FOUND = False
-else:
-    CRYPTOGRAPHY_FOUND = True
+    pass
+
+if t.TYPE_CHECKING:
+    import datetime  # pragma: no cover
 
 
 class CRLError(OpenSSLObjectError):
@@ -524,64 +505,81 @@ class CRLError(OpenSSLObjectError):
 
 
 class CRL(OpenSSLObject):
-
-    def __init__(self, module):
-        super(CRL, self).__init__(
-            module.params["path"],
-            module.params["state"],
-            module.params["force"],
-            module.check_mode,
+    def __init__(self, module: AnsibleModule) -> None:
+        super().__init__(
+            path=module.params["path"],
+            state=module.params["state"],
+            force=module.params["force"],
+            check_mode=module.check_mode,
         )
 
-        self.format = module.params["format"]
+        self.format: t.Literal["pem", "der"] = module.params["format"]
 
-        self.update = module.params["crl_mode"] == "update"
-        self.ignore_timestamps = module.params["ignore_timestamps"]
-        self.return_content = module.params["return_content"]
-        self.name_encoding = module.params["name_encoding"]
-        self.serial_numbers_format = module.params["serial_numbers"]
-        self.crl_content = None
+        self.update: bool = module.params["crl_mode"] == "update"
+        self.ignore_timestamps: bool = module.params["ignore_timestamps"]
+        self.return_content: bool = module.params["return_content"]
+        self.name_encoding: t.Literal["ignore", "idna", "unicode"] = module.params[
+            "name_encoding"
+        ]
+        self.serial_numbers_format: t.Literal["integer", "hex-octets"] = module.params[
+            "serial_numbers"
+        ]
+        self.crl_content: bytes | None = None
 
-        self.privatekey_path = module.params["privatekey_path"]
-        self.privatekey_content = module.params["privatekey_content"]
-        if self.privatekey_content is not None:
-            self.privatekey_content = self.privatekey_content.encode("utf-8")
-        self.privatekey_passphrase = module.params["privatekey_passphrase"]
+        self.privatekey_path: str | None = module.params["privatekey_path"]
+        privatekey_content: str | None = module.params["privatekey_content"]
+        if privatekey_content is not None:
+            self.privatekey_content: bytes | None = privatekey_content.encode("utf-8")
+        else:
+            self.privatekey_content = None
+        self.privatekey_passphrase: str | None = module.params["privatekey_passphrase"]
 
         try:
-            if module.params["issuer_ordered"]:
+            issuer_ordered: list[dict[str, t.Any]] | None = module.params[
+                "issuer_ordered"
+            ]
+            issuer: dict[str, list[str | bytes] | bytes | str] | None = module.params[
+                "issuer"
+            ]
+            if issuer_ordered:
                 self.issuer_ordered = True
                 self.issuer = parse_ordered_name_field(
-                    module.params["issuer_ordered"], "issuer_ordered"
+                    issuer_ordered, name_field_name="issuer_ordered"
                 )
             else:
                 self.issuer_ordered = False
-                self.issuer = parse_name_field(module.params["issuer"], "issuer")
+                self.issuer = (
+                    parse_name_field(issuer, name_field_name="issuer")
+                    if issuer is not None
+                    else []
+                )
         except (TypeError, ValueError) as exc:
-            module.fail_json(msg=to_native(exc))
+            module.fail_json(msg=str(exc))
 
-        self.last_update = get_relative_time_option(
+        self.last_update: datetime.datetime = get_relative_time_option(
             module.params["last_update"],
-            "last_update",
+            input_name="last_update",
             with_timezone=CRYPTOGRAPHY_TIMEZONE,
         )
-        self.next_update = get_relative_time_option(
+        self.next_update: datetime.datetime | None = get_relative_time_option(
             module.params["next_update"],
-            "next_update",
+            input_name="next_update",
             with_timezone=CRYPTOGRAPHY_TIMEZONE,
         )
 
-        self.digest = select_message_digest(module.params["digest"])
-        if self.digest is None:
-            raise CRLError(
-                'The digest "{0}" is not supported'.format(module.params["digest"])
-            )
+        digest = select_message_digest(module.params["digest"])
+        if digest is None:
+            raise CRLError(f'The digest "{module.params["digest"]}" is not supported')
+        self.digest = digest
 
         self.module = module
 
         self.revoked_certificates = []
-        for i, rc in enumerate(module.params["revoked_certificates"]):
-            result = {
+        revoked_certificates: list[dict[str, t.Any]] = module.params[
+            "revoked_certificates"
+        ]
+        for i, rc in enumerate(revoked_certificates):
+            result: dict[str, t.Any] = {
                 "serial_number": None,
                 "revocation_date": None,
                 "issuer": None,
@@ -591,28 +589,26 @@ class CRL(OpenSSLObject):
                 "invalidity_date": None,
                 "invalidity_date_critical": False,
             }
-            path_prefix = "revoked_certificates[{0}].".format(i)
-            if rc["path"] is not None or rc["content"] is not None:
+            path_prefix = f"revoked_certificates[{i}]."
+            path: str | None = rc["path"]
+            content_str: str | None = rc["content"]
+            if path is not None or content_str is not None:
                 # Load certificate from file or content
                 try:
-                    if rc["content"] is not None:
-                        rc["content"] = rc["content"].encode("utf-8")
-                    cert = load_certificate(
-                        rc["path"], content=rc["content"], backend="cryptography"
-                    )
-                    result["serial_number"] = cryptography_serial_number_of_cert(cert)
+                    content: bytes | None = None
+                    if content_str is not None:
+                        content = content_str.encode("utf-8")
+                        rc["content"] = content
+                    cert = load_certificate(path=path, content=content)
+                    result["serial_number"] = cert.serial_number
                 except OpenSSLObjectError as e:
-                    if rc["content"] is not None:
+                    if content_str is not None:
                         module.fail_json(
-                            msg="Cannot parse certificate from {0}content: {1}".format(
-                                path_prefix, to_native(e)
-                            )
+                            msg=f"Cannot parse certificate from {path_prefix}content: {e}"
                         )
                     else:
                         module.fail_json(
-                            msg='Cannot read certificate "{1}" from {0}path: {2}'.format(
-                                path_prefix, rc["path"], to_native(e)
-                            )
+                            msg=f'Cannot read certificate "{path}" from {path_prefix}path: {e}'
                         )
             else:
                 # Specify serial_number (and potentially issuer) directly
@@ -622,12 +618,13 @@ class CRL(OpenSSLObject):
             # All other options
             if rc["issuer"]:
                 result["issuer"] = [
-                    cryptography_get_name(issuer, "issuer") for issuer in rc["issuer"]
+                    cryptography_get_name(issuer, what="issuer")
+                    for issuer in rc["issuer"]
                 ]
                 result["issuer_critical"] = rc["issuer_critical"]
             result["revocation_date"] = get_relative_time_option(
                 rc["revocation_date"],
-                path_prefix + "revocation_date",
+                input_name=path_prefix + "revocation_date",
                 with_timezone=CRYPTOGRAPHY_TIMEZONE,
             )
             if rc["reason"]:
@@ -636,24 +633,23 @@ class CRL(OpenSSLObject):
             if rc["invalidity_date"]:
                 result["invalidity_date"] = get_relative_time_option(
                     rc["invalidity_date"],
-                    path_prefix + "invalidity_date",
+                    input_name=path_prefix + "invalidity_date",
                     with_timezone=CRYPTOGRAPHY_TIMEZONE_INVALIDITY_DATE,
                 )
                 result["invalidity_date_critical"] = rc["invalidity_date_critical"]
             self.revoked_certificates.append(result)
 
-        self.backup = module.params["backup"]
-        self.backup_file = None
+        self.backup: bool = module.params["backup"]
+        self.backup_file: str | None = None
 
         try:
-            self.privatekey = load_privatekey(
+            self.privatekey = load_certificate_issuer_privatekey(
                 path=self.privatekey_path,
                 content=self.privatekey_content,
                 passphrase=self.privatekey_passphrase,
-                backend="cryptography",
             )
         except OpenSSLBadPassphraseError as exc:
-            raise CRLError(exc)
+            raise CRLError(exc) from exc
 
         self.crl = None
         try:
@@ -661,11 +657,11 @@ class CRL(OpenSSLObject):
                 data = f.read()
             self.actual_format = "pem" if identify_pem_format(data) else "der"
             if self.actual_format == "pem":
-                self.crl = x509.load_pem_x509_crl(data, default_backend())
+                self.crl = x509.load_pem_x509_crl(data)
                 if self.return_content:
                     self.crl_content = data
             else:
-                self.crl = x509.load_der_x509_crl(data, default_backend())
+                self.crl = x509.load_der_x509_crl(data)
                 if self.return_content:
                     self.crl_content = base64.b64encode(data)
         except Exception:
@@ -675,47 +671,61 @@ class CRL(OpenSSLObject):
 
         self.diff_after = self.diff_before = self._get_info(data)
 
-    def _parse_serial_number(self, value, index):
+    def _parse_serial_number(self, value: t.Any, index: int) -> int:
         if self.serial_numbers_format == "integer":
             try:
                 return check_type_int(value)
             except TypeError as exc:
                 self.module.fail_json(
-                    msg="Error while parsing revoked_certificates[{idx}].serial_number as an integer: {exc}".format(
-                        idx=index + 1,
-                        exc=to_native(exc),
-                    )
+                    msg=f"Error while parsing revoked_certificates[{index + 1}].serial_number as an integer: {exc}"
                 )
         if self.serial_numbers_format == "hex-octets":
             try:
                 return parse_serial(check_type_str(value))
             except (TypeError, ValueError) as exc:
                 self.module.fail_json(
-                    msg="Error while parsing revoked_certificates[{idx}].serial_number as an colon-separated hex octet string: {exc}".format(
-                        idx=index + 1,
-                        exc=to_native(exc),
-                    )
+                    msg=f"Error while parsing revoked_certificates[{index + 1}].serial_number as an colon-separated hex octet string: {exc}"
                 )
         raise RuntimeError(
-            "Unexpected value %s of serial_numbers" % (self.serial_numbers_format,)
+            f"Unexpected value {self.serial_numbers_format} of serial_numbers"
         )
 
-    def _get_info(self, data):
+    def _get_info(self, data: bytes | None) -> dict[str, t.Any]:
         if data is None:
-            return dict()
+            return {}
         try:
-            result = get_crl_info(self.module, data)
+            result = get_crl_info(module=self.module, content=data)
             result["can_parse_crl"] = True
             return result
         except Exception:
-            return dict(can_parse_crl=False)
+            return {"can_parse_crl": False}
 
-    def remove(self):
+    def remove(self, module: AnsibleModule) -> None:
         if self.backup:
             self.backup_file = self.module.backup_local(self.path)
-        super(CRL, self).remove(self.module)
+        super().remove(self.module)
 
-    def _compress_entry(self, entry):
+    def _compress_entry(self, entry: dict[str, t.Any]) -> (
+        tuple[
+            int | None,
+            tuple[str, ...] | None,
+            bool,
+            int | None,
+            bool,
+            datetime.datetime | None,
+            bool,
+        ]
+        | tuple[
+            int | None,
+            datetime.datetime | None,
+            tuple[str, ...] | None,
+            bool,
+            int | None,
+            bool,
+            datetime.datetime | None,
+            bool,
+        ]
+    ):
         issuer = None
         if entry["issuer"] is not None:
             # Normalize to IDNA. If this is used-provided, it was already converted to
@@ -739,22 +749,29 @@ class CRL(OpenSSLObject):
                 entry["invalidity_date"],
                 entry["invalidity_date_critical"],
             )
-        else:
-            return (
-                entry["serial_number"],
-                entry["revocation_date"],
-                issuer,
-                entry["issuer_critical"],
-                entry["reason"],
-                entry["reason_critical"],
-                entry["invalidity_date"],
-                entry["invalidity_date_critical"],
-            )
+        return (
+            entry["serial_number"],
+            entry["revocation_date"],
+            issuer,
+            entry["issuer_critical"],
+            entry["reason"],
+            entry["reason_critical"],
+            entry["invalidity_date"],
+            entry["invalidity_date_critical"],
+        )
 
-    def check(self, module, perms_required=True, ignore_conversion=True):
+    def check(
+        self,
+        module: AnsibleModule,
+        *,
+        perms_required: bool = True,
+        ignore_conversion: bool = True,
+    ) -> bool:
         """Ensure the resource is in its desired state."""
 
-        state_and_perms = super(CRL, self).check(self.module, perms_required)
+        state_and_perms = super().check(
+            module=self.module, perms_required=perms_required
+        )
 
         if not state_and_perms:
             return False
@@ -781,10 +798,13 @@ class CRL(OpenSSLObject):
         ]
         is_issuer = [(sub.oid, sub.value) for sub in self.crl.issuer]
         if not self.issuer_ordered:
-            want_issuer = set(want_issuer)
-            is_issuer = set(is_issuer)
-        if want_issuer != is_issuer:
-            return False
+            want_issuer_set = set(want_issuer)
+            is_issuer_set = set(is_issuer)
+            if want_issuer_set != is_issuer_set:
+                return False
+        else:
+            if want_issuer != is_issuer:
+                return False
 
         old_entries = [
             self._compress_entry(cryptography_decode_revoked_certificate(cert))
@@ -807,8 +827,7 @@ class CRL(OpenSSLObject):
 
         return True
 
-    def _generate_crl(self):
-        backend = default_backend()
+    def _generate_crl(self) -> bytes:
         crl = CertificateRevocationListBuilder()
 
         try:
@@ -823,50 +842,54 @@ class CRL(OpenSSLObject):
                 )
             )
         except ValueError as e:
-            raise CRLError(e)
+            raise CRLError(e) from e
 
-        crl = set_last_update(crl, self.last_update)
-        crl = set_next_update(crl, self.next_update)
+        crl = set_last_update(crl, value=self.last_update)
+        if self.next_update is not None:
+            crl = set_next_update(crl, value=self.next_update)
 
         if self.update and self.crl:
-            new_entries = set(
-                [self._compress_entry(entry) for entry in self.revoked_certificates]
-            )
+            new_entries = {
+                self._compress_entry(entry) for entry in self.revoked_certificates
+            }
             for entry in self.crl:
                 decoded_entry = self._compress_entry(
                     cryptography_decode_revoked_certificate(entry)
                 )
                 if decoded_entry not in new_entries:
                     crl = crl.add_revoked_certificate(entry)
-        for entry in self.revoked_certificates:
+        for revoked_entry in self.revoked_certificates:
             revoked_cert = RevokedCertificateBuilder()
-            revoked_cert = revoked_cert.serial_number(entry["serial_number"])
-            revoked_cert = set_revocation_date(revoked_cert, entry["revocation_date"])
-            if entry["issuer"] is not None:
+            revoked_cert = revoked_cert.serial_number(revoked_entry["serial_number"])
+            revoked_cert = set_revocation_date(
+                revoked_cert, value=revoked_entry["revocation_date"]
+            )
+            if revoked_entry["issuer"] is not None:
                 revoked_cert = revoked_cert.add_extension(
-                    x509.CertificateIssuer(entry["issuer"]), entry["issuer_critical"]
+                    x509.CertificateIssuer(revoked_entry["issuer"]),
+                    revoked_entry["issuer_critical"],
                 )
-            if entry["reason"] is not None:
+            if revoked_entry["reason"] is not None:
                 revoked_cert = revoked_cert.add_extension(
-                    x509.CRLReason(entry["reason"]), entry["reason_critical"]
+                    x509.CRLReason(revoked_entry["reason"]),
+                    revoked_entry["reason_critical"],
                 )
-            if entry["invalidity_date"] is not None:
+            if revoked_entry["invalidity_date"] is not None:
                 revoked_cert = revoked_cert.add_extension(
-                    x509.InvalidityDate(entry["invalidity_date"]),
-                    entry["invalidity_date_critical"],
+                    x509.InvalidityDate(revoked_entry["invalidity_date"]),
+                    revoked_entry["invalidity_date_critical"],
                 )
-            crl = crl.add_revoked_certificate(revoked_cert.build(backend))
+            crl = crl.add_revoked_certificate(revoked_cert.build())
 
         digest = None
         if cryptography_key_needs_digest_for_signing(self.privatekey):
             digest = self.digest
-        self.crl = crl.sign(self.privatekey, digest, backend=backend)
+        self.crl = crl.sign(self.privatekey, digest)
         if self.format == "pem":
             return self.crl.public_bytes(Encoding.PEM)
-        else:
-            return self.crl.public_bytes(Encoding.DER)
+        return self.crl.public_bytes(Encoding.DER)
 
-    def generate(self):
+    def generate(self, module: AnsibleModule) -> None:
         result = None
         if (
             not self.check(self.module, perms_required=False, ignore_conversion=True)
@@ -891,7 +914,7 @@ class CRL(OpenSSLObject):
                     self.crl_content = base64.b64encode(result)
             if self.backup:
                 self.backup_file = self.module.backup_local(self.path)
-            write_file(self.module, result)
+            write_file(module=self.module, content=result)
             self.changed = True
 
         file_args = self.module.load_file_common_arguments(self.module.params)
@@ -900,7 +923,7 @@ class CRL(OpenSSLObject):
         elif self.module.set_fs_attributes_if_different(file_args, False):
             self.changed = True
 
-    def dump(self, check_mode=False):
+    def dump(self, check_mode: bool = False) -> dict[str, t.Any]:
         result = {
             "changed": self.changed,
             "filename": self.path,
@@ -918,93 +941,106 @@ class CRL(OpenSSLObject):
 
         if check_mode:
             result["last_update"] = self.last_update.strftime(TIMESTAMP_FORMAT)
-            result["next_update"] = self.next_update.strftime(TIMESTAMP_FORMAT)
+            result["next_update"] = (
+                self.next_update.strftime(TIMESTAMP_FORMAT)
+                if self.next_update is not None
+                else None
+            )
             # result['digest'] = cryptography_oid_to_name(self.crl.signature_algorithm_oid)
             result["digest"] = self.module.params["digest"]
             result["issuer_ordered"] = self.issuer
-            result["issuer"] = {}
+            issuer: dict[str, str | bytes] = {}
+            result["issuer"] = issuer
             for k, v in self.issuer:
-                result["issuer"][k] = v
-            result["revoked_certificates"] = []
+                issuer[k] = v
+            revoked_certificates: list[dict[str, t.Any]] = []
+            result["revoked_certificates"] = revoked_certificates
             for entry in self.revoked_certificates:
-                result["revoked_certificates"].append(
+                revoked_certificates.append(
                     cryptography_dump_revoked(entry, idn_rewrite=self.name_encoding)
                 )
         elif self.crl:
             result["last_update"] = get_last_update(self.crl).strftime(TIMESTAMP_FORMAT)
-            result["next_update"] = get_next_update(self.crl).strftime(TIMESTAMP_FORMAT)
+            next_update = get_next_update(self.crl)
+            result["next_update"] = (
+                next_update.strftime(TIMESTAMP_FORMAT)
+                if next_update is not None
+                else None
+            )
             result["digest"] = cryptography_oid_to_name(
                 cryptography_get_signature_algorithm_oid_from_crl(self.crl)
             )
-            issuer = []
+            issuer_list: list[list[str]] = []
             for attribute in self.crl.issuer:
-                issuer.append(
-                    [cryptography_oid_to_name(attribute.oid), attribute.value]
+                issuer_list.append(
+                    [
+                        cryptography_oid_to_name(attribute.oid),
+                        to_text(attribute.value),
+                    ]
                 )
-            result["issuer_ordered"] = issuer
-            result["issuer"] = {}
-            for k, v in issuer:
-                result["issuer"][k] = v
-            result["revoked_certificates"] = []
+            result["issuer_ordered"] = issuer_list
+            issuer = {}
+            result["issuer"] = issuer
+            for k, v in issuer_list:
+                issuer[k] = v
+            revoked_certificates = []
+            result["revoked_certificates"] = revoked_certificates
             for cert in self.crl:
                 entry = cryptography_decode_revoked_certificate(cert)
-                result["revoked_certificates"].append(
+                revoked_certificates.append(
                     cryptography_dump_revoked(entry, idn_rewrite=self.name_encoding)
                 )
 
         if self.return_content:
             result["crl"] = self.crl_content
 
-        result["diff"] = dict(
-            before=self.diff_before,
-            after=self.diff_after,
-        )
+        result["diff"] = {
+            "before": self.diff_before,
+            "after": self.diff_after,
+        }
         return result
 
 
-def main():
+def main() -> t.NoReturn:
     module = AnsibleModule(
-        argument_spec=dict(
-            state=dict(type="str", default="present", choices=["present", "absent"]),
-            crl_mode=dict(
-                type="str",
-                # default='generate',
-                choices=["generate", "update"],
-            ),
-            mode=dict(
-                type="str",
-                # default='generate',
-                choices=["generate", "update"],
-                removed_in_version="3.0.0",
-                removed_from_collection="community.crypto",
-            ),
-            force=dict(type="bool", default=False),
-            backup=dict(type="bool", default=False),
-            path=dict(type="path", required=True),
-            format=dict(type="str", default="pem", choices=["pem", "der"]),
-            privatekey_path=dict(type="path"),
-            privatekey_content=dict(type="str", no_log=True),
-            privatekey_passphrase=dict(type="str", no_log=True),
-            issuer=dict(type="dict"),
-            issuer_ordered=dict(type="list", elements="dict"),
-            last_update=dict(type="str", default="+0s"),
-            next_update=dict(type="str"),
-            digest=dict(type="str", default="sha256"),
-            ignore_timestamps=dict(type="bool", default=False),
-            return_content=dict(type="bool", default=False),
-            revoked_certificates=dict(
-                type="list",
-                elements="dict",
-                options=dict(
-                    path=dict(type="path"),
-                    content=dict(type="str"),
-                    serial_number=dict(type="raw"),
-                    revocation_date=dict(type="str", default="+0s"),
-                    issuer=dict(type="list", elements="str"),
-                    issuer_critical=dict(type="bool", default=False),
-                    reason=dict(
-                        type="str",
-                        choices=[
+        argument_spec={
+            "state": {
+                "type": "str",
+                "default": "present",
+                "choices": ["present", "absent"],
+            },
+            "crl_mode": {
+                "type": "str",
+                "default": "generate",
+                "choices": ["generate", "update"],
+            },
+            "force": {"type": "bool", "default": False},
+            "backup": {"type": "bool", "default": False},
+            "path": {"type": "path", "required": True},
+            "format": {"type": "str", "default": "pem", "choices": ["pem", "der"]},
+            "privatekey_path": {"type": "path"},
+            "privatekey_content": {"type": "str", "no_log": True},
+            "privatekey_passphrase": {"type": "str", "no_log": True},
+            "issuer": {"type": "dict"},
+            "issuer_ordered": {"type": "list", "elements": "dict"},
+            "last_update": {"type": "str", "default": "+0s"},
+            "next_update": {"type": "str"},
+            "digest": {"type": "str", "default": "sha256"},
+            "ignore_timestamps": {"type": "bool", "default": False},
+            "return_content": {"type": "bool", "default": False},
+            "revoked_certificates": {
+                "type": "list",
+                "elements": "dict",
+                "options": {
+                    "path": {"type": "path"},
+                    "content": {"type": "str"},
+                    "serial_number": {"type": "raw"},
+                    "revocation_date": {"type": "str", "default": "+0s"},
+                    "issuer": {"type": "list", "elements": "str"},
+                    "issuer_critical": {"type": "bool", "default": False},
+                    "reason": {
+                        "type": "str",
+                        "choices": [
                             "unspecified",
                             "key_compromise",
                             "ca_compromise",
@@ -1016,21 +1052,25 @@ def main():
                             "aa_compromise",
                             "remove_from_crl",
                         ],
-                    ),
-                    reason_critical=dict(type="bool", default=False),
-                    invalidity_date=dict(type="str"),
-                    invalidity_date_critical=dict(type="bool", default=False),
-                ),
-                required_one_of=[["path", "content", "serial_number"]],
-                mutually_exclusive=[["path", "content", "serial_number"]],
-            ),
-            name_encoding=dict(
-                type="str", default="ignore", choices=["ignore", "idna", "unicode"]
-            ),
-            serial_numbers=dict(
-                type="str", default="integer", choices=["integer", "hex-octets"]
-            ),
-        ),
+                    },
+                    "reason_critical": {"type": "bool", "default": False},
+                    "invalidity_date": {"type": "str"},
+                    "invalidity_date_critical": {"type": "bool", "default": False},
+                },
+                "required_one_of": [["path", "content", "serial_number"]],
+                "mutually_exclusive": [["path", "content", "serial_number"]],
+            },
+            "name_encoding": {
+                "type": "str",
+                "default": "ignore",
+                "choices": ["ignore", "idna", "unicode"],
+            },
+            "serial_numbers": {
+                "type": "str",
+                "default": "integer",
+                "choices": ["integer", "hex-octets"],
+            },
+        },
         required_if=[
             ("state", "present", ["privatekey_path", "privatekey_content"], True),
             ("state", "present", ["issuer", "issuer_ordered"], True),
@@ -1044,23 +1084,9 @@ def main():
         add_file_common_args=True,
     )
 
-    if module.params["mode"]:
-        if module.params["crl_mode"]:
-            module.fail_json(
-                "You cannot use both `mode` and `crl_mode`. Use `crl_mode`."
-            )
-        module.params["crl_mode"] = module.params["mode"]
-    # TODO: in 3.0.0, once the option `mode` has been removed, remove this:
-    module.params.pop("mode", None)
-    # From then on, `mode` will be the file mode of the CRL file
-
-    if not CRYPTOGRAPHY_FOUND:
-        module.fail_json(
-            msg=missing_required_lib(
-                "cryptography >= {0}".format(MINIMAL_CRYPTOGRAPHY_VERSION)
-            ),
-            exception=CRYPTOGRAPHY_IMP_ERR,
-        )
+    assert_required_cryptography_version(
+        module, minimum_cryptography_version=MINIMAL_CRYPTOGRAPHY_VERSION
+    )
 
     try:
         crl = CRL(module)
@@ -1075,19 +1101,19 @@ def main():
                 )
                 module.exit_json(**result)
 
-            crl.generate()
+            crl.generate(module)
         else:
             if module.check_mode:
                 result = crl.dump(check_mode=True)
                 result["changed"] = os.path.exists(module.params["path"])
                 module.exit_json(**result)
 
-            crl.remove()
+            crl.remove(module)
 
         result = crl.dump()
         module.exit_json(**result)
     except OpenSSLObjectError as exc:
-        module.fail_json(msg=to_native(exc))
+        module.fail_json(msg=str(exc))
 
 
 if __name__ == "__main__":

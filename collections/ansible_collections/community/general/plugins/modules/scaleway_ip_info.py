@@ -30,12 +30,17 @@ options:
     choices:
       - ams1
       - EMEA-NL-EVS
+      - ams2
+      - ams3
       - par1
       - EMEA-FR-PAR1
       - par2
       - EMEA-FR-PAR2
+      - par3
       - waw1
       - EMEA-PL-WAW1
+      - waw2
+      - waw3
 """
 
 EXAMPLES = r"""
@@ -52,12 +57,12 @@ RETURN = r"""
 scaleway_ip_info:
   description:
     - Response from Scaleway API.
-    - 'For more details please refer to U(https://developers.scaleway.com/en/products/instance/api/).'
+    - For more details please refer to U(https://developers.scaleway.com/en/products/instance/api/).
   returned: success
   type: list
   elements: dict
   sample:
-    "scaleway_ip_info": [
+    [
       {
         "address": "163.172.170.243",
         "id": "ea081794-a581-8899-8451-386ddaf0a451",

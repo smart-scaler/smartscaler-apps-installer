@@ -15,7 +15,7 @@ short_description: Send notifications through U(https://pushover.net)
 description:
   - Send notifications through pushover to subscriber list of devices and email addresses. Requires pushover app on devices.
 notes:
-  - You will require a pushover.net account to use this module. But no account is required to receive messages.
+  - You need a pushover.net account to use this module. But no account is required to receive messages.
 extends_documentation_fragment:
   - community.general.attributes
 attributes:
@@ -140,7 +140,7 @@ def main():
             msg=dict(required=True),
             app_token=dict(required=True, no_log=True),
             user_key=dict(required=True, no_log=True),
-            pri=dict(required=False, default='0', choices=['-2', '-1', '0', '1', '2']),
+            pri=dict(default='0', choices=['-2', '-1', '0', '1', '2']),
             device=dict(type='str'),
         ),
     )

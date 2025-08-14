@@ -17,8 +17,8 @@ description:
 notes:
   - This module is non-idempotent because it sends an email through the external API. It is idempotent only in the case that
     the module fails.
-  - Like the other notification modules, this one requires an external dependency to work. In this case, you will need an
-    active SendGrid account.
+  - Like the other notification modules, this one requires an external dependency to work. In this case, you need an active
+    SendGrid account.
   - In order to use O(api_key), O(cc), O(bcc), O(attachments), O(from_name), O(html_body), and O(headers) you must C(pip install
     sendgrid).
 requirements:
@@ -82,7 +82,7 @@ options:
       - The name you want to appear in the from field, for example V(John Doe).
   html_body:
     description:
-      - Whether the body is html content that should be rendered.
+      - Whether the body is HTML content that should be rendered.
     type: bool
     default: false
   headers:
@@ -214,19 +214,19 @@ def post_sendgrid_api(module, username, password, from_address, to_addresses,
 def main():
     module = AnsibleModule(
         argument_spec=dict(
-            username=dict(required=False),
-            password=dict(required=False, no_log=True),
-            api_key=dict(required=False, no_log=True),
-            bcc=dict(required=False, type='list', elements='str'),
-            cc=dict(required=False, type='list', elements='str'),
-            headers=dict(required=False, type='dict'),
+            username=dict(),
+            password=dict(no_log=True),
+            api_key=dict(no_log=True),
+            bcc=dict(type='list', elements='str'),
+            cc=dict(type='list', elements='str'),
+            headers=dict(type='dict'),
             from_address=dict(required=True),
-            from_name=dict(required=False),
+            from_name=dict(),
             to_addresses=dict(required=True, type='list', elements='str'),
             subject=dict(required=True),
             body=dict(required=True),
-            html_body=dict(required=False, default=False, type='bool'),
-            attachments=dict(required=False, type='list', elements='path')
+            html_body=dict(default=False, type='bool'),
+            attachments=dict(type='list', elements='path')
         ),
         supports_check_mode=True,
         mutually_exclusive=[

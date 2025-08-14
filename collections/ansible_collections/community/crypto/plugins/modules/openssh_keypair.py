@@ -1,14 +1,10 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2018, David Kainz <dkainz@mgit.at> <dave.jokain@gmx.at>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
+from __future__ import annotations
 
-
-__metaclass__ = type
 
 DOCUMENTATION = r"""
 module: openssh_keypair
@@ -19,12 +15,11 @@ description:
     V(rsa), V(dsa), V(rsa1), V(ed25519) or V(ecdsa) private keys.
 requirements:
   - ssh-keygen (if O(backend=openssh))
-  - cryptography >= 2.6 (if O(backend=cryptography) and OpenSSH < 7.8 is installed)
-  - cryptography >= 3.0 (if O(backend=cryptography) and OpenSSH >= 7.8 is installed)
+  - cryptography >= 3.3 (if O(backend=cryptography))
 extends_documentation_fragment:
   - ansible.builtin.files
-  - community.crypto.attributes
-  - community.crypto.attributes.files
+  - community.crypto._attributes
+  - community.crypto._attributes.files
 attributes:
   check_mode:
     support: full
@@ -164,6 +159,13 @@ EXAMPLES = r"""
     path: /tmp/id_ssh_rsa
     force: true
 
+- name: Regenerate SSH keypair only if format or options mismatch
+  community.crypto.openssh_keypair:
+    path: /home/devops/.ssh/id_ed25519
+    type: ed25519
+    regenerate: full_idempotence
+    private_key_format: ssh
+
 - name: Generate an OpenSSH keypair with a different algorithm (dsa)
   community.crypto.openssh_keypair:
     path: /tmp/id_ssh_dsa
@@ -203,55 +205,60 @@ comment:
   sample: test@comment
 """
 
+import typing as t
+
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.community.crypto.plugins.module_utils.openssh.backends.keypair_backend import (
+from ansible_collections.community.crypto.plugins.module_utils._openssh.backends.keypair_backend import (
     select_backend,
 )
 
 
-def main():
-
+def main() -> t.NoReturn:
     module = AnsibleModule(
-        argument_spec=dict(
-            state=dict(type="str", default="present", choices=["present", "absent"]),
-            size=dict(type="int"),
-            type=dict(
-                type="str",
-                default="rsa",
-                choices=["rsa", "dsa", "rsa1", "ecdsa", "ed25519"],
-            ),
-            force=dict(type="bool", default=False),
-            path=dict(type="path", required=True),
-            comment=dict(type="str"),
-            regenerate=dict(
-                type="str",
-                default="partial_idempotence",
-                choices=[
+        argument_spec={
+            "state": {
+                "type": "str",
+                "default": "present",
+                "choices": ["present", "absent"],
+            },
+            "size": {"type": "int"},
+            "type": {
+                "type": "str",
+                "default": "rsa",
+                "choices": ["rsa", "dsa", "rsa1", "ecdsa", "ed25519"],
+            },
+            "force": {"type": "bool", "default": False},
+            "path": {"type": "path", "required": True},
+            "comment": {"type": "str"},
+            "regenerate": {
+                "type": "str",
+                "default": "partial_idempotence",
+                "choices": [
                     "never",
                     "fail",
                     "partial_idempotence",
                     "full_idempotence",
                     "always",
                 ],
-            ),
-            passphrase=dict(type="str", no_log=True),
-            private_key_format=dict(
-                type="str",
-                default="auto",
-                no_log=False,
-                choices=["auto", "pkcs1", "pkcs8", "ssh"],
-            ),
-            backend=dict(
-                type="str",
-                default="auto",
-                choices=["auto", "cryptography", "opensshbin"],
-            ),
-        ),
+            },
+            "passphrase": {"type": "str", "no_log": True},
+            "private_key_format": {
+                "type": "str",
+                "default": "auto",
+                "no_log": False,
+                "choices": ["auto", "pkcs1", "pkcs8", "ssh"],
+            },
+            "backend": {
+                "type": "str",
+                "default": "auto",
+                "choices": ["auto", "cryptography", "opensshbin"],
+            },
+        },
         supports_check_mode=True,
         add_file_common_args=True,
     )
 
-    keypair = select_backend(module, module.params["backend"])[1]
+    keypair = select_backend(module=module, backend=module.params["backend"])
 
     keypair.execute()
 

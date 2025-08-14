@@ -29,7 +29,7 @@ options:
   name:
     type: str
     description:
-      - The name of the object. Will be used to identify the entry.
+      - The name of the object that identifies the entry.
     required: true
   address:
     type: str
@@ -123,10 +123,10 @@ def main():
         argument_spec=dict(
             name=dict(type='str', required=True),
             address=dict(type='str', required=True),
-            comment=dict(type='str', required=False, default=""),
-            address6=dict(type='str', required=False),
-            resolved=dict(type='bool', required=False),
-            resolved6=dict(type='bool', required=False),
+            comment=dict(type='str', default=""),
+            address6=dict(type='str'),
+            resolved=dict(type='bool'),
+            resolved6=dict(type='bool'),
         )
     )
     try:

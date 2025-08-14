@@ -1,12 +1,9 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2023, Felix Fontein <felix@fontein.de>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
+from __future__ import annotations
 
-
-__metaclass__ = type
 
 DOCUMENTATION = r"""
 name: gpg_fingerprint
@@ -42,36 +39,37 @@ _value:
   type: string
 """
 
+import typing as t
+
 from ansible.errors import AnsibleFilterError
-from ansible.module_utils.common.text.converters import to_bytes, to_native
-from ansible.module_utils.six import string_types
-from ansible_collections.community.crypto.plugins.module_utils.gnupg.cli import (
+from ansible.module_utils.common.text.converters import to_bytes
+from ansible_collections.community.crypto.plugins.module_utils._gnupg.cli import (
     GPGError,
     get_fingerprint_from_bytes,
 )
-from ansible_collections.community.crypto.plugins.plugin_utils.gnupg import (
+from ansible_collections.community.crypto.plugins.plugin_utils._gnupg import (
     PluginGPGRunner,
 )
 
 
-def gpg_fingerprint(input):
-    if not isinstance(input, string_types):
+def gpg_fingerprint(gpg_key_content: str | bytes) -> str:
+    if not isinstance(gpg_key_content, (str, bytes)):
         raise AnsibleFilterError(
-            "The input for the community.crypto.gpg_fingerprint filter must be a string; got {type} instead".format(
-                type=type(input)
-            )
+            f"The input for the community.crypto.gpg_fingerprint filter must be a string; got {type(gpg_key_content)} instead"
         )
     try:
         gpg = PluginGPGRunner()
-        return get_fingerprint_from_bytes(gpg, to_bytes(input))
+        return get_fingerprint_from_bytes(
+            gpg_runner=gpg, content=to_bytes(gpg_key_content)
+        )
     except GPGError as exc:
-        raise AnsibleFilterError(to_native(exc))
+        raise AnsibleFilterError(str(exc)) from exc
 
 
-class FilterModule(object):
+class FilterModule:
     """Ansible jinja2 filters"""
 
-    def filters(self):
+    def filters(self) -> dict[str, t.Callable]:
         return {
             "gpg_fingerprint": gpg_fingerprint,
         }

@@ -40,10 +40,10 @@ options:
     choices: [absent, present]
     default: present
 notes:
-  - The capabilities system will automatically transform operators and flags into the effective set, so for example, C(cap_foo=ep)
-    will probably become C(cap_foo+ep).
-  - This module does not attempt to determine the final operator and flags to compare, so you will want to ensure that your
-    capabilities argument matches the final capabilities.
+  - The capabilities system automatically transforms operators and flags into the effective set, so for example, C(cap_foo=ep)
+    probably becomes C(cap_foo+ep).
+  - This module does not attempt to determine the final operator and flags to compare, so you want to ensure that your capabilities
+    argument matches the final capabilities.
 author:
   - Nate Coraor (@natefoo)
 """
@@ -109,7 +109,7 @@ class CapabilitiesModule(object):
 
     def getcap(self, path):
         rval = []
-        cmd = "%s -v %s" % (self.getcap_cmd, path)
+        cmd = [self.getcap_cmd, "-v", path]
         rc, stdout, stderr = self.module.run_command(cmd)
         # If file xattrs are set but no caps are set the output will be:
         #   '/foo ='
@@ -123,6 +123,8 @@ class CapabilitiesModule(object):
             if ' =' in stdout:
                 # process output of an older version of libcap
                 caps = stdout.split(' =')[1].strip().split()
+            elif stdout.strip().endswith(")"):  # '/foo (Error Message)'
+                self.module.fail_json(msg="Unable to get capabilities of %s" % path, stdout=stdout.strip(), stderr=stderr)
             else:
                 # otherwise, we have a newer version here
                 # see original commit message of cap/v0.2.40-18-g177cd41 in libcap.git
@@ -142,7 +144,7 @@ class CapabilitiesModule(object):
 
     def setcap(self, path, caps):
         caps = ' '.join([''.join(cap) for cap in caps])
-        cmd = "%s '%s' %s" % (self.setcap_cmd, caps, path)
+        cmd = [self.setcap_cmd, caps, path]
         rc, stdout, stderr = self.module.run_command(cmd)
         if rc != 0:
             self.module.fail_json(msg="Unable to set capabilities of %s" % path, stdout=stdout, stderr=stderr)

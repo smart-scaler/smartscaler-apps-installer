@@ -43,10 +43,9 @@ options:
     choices: [present, absent, exact]
     default: present
     description:
-      - The state of the attribute values. If V(present), all given attribute values will be added if they are missing. If
-        V(absent), all given attribute values will be removed if present. If V(exact), the set of attribute values will be
-        forced to exactly those provided and no others. If O(state=exact) and the attribute value is empty, all values for
-        this attribute will be removed.
+      - The state of the attribute values. If V(present), all given attribute values are added if they are missing. If V(absent),
+        all given attribute values are removed if present. If V(exact), the set of attribute values is forced to exactly those
+        provided and no others. If O(state=exact) and the attribute value is empty, all values for this attribute are removed.
   attributes:
     required: true
     type: dict
@@ -297,7 +296,7 @@ def main():
     module = AnsibleModule(
         argument_spec=gen_specs(
             attributes=dict(type='dict', required=True),
-            ordered=dict(type='bool', default=False, required=False),
+            ordered=dict(type='bool', default=False),
             state=dict(type='str', default='present', choices=['absent', 'exact', 'present']),
         ),
         supports_check_mode=True,

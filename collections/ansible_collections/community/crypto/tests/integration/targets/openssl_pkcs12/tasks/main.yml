@@ -62,30 +62,10 @@
         path: '{{ remote_tmp_dir }}/ansible.p12'
         state: absent
 
-    - block:
-        - name: Running tests with pyOpenSSL backend
-          ansible.builtin.include_tasks: impl.yml
-          vars:
-            select_crypto_backend: pyopenssl
-
-      when: >-
-        (pyopenssl_version.stdout | default('0.0')) is version('0.15', '>=')
-        and
-        (pyopenssl_version.stdout | default('0.0')) is version('23.3.0', '<')
-
-    - block:
-        - name: Running tests with cryptography backend
-          ansible.builtin.include_tasks: impl.yml
-          vars:
-            select_crypto_backend: cryptography
-
-      when: cryptography_version.stdout is version('3.0', '>=')
+    - name: Running tests with cryptography backend
+      ansible.builtin.include_tasks: impl.yml
+      vars:
+        select_crypto_backend: cryptography
 
   when: >-
-    (
-      (pyopenssl_version.stdout | default('0.0')) is version('0.15', '>=')
-      and
-      (pyopenssl_version.stdout | default('0.0')) is version('23.3.0', '<')
-    )
-    or
-    cryptography_version.stdout is version('3.0', '>=')
+    cryptography_version is version('3.3', '>=')

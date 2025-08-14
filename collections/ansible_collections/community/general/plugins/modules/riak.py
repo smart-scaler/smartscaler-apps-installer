@@ -62,8 +62,8 @@ options:
     type: str
   validate_certs:
     description:
-      - If V(false), SSL certificates will not be validated. This should only be used on personally controlled sites using
-        self-signed certificates.
+      - If V(false), SSL certificates are not validated. This should only be used on personally controlled sites using self-signed
+        certificates.
     type: bool
     default: true
 """
@@ -103,15 +103,13 @@ def main():
 
     module = AnsibleModule(
         argument_spec=dict(
-            command=dict(required=False, default=None, choices=[
-                'ping', 'kv_test', 'join', 'plan', 'commit']),
+            command=dict(choices=['ping', 'kv_test', 'join', 'plan', 'commit']),
             config_dir=dict(default='/etc/riak', type='path'),
-            http_conn=dict(required=False, default='127.0.0.1:8098'),
-            target_node=dict(default='riak@127.0.0.1', required=False),
+            http_conn=dict(default='127.0.0.1:8098'),
+            target_node=dict(default='riak@127.0.0.1'),
             wait_for_handoffs=dict(default=0, type='int'),
             wait_for_ring=dict(default=0, type='int'),
-            wait_for_service=dict(
-                required=False, default=None, choices=['kv']),
+            wait_for_service=dict(choices=['kv']),
             validate_certs=dict(default=True, type='bool'))
     )
 
@@ -155,7 +153,7 @@ def main():
                   version=version)
 
     if command == 'ping':
-        cmd = '%s ping %s' % (riak_bin, target_node)
+        cmd = [riak_bin, 'ping', target_node]
         rc, out, err = module.run_command(cmd)
         if rc == 0:
             result['ping'] = out

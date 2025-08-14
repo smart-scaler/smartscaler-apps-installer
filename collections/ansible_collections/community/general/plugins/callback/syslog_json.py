@@ -12,12 +12,12 @@ name: syslog_json
 type: notification
 requirements:
   - whitelist in configuration
-short_description: sends JSON events to syslog
+short_description: Sends JSON events to syslog
 description:
   - This plugin logs ansible-playbook and ansible runs to a syslog server in JSON format.
 options:
   server:
-    description: Syslog server that will receive the event.
+    description: Syslog server that receives the event.
     type: str
     env:
       - name: SYSLOG_SERVER

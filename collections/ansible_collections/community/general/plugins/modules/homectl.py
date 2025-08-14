@@ -65,7 +65,7 @@ options:
     type: str
   resize:
     description:
-      - When used with O(disksize) this will attempt to resize the home directory immediately.
+      - When used with O(disksize) this attempts to resize the home directory immediately.
     default: false
     type: bool
   realname:
@@ -297,8 +297,6 @@ else:
 
 
 class Homectl(object):
-    '''#TODO DOC STRINGS'''
-
     def __init__(self, module):
         self.module = module
         self.state = module.params['state']

@@ -193,7 +193,7 @@ options:
   quietfail:
     description:
       - Suppresses display of the build log on stdout (--quiet-fail).
-      - Only the die message and the path of the build log will be displayed on stdout.
+      - Only the die message and the path of the build log are displayed on stdout.
     type: bool
     default: false
 
@@ -282,7 +282,7 @@ def query_atom(module, atom, action):
     return bool(exists)
 
 
-def query_set(module, set, action):
+def query_set(module, set_, action):
     system_sets = [
         '@live-rebuild',
         '@module-rebuild',
@@ -294,16 +294,16 @@ def query_set(module, set, action):
         '@x11-module-rebuild',
     ]
 
-    if set in system_sets:
+    if set_ in system_sets:
         if action == 'unmerge':
-            module.fail_json(msg='set %s cannot be removed' % set)
+            module.fail_json(msg='set %s cannot be removed' % set_)
         return False
 
     world_sets_path = '/var/lib/portage/world_sets'
     if not os.path.exists(world_sets_path):
         return False
 
-    cmd = 'grep %s %s' % (set, world_sets_path)
+    cmd = ['grep', set_, world_sets_path]
 
     rc, out, err = module.run_command(cmd)
     return rc == 0
@@ -315,9 +315,9 @@ def sync_repositories(module, webrsync=False):
 
     if webrsync:
         webrsync_path = module.get_bin_path('emerge-webrsync', required=True)
-        cmd = '%s --quiet' % webrsync_path
+        cmd = [webrsync_path, '--quiet']
     else:
-        cmd = '%s --sync --quiet --ask=n' % module.emerge_path
+        cmd = [module.emerge_path, '--sync', '--quiet', '--ask=n']
 
     rc, out, err = module.run_command(cmd)
     if rc != 0:
@@ -510,13 +510,13 @@ portage_absent_states = ['absent', 'unmerged', 'removed']
 def main():
     module = AnsibleModule(
         argument_spec=dict(
-            package=dict(type='list', elements='str', default=None, aliases=['name']),
+            package=dict(type='list', elements='str', aliases=['name']),
             state=dict(
                 default=portage_present_states[0],
                 choices=portage_present_states + portage_absent_states,
             ),
             update=dict(default=False, type='bool'),
-            backtrack=dict(default=None, type='int'),
+            backtrack=dict(type='int'),
             deep=dict(default=False, type='bool'),
             newuse=dict(default=False, type='bool'),
             changed_use=dict(default=False, type='bool'),
@@ -525,18 +525,18 @@ def main():
             nodeps=dict(default=False, type='bool'),
             onlydeps=dict(default=False, type='bool'),
             depclean=dict(default=False, type='bool'),
-            select=dict(default=None, type='bool'),
+            select=dict(type='bool'),
             quiet=dict(default=False, type='bool'),
             verbose=dict(default=False, type='bool'),
-            sync=dict(default=None, choices=['yes', 'web', 'no']),
+            sync=dict(choices=['yes', 'web', 'no']),
             getbinpkgonly=dict(default=False, type='bool'),
             getbinpkg=dict(default=False, type='bool'),
             usepkgonly=dict(default=False, type='bool'),
             usepkg=dict(default=False, type='bool'),
             keepgoing=dict(default=False, type='bool'),
-            jobs=dict(default=None, type='int'),
-            loadavg=dict(default=None, type='float'),
-            withbdeps=dict(default=None, type='bool'),
+            jobs=dict(type='int'),
+            loadavg=dict(type='float'),
+            withbdeps=dict(type='bool'),
             quietbuild=dict(default=False, type='bool'),
             quietfail=dict(default=False, type='bool'),
         ),

@@ -113,22 +113,6 @@ result:
   description: Message about action taken.
   returned: always
   type: str
-warnings:
-  description: List of warning messages.
-  returned: when needed
-  type: list
-rc:
-  description: Return code of underlying command.
-  returned: failed
-  type: int
-stdout:
-  description: The stdout of underlying command.
-  returned: failed
-  type: str
-stderr:
-  description: The stderr of underlying command.
-  returned: failed
-  type: str
 """
 
 import re
@@ -164,12 +148,12 @@ def _module_is_enabled(module):
         if module.params['ignore_configcheck']:
             if 'AH00534' in stderr and 'mpm_' in module.params['name']:
                 if module.params['warn_mpm_absent']:
-                    module.warnings.append(
+                    module.warn(
                         "No MPM module loaded! apache2 reload AND other module actions"
                         " will fail if no MPM module is loaded immediately."
                     )
             else:
-                module.warnings.append(error_msg)
+                module.warn(error_msg)
             return False
         else:
             module.fail_json(msg=error_msg)
@@ -224,9 +208,7 @@ def _set_state(module, state):
 
     if _module_is_enabled(module) != want_enabled:
         if module.check_mode:
-            module.exit_json(changed=True,
-                             result=success_msg,
-                             warnings=module.warnings)
+            module.exit_json(changed=True, result=success_msg)
 
         a2mod_binary_path = module.get_bin_path(a2mod_binary)
         if a2mod_binary_path is None:
@@ -241,9 +223,7 @@ def _set_state(module, state):
         result, stdout, stderr = module.run_command(a2mod_binary_cmd + [name])
 
         if _module_is_enabled(module) == want_enabled:
-            module.exit_json(changed=True,
-                             result=success_msg,
-                             warnings=module.warnings)
+            module.exit_json(changed=True, result=success_msg)
         else:
             msg = (
                 'Failed to set module {name} to {state}:\n'
@@ -261,9 +241,7 @@ def _set_state(module, state):
                              stdout=stdout,
                              stderr=stderr)
     else:
-        module.exit_json(changed=False,
-                         result=success_msg,
-                         warnings=module.warnings)
+        module.exit_json(changed=False, result=success_msg)
 
 
 def main():
@@ -278,8 +256,6 @@ def main():
         ),
         supports_check_mode=True,
     )
-
-    module.warnings = []
 
     name = module.params['name']
     if name == 'cgi' and _run_threaded(module):

@@ -1,12 +1,9 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2023, Felix Fontein <felix@fontein.de>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
+from __future__ import annotations
 
-
-__metaclass__ = type
 
 DOCUMENTATION = r"""
 name: gpg_fingerprint
@@ -45,27 +42,42 @@ _value:
   elements: string
 """
 
+import os
+import typing as t
+
 from ansible.errors import AnsibleLookupError
-from ansible.module_utils.common.text.converters import to_native
+from ansible.module_utils.common.text.converters import to_text
 from ansible.plugins.lookup import LookupBase
-from ansible_collections.community.crypto.plugins.module_utils.gnupg.cli import (
+from ansible_collections.community.crypto.plugins.module_utils._gnupg.cli import (
     GPGError,
     get_fingerprint_from_file,
 )
-from ansible_collections.community.crypto.plugins.plugin_utils.gnupg import (
+from ansible_collections.community.crypto.plugins.plugin_utils._gnupg import (
     PluginGPGRunner,
 )
 
 
 class LookupModule(LookupBase):
-    def run(self, terms, variables=None, **kwargs):
+    def run(
+        self, terms: list[t.Any], variables: None = None, **kwargs: t.Any
+    ) -> list[str]:
         self.set_options(direct=kwargs)
+        if self._loader is None:
+            raise AssertionError(
+                "Contract violation: self._loader is None"
+            )  # pragma: no cover
 
         try:
             gpg = PluginGPGRunner(cwd=self._loader.get_basedir())
             result = []
-            for path in terms:
-                result.append(get_fingerprint_from_file(gpg, path))
+            for i, path in enumerate(terms):
+                if not isinstance(path, (str, bytes, os.PathLike)):
+                    raise AnsibleLookupError(
+                        f"Lookup parameter #{i} should be string or a path object, but got {type(path)}"
+                    )
+                result.append(
+                    get_fingerprint_from_file(gpg_runner=gpg, path=to_text(path))
+                )
             return result
         except GPGError as exc:
-            raise AnsibleLookupError(to_native(exc))
+            raise AnsibleLookupError(str(exc)) from exc

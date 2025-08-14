@@ -21,8 +21,8 @@ attributes:
     support: partial
     details:
       - For C(check_mode) to work, the specified O(login_user) needs permission to run the C(GET) command on the key, otherwise
-        the module will fail.
-      - When using C(check_mode) the module will try to calculate the value that Redis would return. If the key is not present,
+        the module fails.
+      - When using C(check_mode) the module tries to calculate the value that Redis would return. If the key is not present,
         V(0.0) is used as value.
   diff_mode:
     support: none
@@ -98,8 +98,8 @@ def main():
     redis_auth_args = redis_auth_argument_spec()
     module_args = dict(
         key=dict(type='str', required=True, no_log=False),
-        increment_int=dict(type='int', required=False),
-        increment_float=dict(type='float', required=False),
+        increment_int=dict(type='int'),
+        increment_float=dict(type='float'),
     )
     module_args.update(redis_auth_args)
 

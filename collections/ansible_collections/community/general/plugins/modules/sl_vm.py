@@ -173,8 +173,16 @@ options:
     type: int
 requirements:
   - softlayer >= 4.1.1
+notes:
+  - If using Python 2.7, you must install C(softlayer-python<=5.7.2).
+  - If using Python 3.6, you must install C(softlayer-python<=6.0.0).
+  - The C(softlayer-python) library, at version 6.2.6 (from Jan 2025), only supports Python version 3.8, 3.9 and 3.10.
 author:
   - Matt Colton (@mcltn)
+seealso:
+  - name: SoftLayer API Python Client
+    description: The SoftLayer API Python Client is required for this module.
+    link: https://github.com/SoftLayer/softlayer-python
 """
 
 EXAMPLES = r"""
@@ -311,9 +319,9 @@ def create_virtual_instance(module):
         return False, None
 
     # Check if OS or Image Template is provided (Can't be both, defaults to OS)
-    if (module.params.get('os_code') is not None and module.params.get('os_code') != ''):
+    if module.params.get('os_code') is not None and module.params.get('os_code') != '':
         module.params['image_id'] = ''
-    elif (module.params.get('image_id') is not None and module.params.get('image_id') != ''):
+    elif module.params.get('image_id') is not None and module.params.get('image_id') != '':
         module.params['os_code'] = ''
         module.params['disks'] = []  # Blank out disks since it will use the template
     else:

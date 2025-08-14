@@ -51,7 +51,7 @@ options:
     default: "https://api.honeybadger.io/v1/deploys"
   validate_certs:
     description:
-      - If V(false), SSL certificates for the target URL will not be validated. This should only be used on personally controlled
+      - If V(false), SSL certificates for the target URL are not validated. This should only be used on personally controlled
         sites using self-signed certificates.
     type: bool
     default: true
@@ -88,9 +88,9 @@ def main():
             token=dict(required=True, no_log=True),
             environment=dict(required=True),
             user=dict(required=False),
-            repo=dict(required=False),
-            revision=dict(required=False),
-            url=dict(required=False, default='https://api.honeybadger.io/v1/deploys'),
+            repo=dict(),
+            revision=dict(),
+            url=dict(default='https://api.honeybadger.io/v1/deploys'),
             validate_certs=dict(default=True, type='bool'),
         ),
         supports_check_mode=True

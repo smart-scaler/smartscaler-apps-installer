@@ -27,7 +27,7 @@ options:
       - org
     default: null
     description:
-      - Name of the Pritunl organization to search for. If none provided, the module will return all Pritunl organizations.
+      - Name of the Pritunl organization to search for. If none provided, the module returns all Pritunl organizations.
 """
 
 EXAMPLES = r"""
@@ -113,7 +113,7 @@ def main():
 
     argument_spec.update(
         dict(
-            organization=dict(required=False, type="str", default=None, aliases=["org"])
+            organization=dict(type="str", aliases=["org"])
         )
     )
 

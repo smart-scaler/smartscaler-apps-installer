@@ -29,7 +29,7 @@ options:
   name:
     type: str
     description:
-      - The name of the object. Will be used to identify the entry.
+      - The name of the object that identifies the entry.
     required: true
   address:
     type: str
@@ -130,7 +130,7 @@ result:
       description: Whether the ipv6 address is resolved or not.
       type: bool
     timeout:
-      description: The timeout until a new resolving will be attempted.
+      description: The timeout until a new resolving is attempted.
       type: int
 """
 
@@ -144,14 +144,14 @@ def main():
     module = UTMModule(
         argument_spec=dict(
             name=dict(type='str', required=True),
-            address=dict(type='str', required=False, default='0.0.0.0'),
-            address6=dict(type='str', required=False, default='::'),
-            comment=dict(type='str', required=False, default=""),
-            hostname=dict(type='str', required=False),
-            interface=dict(type='str', required=False, default=""),
-            resolved=dict(type='bool', required=False, default=False),
-            resolved6=dict(type='bool', required=False, default=False),
-            timeout=dict(type='int', required=False, default=0),
+            address=dict(type='str', default='0.0.0.0'),
+            address6=dict(type='str', default='::'),
+            comment=dict(type='str', default=""),
+            hostname=dict(type='str'),
+            interface=dict(type='str', default=""),
+            resolved=dict(type='bool', default=False),
+            resolved6=dict(type='bool', default=False),
+            timeout=dict(type='int', default=0),
         )
     )
     try:

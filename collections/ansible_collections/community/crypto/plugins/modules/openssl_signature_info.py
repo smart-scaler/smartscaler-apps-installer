@@ -1,14 +1,9 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2019, Patrick Pichler <ppichler+ansible@mgit.at>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -18,15 +13,14 @@ short_description: Verify signatures with openssl
 description:
   - This module allows one to verify a signature for a file by a certificate.
   - The module uses the cryptography Python library.
-requirements:
-  - cryptography >= 1.4 (some key types require newer versions)
 author:
   - Patrick Pichler (@aveexy)
   - Markus Teufelberger (@MarkusTeufelberger)
 extends_documentation_fragment:
-  - community.crypto.attributes
-  - community.crypto.attributes.info_module
-  - community.crypto.attributes.idempotent_not_modify_state
+  - community.crypto._attributes
+  - community.crypto._attributes.info_module
+  - community.crypto._attributes.idempotent_not_modify_state
+  - community.crypto._cryptography_dep.minimum
 options:
   path:
     description:
@@ -53,13 +47,12 @@ options:
       - Determines which crypto backend to use.
       - The default choice is V(auto), which tries to use C(cryptography) if available.
       - If set to V(cryptography), will try to use the L(cryptography,https://cryptography.io/) library.
+      - Note that with community.crypto 3.0.0, all values behave the same.
+        This option will be deprecated in a later version.
+        We recommend to not set it explicitly.
     type: str
     default: auto
     choices: [auto, cryptography]
-notes:
-  - "When using the C(cryptography) backend, the following key types require at least the following C(cryptography) version:\n
-    RSA keys: C(cryptography) >= 1.4\nDSA and ECDSA keys: C(cryptography) >= 1.5\ned448 and ed25519 keys: C(cryptography)
-    >= 2.6."
 seealso:
   - module: community.crypto.openssl_signature
   - module: community.crypto.x509_certificate
@@ -95,16 +88,19 @@ valid:
 
 import base64
 import os
-import traceback
+import typing as t
 
-from ansible_collections.community.crypto.plugins.module_utils.version import (
+from ansible_collections.community.crypto.plugins.module_utils._cryptography_dep import (
+    COLLECTION_MINIMUM_CRYPTOGRAPHY_VERSION,
+    assert_required_cryptography_version,
+)
+from ansible_collections.community.crypto.plugins.module_utils._version import (
     LooseVersion,
 )
 
 
-MINIMAL_CRYPTOGRAPHY_VERSION = "1.4"
+MINIMAL_CRYPTOGRAPHY_VERSION = COLLECTION_MINIMUM_CRYPTOGRAPHY_VERSION
 
-CRYPTOGRAPHY_IMP_ERR = None
 try:
     import cryptography
     import cryptography.hazmat.primitives.asymmetric.padding
@@ -112,65 +108,55 @@ try:
 
     CRYPTOGRAPHY_VERSION = LooseVersion(cryptography.__version__)
 except ImportError:
-    CRYPTOGRAPHY_IMP_ERR = traceback.format_exc()
-    CRYPTOGRAPHY_FOUND = False
-else:
-    CRYPTOGRAPHY_FOUND = True
+    CRYPTOGRAPHY_VERSION = LooseVersion("0.0")
 
-from ansible.module_utils.basic import AnsibleModule, missing_required_lib
-from ansible.module_utils.common.text.converters import to_native
-from ansible_collections.community.crypto.plugins.module_utils.crypto.basic import (
-    CRYPTOGRAPHY_HAS_DSA_SIGN,
-    CRYPTOGRAPHY_HAS_EC_SIGN,
-    CRYPTOGRAPHY_HAS_ED448_SIGN,
-    CRYPTOGRAPHY_HAS_ED25519_SIGN,
-    CRYPTOGRAPHY_HAS_RSA_SIGN,
+from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.community.crypto.plugins.module_utils._crypto.basic import (
     OpenSSLObjectError,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.support import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.support import (
     OpenSSLObject,
     load_certificate,
 )
 
 
 class SignatureInfoBase(OpenSSLObject):
-
-    def __init__(self, module, backend):
-        super(SignatureInfoBase, self).__init__(
+    def __init__(self, module: AnsibleModule) -> None:
+        super().__init__(
             path=module.params["path"],
             state="present",
             force=False,
             check_mode=module.check_mode,
         )
 
-        self.backend = backend
+        self.module = module
+        self.signature: str = module.params["signature"]
+        self.certificate_path: str | None = module.params["certificate_path"]
+        certificate_content: str | None = module.params["certificate_content"]
+        if certificate_content is not None:
+            self.certificate_content: bytes | None = certificate_content.encode("utf-8")
+        else:
+            self.certificate_content = None
 
-        self.signature = module.params["signature"]
-        self.certificate_path = module.params["certificate_path"]
-        self.certificate_content = module.params["certificate_content"]
-        if self.certificate_content is not None:
-            self.certificate_content = self.certificate_content.encode("utf-8")
-
-    def generate(self):
+    def generate(self, module: AnsibleModule) -> None:
         # Empty method because OpenSSLObject wants this
         pass
 
-    def dump(self):
+    def dump(self) -> dict[str, t.Any]:
         # Empty method because OpenSSLObject wants this
-        pass
+        return {}
 
 
 # Implementation with using cryptography
 class SignatureInfoCryptography(SignatureInfoBase):
+    def __init__(self, module: AnsibleModule) -> None:
+        super().__init__(module)
 
-    def __init__(self, module, backend):
-        super(SignatureInfoCryptography, self).__init__(module, backend)
-
-    def run(self):
+    def run(self) -> dict[str, t.Any]:
         _padding = cryptography.hazmat.primitives.asymmetric.padding.PKCS1v15()
         _hash = cryptography.hazmat.primitives.hashes.SHA256()
 
-        result = dict()
+        result: dict[str, t.Any] = {}
 
         try:
             with open(self.path, "rb") as f:
@@ -180,105 +166,83 @@ class SignatureInfoCryptography(SignatureInfoBase):
             certificate = load_certificate(
                 path=self.certificate_path,
                 content=self.certificate_content,
-                backend=self.backend,
             )
             public_key = certificate.public_key()
             verified = False
             valid = False
 
-            if CRYPTOGRAPHY_HAS_DSA_SIGN:
-                try:
-                    if isinstance(
-                        public_key,
-                        cryptography.hazmat.primitives.asymmetric.dsa.DSAPublicKey,
-                    ):
-                        public_key.verify(_signature, _in, _hash)
-                        verified = True
-                        valid = True
-                except cryptography.exceptions.InvalidSignature:
+            try:
+                if isinstance(
+                    public_key,
+                    cryptography.hazmat.primitives.asymmetric.dsa.DSAPublicKey,
+                ):
+                    public_key.verify(_signature, _in, _hash)
                     verified = True
-                    valid = False
+                    valid = True
 
-            if CRYPTOGRAPHY_HAS_EC_SIGN:
-                try:
-                    if isinstance(
-                        public_key,
-                        cryptography.hazmat.primitives.asymmetric.ec.EllipticCurvePublicKey,
-                    ):
-                        public_key.verify(
-                            _signature,
-                            _in,
-                            cryptography.hazmat.primitives.asymmetric.ec.ECDSA(_hash),
-                        )
-                        verified = True
-                        valid = True
-                except cryptography.exceptions.InvalidSignature:
+                elif isinstance(
+                    public_key,
+                    cryptography.hazmat.primitives.asymmetric.ec.EllipticCurvePublicKey,
+                ):
+                    public_key.verify(
+                        _signature,
+                        _in,
+                        cryptography.hazmat.primitives.asymmetric.ec.ECDSA(_hash),
+                    )
                     verified = True
-                    valid = False
+                    valid = True
 
-            if CRYPTOGRAPHY_HAS_ED25519_SIGN:
-                try:
-                    if isinstance(
-                        public_key,
-                        cryptography.hazmat.primitives.asymmetric.ed25519.Ed25519PublicKey,
-                    ):
-                        public_key.verify(_signature, _in)
-                        verified = True
-                        valid = True
-                except cryptography.exceptions.InvalidSignature:
+                elif isinstance(
+                    public_key,
+                    cryptography.hazmat.primitives.asymmetric.ed25519.Ed25519PublicKey,
+                ):
+                    public_key.verify(_signature, _in)
                     verified = True
-                    valid = False
+                    valid = True
 
-            if CRYPTOGRAPHY_HAS_ED448_SIGN:
-                try:
-                    if isinstance(
-                        public_key,
-                        cryptography.hazmat.primitives.asymmetric.ed448.Ed448PublicKey,
-                    ):
-                        public_key.verify(_signature, _in)
-                        verified = True
-                        valid = True
-                except cryptography.exceptions.InvalidSignature:
+                elif isinstance(
+                    public_key,
+                    cryptography.hazmat.primitives.asymmetric.ed448.Ed448PublicKey,
+                ):
+                    public_key.verify(_signature, _in)
                     verified = True
-                    valid = False
+                    valid = True
 
-            if CRYPTOGRAPHY_HAS_RSA_SIGN:
-                try:
-                    if isinstance(
-                        public_key,
-                        cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey,
-                    ):
-                        public_key.verify(_signature, _in, _padding, _hash)
-                        verified = True
-                        valid = True
-                except cryptography.exceptions.InvalidSignature:
+                elif isinstance(
+                    public_key,
+                    cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey,
+                ):
+                    public_key.verify(_signature, _in, _padding, _hash)
                     verified = True
-                    valid = False
+                    valid = True
+            except cryptography.exceptions.InvalidSignature:
+                verified = True
+                valid = False
 
             if not verified:
                 self.module.fail_json(
-                    msg="Unsupported key type. Your cryptography version is {0}".format(
-                        CRYPTOGRAPHY_VERSION
-                    )
+                    msg=f"Unsupported key type. Your cryptography version is {CRYPTOGRAPHY_VERSION}"
                 )
             result["valid"] = valid
             return result
 
         except Exception as e:
-            raise OpenSSLObjectError(e)
+            raise OpenSSLObjectError(e) from e
 
 
-def main():
+def main() -> t.NoReturn:
     module = AnsibleModule(
-        argument_spec=dict(
-            certificate_path=dict(type="path"),
-            certificate_content=dict(type="str"),
-            path=dict(type="path", required=True),
-            signature=dict(type="str", required=True),
-            select_crypto_backend=dict(
-                type="str", choices=["auto", "cryptography"], default="auto"
-            ),
-        ),
+        argument_spec={
+            "certificate_path": {"type": "path"},
+            "certificate_content": {"type": "str"},
+            "path": {"type": "path", "required": True},
+            "signature": {"type": "str", "required": True},
+            "select_crypto_backend": {
+                "type": "str",
+                "choices": ["auto", "cryptography"],
+                "default": "auto",
+            },
+        },
         mutually_exclusive=(["certificate_path", "certificate_content"],),
         required_one_of=(["certificate_path", "certificate_content"],),
         supports_check_mode=True,
@@ -287,45 +251,21 @@ def main():
     if not os.path.isfile(module.params["path"]):
         module.fail_json(
             name=module.params["path"],
-            msg="The file {0} does not exist".format(module.params["path"]),
+            msg=f"The file {module.params['path']} does not exist",
         )
 
-    backend = module.params["select_crypto_backend"]
-    if backend == "auto":
-        # Detection what is possible
-        can_use_cryptography = (
-            CRYPTOGRAPHY_FOUND
-            and CRYPTOGRAPHY_VERSION >= LooseVersion(MINIMAL_CRYPTOGRAPHY_VERSION)
-        )
+    assert_required_cryptography_version(
+        module, minimum_cryptography_version=MINIMAL_CRYPTOGRAPHY_VERSION
+    )
 
-        # Decision
-        if can_use_cryptography:
-            backend = "cryptography"
-
-        # Success?
-        if backend == "auto":
-            module.fail_json(
-                msg=(
-                    "Cannot detect any of the required Python libraries "
-                    "cryptography (>= {0})"
-                ).format(MINIMAL_CRYPTOGRAPHY_VERSION)
-            )
     try:
-        if backend == "cryptography":
-            if not CRYPTOGRAPHY_FOUND:
-                module.fail_json(
-                    msg=missing_required_lib(
-                        "cryptography >= {0}".format(MINIMAL_CRYPTOGRAPHY_VERSION)
-                    ),
-                    exception=CRYPTOGRAPHY_IMP_ERR,
-                )
-            _sign = SignatureInfoCryptography(module, backend)
+        _sign = SignatureInfoCryptography(module)
 
         result = _sign.run()
 
         module.exit_json(**result)
     except OpenSSLObjectError as exc:
-        module.fail_json(msg=to_native(exc))
+        module.fail_json(msg=str(exc))
 
 
 if __name__ == "__main__":

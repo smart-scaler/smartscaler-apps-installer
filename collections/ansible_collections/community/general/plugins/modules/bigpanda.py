@@ -75,7 +75,7 @@ options:
     default: "https://api.bigpanda.io"
   validate_certs:
     description:
-      - If V(false), SSL certificates for the target URL will not be validated. This should only be used on personally controlled
+      - If V(false), SSL certificates for the target URL are not validated. This should only be used on personally controlled
         sites using self-signed certificates.
     required: false
     default: true
@@ -150,14 +150,14 @@ def main():
             version=dict(required=True),
             token=dict(required=True, no_log=True),
             state=dict(required=True, choices=['started', 'finished', 'failed']),
-            hosts=dict(required=False, aliases=['host']),
-            env=dict(required=False),
-            owner=dict(required=False),
-            description=dict(required=False),
-            deployment_message=dict(required=False),
-            source_system=dict(required=False, default='ansible'),
+            hosts=dict(aliases=['host']),
+            env=dict(),
+            owner=dict(),
+            description=dict(),
+            deployment_message=dict(),
+            source_system=dict(default='ansible'),
             validate_certs=dict(default=True, type='bool'),
-            url=dict(required=False, default='https://api.bigpanda.io'),
+            url=dict(default='https://api.bigpanda.io'),
         ),
         supports_check_mode=True,
     )

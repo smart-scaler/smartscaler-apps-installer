@@ -1,14 +1,9 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 # Copyright (c) 2016, Yanis Guenane <yanis+ansible@guenane.org>
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import absolute_import, division, print_function
-
-
-__metaclass__ = type
+from __future__ import annotations
 
 
 DOCUMENTATION = r"""
@@ -25,9 +20,9 @@ author:
   - Felix Fontein (@felixfontein)
 extends_documentation_fragment:
   - ansible.builtin.files
-  - community.crypto.attributes
-  - community.crypto.attributes.files
-  - community.crypto.module_privatekey
+  - community.crypto._attributes
+  - community.crypto._attributes.files
+  - community.crypto._module_privatekey
 attributes:
   check_mode:
     support: full
@@ -160,47 +155,57 @@ privatekey:
 """
 
 import os
+import typing as t
 
-from ansible.module_utils.common.text.converters import to_native
-from ansible_collections.community.crypto.plugins.module_utils.crypto.basic import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.basic import (
     OpenSSLObjectError,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.module_backends.privatekey import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.module_backends.privatekey import (
     get_privatekey_argument_spec,
     select_backend,
 )
-from ansible_collections.community.crypto.plugins.module_utils.crypto.support import (
+from ansible_collections.community.crypto.plugins.module_utils._crypto.support import (
     OpenSSLObject,
 )
-from ansible_collections.community.crypto.plugins.module_utils.io import (
+from ansible_collections.community.crypto.plugins.module_utils._io import (
     load_file_if_exists,
     write_file,
 )
 
 
-class PrivateKeyModule(OpenSSLObject):
+if t.TYPE_CHECKING:
+    from ansible.module_utils.basic import AnsibleModule  # pragma: no cover
+    from ansible_collections.community.crypto.plugins.module_utils._crypto.module_backends.privatekey import (  # pragma: no cover
+        PrivateKeyBackend,
+    )
 
-    def __init__(self, module, module_backend):
-        super(PrivateKeyModule, self).__init__(
-            module.params["path"],
-            module.params["state"],
-            module.params["force"],
-            module.check_mode,
+
+class PrivateKeyModule(OpenSSLObject):
+    def __init__(
+        self, module: AnsibleModule, module_backend: PrivateKeyBackend
+    ) -> None:
+        super().__init__(
+            path=module.params["path"],
+            state=module.params["state"],
+            force=module.params["force"],
+            check_mode=module.check_mode,
         )
         self.module_backend = module_backend
-        self.return_content = module.params["return_content"]
+        self.return_content: bool = module.params["return_content"]
         if self.force:
             module_backend.regenerate = "always"
 
-        self.backup = module.params["backup"]
-        self.backup_file = None
+        self.backup: str | None = module.params["backup"]
+        self.backup_file: str | None = None
 
         if module.params["mode"] is None:
             module.params["mode"] = "0600"
 
-        module_backend.set_existing(load_file_if_exists(self.path, module))
+        module_backend.set_existing(
+            privatekey_bytes=load_file_if_exists(path=self.path, module=module)
+        )
 
-    def generate(self, module):
+    def generate(self, module: AnsibleModule) -> None:
         """Generate a keypair."""
 
         if self.module_backend.needs_regeneration():
@@ -210,9 +215,7 @@ class PrivateKeyModule(OpenSSLObject):
                     self.backup_file = module.backup_local(self.path)
                 self.module_backend.generate_private_key()
                 privatekey_data = self.module_backend.get_private_key_data()
-                if self.return_content:
-                    self.privatekey_bytes = privatekey_data
-                write_file(module, privatekey_data, 0o600)
+                write_file(module=module, content=privatekey_data, default_mode=0o600)
             self.changed = True
         elif self.module_backend.needs_conversion():
             # Convert
@@ -221,9 +224,7 @@ class PrivateKeyModule(OpenSSLObject):
                     self.backup_file = module.backup_local(self.path)
                 self.module_backend.convert_private_key()
                 privatekey_data = self.module_backend.get_private_key_data()
-                if self.return_content:
-                    self.privatekey_bytes = privatekey_data
-                write_file(module, privatekey_data, 0o600)
+                write_file(module=module, content=privatekey_data, default_mode=0o600)
             self.changed = True
 
         file_args = module.load_file_common_arguments(module.params)
@@ -234,13 +235,13 @@ class PrivateKeyModule(OpenSSLObject):
                 file_args, self.changed
             )
 
-    def remove(self, module):
-        self.module_backend.set_existing(None)
+    def remove(self, module: AnsibleModule) -> None:
+        self.module_backend.set_existing(privatekey_bytes=None)
         if self.backup and not self.check_mode:
             self.backup_file = module.backup_local(self.path)
-        super(PrivateKeyModule, self).remove(module)
+        super().remove(module)
 
-    def dump(self):
+    def dump(self) -> dict[str, t.Any]:
         """Serialize the object into a dictionary."""
 
         result = self.module_backend.dump(include_key=self.return_content)
@@ -252,17 +253,20 @@ class PrivateKeyModule(OpenSSLObject):
         return result
 
 
-def main():
-
+def main() -> t.NoReturn:
     argument_spec = get_privatekey_argument_spec()
     argument_spec.argument_spec.update(
-        dict(
-            state=dict(type="str", default="present", choices=["present", "absent"]),
-            force=dict(type="bool", default=False),
-            path=dict(type="path", required=True),
-            backup=dict(type="bool", default=False),
-            return_content=dict(type="bool", default=False),
-        )
+        {
+            "state": {
+                "type": "str",
+                "default": "present",
+                "choices": ["present", "absent"],
+            },
+            "force": {"type": "bool", "default": False},
+            "path": {"type": "path", "required": True},
+            "backup": {"type": "bool", "default": False},
+            "return_content": {"type": "bool", "default": False},
+        }
     )
     module = argument_spec.create_ansible_module(
         supports_check_mode=True,
@@ -273,14 +277,10 @@ def main():
     if not os.path.isdir(base_dir):
         module.fail_json(
             name=base_dir,
-            msg="The directory %s does not exist or the file is not a directory"
-            % base_dir,
+            msg=f"The directory {base_dir} does not exist or the file is not a directory",
         )
 
-    backend, module_backend = select_backend(
-        module=module,
-        backend=module.params["select_crypto_backend"],
-    )
+    module_backend = select_backend(module=module)
 
     try:
         private_key = PrivateKeyModule(module, module_backend)
@@ -293,7 +293,7 @@ def main():
         result = private_key.dump()
         module.exit_json(**result)
     except OpenSSLObjectError as exc:
-        module.fail_json(msg=to_native(exc))
+        module.fail_json(msg=str(exc))
 
 
 if __name__ == "__main__":

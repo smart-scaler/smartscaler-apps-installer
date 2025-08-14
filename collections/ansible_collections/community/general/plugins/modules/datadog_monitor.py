@@ -92,26 +92,26 @@ options:
     type: dict
     description:
       - Dictionary of scopes to silence, with timestamps or None.
-      - Each scope will be muted until the given POSIX timestamp or forever if the value is None.
+      - Each scope is muted until the given POSIX timestamp or forever if the value is V(None).
   notify_no_data:
     description:
-      - Whether this monitor will notify when data stops reporting.
+      - Whether this monitor notifies when data stops reporting.
     type: bool
     default: false
   no_data_timeframe:
     description:
-      - The number of minutes before a monitor will notify when data stops reporting.
+      - The number of minutes before a monitor notifies when data stops reporting.
       - Must be at least 2x the monitor timeframe for metric alerts or 2 minutes for service checks.
       - If not specified, it defaults to 2x timeframe for metric, 2 minutes for service.
     type: str
   timeout_h:
     description:
-      - The number of hours of the monitor not reporting data before it will automatically resolve from a triggered state.
+      - The number of hours of the monitor not reporting data before it automatically resolves from a triggered state.
     type: str
   renotify_interval:
     description:
-      - The number of minutes after the last notification before a monitor will re-notify on the current status.
-      - It will only re-notify if it is not resolved.
+      - The number of minutes after the last notification before a monitor re-notifies on the current status.
+      - It only re-notifies if it is not resolved.
     type: str
   escalation_message:
     description:
@@ -120,7 +120,7 @@ options:
     type: str
   notify_audit:
     description:
-      - Whether tagged users will be notified on changes to this monitor.
+      - Whether tagged users are notified on changes to this monitor.
     type: bool
     default: false
   thresholds:
@@ -138,7 +138,7 @@ options:
   require_full_window:
     description:
       - Whether this monitor needs a full window of data before it gets evaluated.
-      - We highly recommend you set this to False for sparse metrics, otherwise some evaluations will be skipped.
+      - We highly recommend you set this to V(false) for sparse metrics, otherwise some evaluations are skipped.
     type: bool
   new_host_delay:
     description:
@@ -153,7 +153,7 @@ options:
   id:
     description:
       - The ID of the alert.
-      - If set, will be used instead of the name to locate the alert.
+      - If set, it is used instead of O(name) to locate the alert.
     type: str
   include_tags:
     description:
@@ -275,14 +275,14 @@ def main():
             renotify_interval=dict(),
             escalation_message=dict(),
             notify_audit=dict(default=False, type='bool'),
-            thresholds=dict(type='dict', default=None),
-            tags=dict(type='list', elements='str', default=None),
+            thresholds=dict(type='dict'),
+            tags=dict(type='list', elements='str'),
             locked=dict(default=False, type='bool'),
             require_full_window=dict(type='bool'),
             new_host_delay=dict(),
             evaluation_delay=dict(),
             id=dict(),
-            include_tags=dict(required=False, default=True, type='bool'),
+            include_tags=dict(default=True, type='bool'),
             priority=dict(type='int'),
             notification_preset_name=dict(choices=['show_all', 'hide_query', 'hide_handles', 'hide_all']),
             renotify_occurrences=dict(type='int'),
@@ -435,7 +435,7 @@ def mute_monitor(module):
         module.fail_json(msg="Monitor %s not found!" % module.params['name'])
     elif monitor['options']['silenced']:
         module.fail_json(msg="Monitor is already muted. Datadog does not allow to modify muted alerts, consider unmuting it first.")
-    elif (module.params['silenced'] is not None and len(set(monitor['options']['silenced']) ^ set(module.params['silenced'])) == 0):
+    elif module.params['silenced'] is not None and len(set(monitor['options']['silenced']) ^ set(module.params['silenced'])) == 0:
         module.exit_json(changed=False)
     try:
         if module.params['silenced'] is None or module.params['silenced'] == "":
