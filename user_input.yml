@@ -146,16 +146,9 @@ k3s_deployment:
     # Node Taints
     node_taints: {}                            # Taints to apply to nodes
 
-  # NVIDIA Container Runtime Configuration
-  # Required for GPU support in the cluster
-  nvidia_runtime:
-    enabled: true                           # Enable NVIDIA container runtime
-                                          # Set to true if using NVIDIA GPUs
-    install_toolkit: true                   # Install NVIDIA Container Toolkit
-                                          # Required for GPU support
-    configure_containerd: true              # Configure containerd for NVIDIA runtime
-    create_runtime_class: true              # Create Kubernetes RuntimeClass for NVIDIA
-    architecture: "amd64"                   # Architecture for NVIDIA container runtime package
+
+
+
 
   # Kubernetes Component Configuration
   # Core Kubernetes infrastructure choices
@@ -264,6 +257,76 @@ k3s_deployment:
 ###############################################################################
 
 skip_prerequisites: false
+
+# Jetson Prerequisites Configuration
+# Automatically detect Jetson devices and install jetson-stats for monitoring
+# This works for BOTH K3s and Kubespray deployments
+jetson_prerequisites:
+  enabled: true                           # Enable Jetson detection and jetson-stats installation
+                                          # Set to true to automatically detect and configure Jetson devices
+  
+  # jetson-stats installation options
+  jetson_stats:
+    force_reinstall: false                # Force reinstallation even if already present
+    upgrade: true                         # Upgrade to latest version
+    python_version: "python3"            # Python version to use (python3 is default)
+    pip_extra_args: "--upgrade"          # Additional pip arguments
+  
+  # Detection methods to use
+  detection_methods:
+    - device_tree_model                   # Check /proc/device-tree/model
+    - device_tree_compatible              # Check /proc/device-tree/compatible
+    - nv_tegra_release                   # Check /etc/nv_tegra_release
+    - system_architecture                 # Check system architecture
+  
+  # Timeout for jtop test (seconds)
+  jtop_test_timeout: 5
+  
+  # Verbose output
+  verbose: false
+
+# NVIDIA Prerequisites Configuration
+# Automatically detect NVIDIA GPUs and install container runtime support
+# This works for BOTH K3s and Kubespray deployments
+nvidia_prerequisites:
+  enabled: true                           # Enable NVIDIA GPU detection and container runtime setup
+                                          # Set to true if using NVIDIA GPUs in your cluster
+  
+  # NVIDIA Container Runtime Configuration
+  container_runtime:
+    install_toolkit: true                  # Install NVIDIA Container Toolkit
+                                          # Required for GPU support in containers
+    configure_containerd: true             # Configure containerd for NVIDIA runtime
+    create_runtime_class: true             # Create Kubernetes RuntimeClass for NVIDIA
+    architecture: "amd64"                  # Architecture for NVIDIA container runtime package
+  
+  # NVIDIA Driver Configuration
+  driver:
+    auto_install: false                    # Automatically install NVIDIA drivers (use with caution)
+    version: "latest"                      # Driver version to install (latest, specific version, or auto)
+    install_method: "package"              # Installation method: package, runfile, or container
+  
+  # GPU Detection and Validation
+  detection:
+    enabled: true                          # Enable automatic GPU detection
+    methods:
+      - nvidia_smi                         # Use nvidia-smi command
+      - lspci                              # Use lspci to find NVIDIA devices
+      - device_files                       # Check for /dev/nvidia* files
+      - kernel_modules                     # Check for loaded nvidia kernel modules
+  
+  # Verification Settings
+  verification:
+    test_gpu_access: true                  # Test GPU access from containers
+    create_test_pod: true                  # Create test pod to verify GPU functionality
+    timeout: 300                           # Timeout for verification tests (seconds)
+  
+  # Advanced Settings
+  advanced:
+    enable_mps: false                      # Enable NVIDIA Multi-Process Service
+    enable_uvm: true                       # Enable Unified Virtual Memory
+    enable_persistent_mode: true           # Enable persistent mode for GPUs
+    verbose: false                         # Verbose output during installation
 
 # Validation and Execution Settings
 validate_prerequisites:

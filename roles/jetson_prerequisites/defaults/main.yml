@@ -1,0 +1,33 @@
+---
+# Jetson Prerequisites Role Defaults
+
+# Enable/disable Jetson detection and jetson-stats installation
+jetson_prerequisites:
+  enabled: true
+  
+  # jetson-stats installation options
+  jetson_stats:
+    # Force reinstallation even if already present
+    force_reinstall: false
+    
+    # Upgrade to latest version
+    upgrade: true
+    
+    # Python version to use (python3 is default)
+    python_version: "python3"
+    
+    # Additional pip arguments
+    pip_extra_args: "--upgrade"
+    
+  # Detection methods to use
+  detection_methods:
+    - device_tree_model
+    - device_tree_compatible
+    - nv_tegra_release
+    - system_architecture
+    
+  # Timeout for jtop test (seconds)
+  jtop_test_timeout: 5
+  
+  # Verbose output
+  verbose: false

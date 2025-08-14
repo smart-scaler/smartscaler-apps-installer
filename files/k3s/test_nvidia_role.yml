@@ -1,0 +1,36 @@
+---
+# Test NVIDIA Prerequisites Role (Independent Testing)
+# This playbook tests the NVIDIA role independently of Kubernetes deployment
+# 
+# 🚀 Platform Support: Works for BOTH K3s and Kubespray deployments!
+# Use this role before any Kubernetes deployment to ensure NVIDIA GPU support is properly configured
+
+- name: Test NVIDIA Prerequisites Role (Independent Testing)
+  hosts: all
+  become: true
+  gather_facts: true
+  
+  vars:
+    nvidia_prerequisites:
+      enabled: true
+      container_runtime:
+        install_toolkit: true
+        configure_containerd: true
+        create_runtime_class: true
+        architecture: "amd64"
+      detection:
+        enabled: true
+        methods:
+          - nvidia_smi
+          - lspci
+          - device_files
+          - kernel_modules
+      verification:
+        test_gpu_access: true
+        create_test_pod: true
+        timeout: 300
+      advanced:
+        verbose: true
+  
+  roles:
+    - nvidia_prerequisites
