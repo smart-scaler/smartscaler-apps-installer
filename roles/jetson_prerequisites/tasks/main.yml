@@ -510,6 +510,8 @@
         jtop_service_config: {'stdout': 'Service config not available'}
         jtop_service_enabled: {'stdout': 'Service boot status not available'}
         jtop_sock_permissions: {'stdout': 'Permissions not available'}
+        jtop_sock_connectivity: {'stdout': 'Connectivity not tested'}
+        jtop_sock_container_access: {'stdout': 'Container access not tested'}
       when: is_jetson
       
     - name: Display jtop.sock status
@@ -556,7 +558,8 @@
       
     - name: Display jtop.sock connectivity result
       debug:
-        msg: "{{ jtop_sock_connectivity.stdout }}"
+        msg: "{{ jtop_sock_connectivity.stdout | default('Connectivity not tested') }}"
+      when: jtop_sock_connectivity is defined
         
     - name: Check jtop.sock permissions for container access
       shell: ls -la /run/jtop.sock 2>/dev/null | awk '{print $1, $3, $4}' || echo "Cannot check permissions"
@@ -566,7 +569,8 @@
       
     - name: Display jtop.sock permissions
       debug:
-        msg: "jtop.sock permissions: {{ jtop_sock_permissions.stdout }}"
+        msg: "jtop.sock permissions: {{ jtop_sock_permissions.stdout | default('Permissions not available') }}"
+      when: jtop_sock_permissions is defined
         
     - name: Verify jtop.sock is accessible by containers
       shell: timeout 5s python3 -c "import os; print('Container accessible:', os.access('/run/jtop.sock', os.R_OK))" 2>/dev/null || echo "Cannot verify container access"
@@ -576,7 +580,8 @@
       
     - name: Display container access verification
       debug:
-        msg: "{{ jtop_sock_container_access.stdout }}"
+        msg: "{{ jtop_sock_container_access.stdout | default('Container access not tested') }}"
+      when: jtop_sock_container_access is defined
         
   when: 
     - jetson_prerequisites.enabled | default(false)
@@ -605,15 +610,15 @@
       ================================
       ✅ Device Detection: {{ 'PASS' if jetson_gpu_info.is_jetson | default(false) else 'N/A' }}
       ✅ jetson-stats Installation: {{ 'PASS' if jetson_gpu_info.is_jetson | default(false) else 'N/A' }}
-      ✅ jtop Command Test: {{ 'PASS' if jetson_gpu_info.is_jetson and 'not properly installed' not in jetson_stats_verification.stdout else 'N/A' }}
+      ✅ jtop Command Test: {{ 'PASS' if jetson_gpu_info.is_jetson and jetson_stats_verification is defined and 'not properly installed' not in jetson_stats_verification.stdout else 'N/A' }}
       ✅ jtop.sock File: {{ 'PASS' if jetson_gpu_info.is_jetson and jtop_sock_check.stat.exists | default(false) else 'FAIL' if jetson_gpu_info.is_jetson else 'N/A' }}
-      ✅ jtop Service: {{ 'PASS' if jetson_gpu_info.is_jetson and 'active' in jtop_service_status.stdout else 'FAIL' if jetson_gpu_info.is_jetson else 'N/A' }}
-      ✅ Service Configuration: {{ 'PASS' if jetson_gpu_info.is_jetson and 'Type=' in jtop_service_config.stdout else 'FAIL' if jetson_gpu_info.is_jetson else 'N/A' }}
-      ✅ Boot Enabled: {{ 'PASS' if jetson_gpu_info.is_jetson and 'enabled' in jtop_service_enabled.stdout else 'FAIL' if jetson_gpu_info.is_jetson else 'N/A' }}
+      ✅ jtop Service: {{ 'PASS' if jetson_gpu_info.is_jetson and jtop_service_status is defined and 'active' in jtop_service_status.stdout else 'FAIL' if jetson_gpu_info.is_jetson else 'N/A' }}
+      ✅ Service Configuration: {{ 'PASS' if jetson_gpu_info.is_jetson and jtop_service_config is defined and 'Type=' in jtop_service_config.stdout else 'FAIL' if jetson_gpu_info.is_jetson else 'N/A' }}
+      ✅ Boot Enabled: {{ 'PASS' if jetson_gpu_info.is_jetson and jtop_service_enabled is defined and 'enabled' in jtop_service_enabled.stdout else 'FAIL' if jetson_gpu_info.is_jetson else 'N/A' }}
       ✅ Socket Connectivity: {{ 'PASS' if jetson_gpu_info.is_jetson and jtop_sock_check.stat.exists and jtop_sock_connectivity is defined and 'accessible' in jtop_sock_connectivity.stdout else 'FAIL' if jetson_gpu_info.is_jetson and jtop_sock_check.stat.exists else 'N/A' }}
       ✅ Container Access: {{ 'PASS' if jetson_gpu_info.is_jetson and jtop_sock_check.stat.exists and jtop_sock_container_access is defined and 'True' in jtop_sock_container_access.stdout else 'FAIL' if jetson_gpu_info.is_jetson and jtop_sock_check.stat.exists else 'N/A' }}
       
-      📊 Overall Status: {{ 'EXCELLENT' if jetson_gpu_info.is_jetson and jtop_sock_check.stat.exists | default(false) and 'active' in jtop_service_status.stdout and 'enabled' in jtop_service_enabled.stdout and jtop_sock_connectivity is defined and 'accessible' in jtop_sock_connectivity.stdout and jtop_sock_container_access is defined and 'True' in jtop_sock_container_access.stdout else 'GOOD' if jetson_gpu_info.is_jetson and jtop_sock_check.stat.exists | default(false) and 'active' in jtop_service_status.stdout else 'NEEDS ATTENTION' if jetson_gpu_info.is_jetson else 'N/A' }}
+      📊 Overall Status: {{ 'EXCELLENT' if jetson_gpu_info.is_jetson and jtop_sock_check.stat.exists | default(false) and jtop_service_status is defined and 'active' in jtop_service_status.stdout and jtop_service_enabled is defined and 'enabled' in jtop_service_enabled.stdout and jtop_sock_connectivity is defined and 'accessible' in jtop_sock_connectivity.stdout and jtop_sock_container_access is defined and 'True' in jtop_sock_container_access.stdout else 'GOOD' if jetson_gpu_info.is_jetson and jtop_sock_check.stat.exists | default(false) and jtop_service_status is defined and 'active' in jtop_service_status.stdout else 'NEEDS ATTENTION' if jetson_gpu_info.is_jetson else 'N/A' }}
       
       🔧 Next Steps:
       {%- if is_jetson %}
