@@ -255,6 +255,13 @@
       
 
       
+    - name: Update package cache (Ubuntu/Debian)
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      become: true
+      when: ansible_os_family == "Debian"
+      
     - name: Ensure pip3 is available (Ubuntu/Debian)
       package:
         name: 
@@ -263,6 +270,50 @@
         state: present
       become: true
       when: ansible_os_family == "Debian"
+      register: pip_install_result
+      ignore_errors: true
+      
+    - name: Try alternative pip package names (Ubuntu/Debian)
+      package:
+        name: 
+          - python3-pip3
+          - python3-pip
+          - python-pip3
+          - python-pip
+        state: present
+      become: true
+      when: 
+        - ansible_os_family == "Debian"
+        - pip_install_result is failed
+      register: pip_alt_install_result
+      ignore_errors: true
+      
+    - name: Install pip using get-pip.py as fallback
+      get_url:
+        url: https://bootstrap.pypa.io/get-pip.py
+        dest: /tmp/get-pip.py
+        mode: '0755'
+      become: true
+      when: 
+        - ansible_os_family == "Debian"
+        - pip_install_result is failed
+        - pip_alt_install_result is failed
+      
+    - name: Execute get-pip.py to install pip
+      command: python3 /tmp/get-pip.py --force-reinstall
+      become: true
+      when: 
+        - ansible_os_family == "Debian"
+        - pip_install_result is failed
+        - pip_alt_install_result is failed
+      register: get_pip_result
+      ignore_errors: true
+      
+    - name: Update package cache (RHEL/CentOS)
+      yum:
+        update_cache: yes
+      become: true
+      when: ansible_os_family == "RedHat"
       
     - name: Ensure pip3 is available (RHEL/CentOS)
       package:
@@ -272,6 +323,43 @@
         state: present
       become: true
       when: ansible_os_family == "RedHat"
+      register: pip_install_result_rhel
+      ignore_errors: true
+      
+    - name: Try alternative pip package names (RHEL/CentOS)
+      package:
+        name: 
+          - python3-pip3
+          - python-pip3
+          - python-pip
+        state: present
+      become: true
+      when: 
+        - ansible_os_family == "RedHat"
+        - pip_install_result_rhel is failed
+      register: pip_alt_install_result_rhel
+      ignore_errors: true
+      
+    - name: Install pip using get-pip.py as fallback (RHEL/CentOS)
+      get_url:
+        url: https://bootstrap.pypa.io/get-pip.py
+        dest: /tmp/get-pip.py
+        mode: '0755'
+      become: true
+      when: 
+        - ansible_os_family == "RedHat"
+        - pip_install_result_rhel is failed
+        - pip_alt_install_result_rhel is failed
+      
+    - name: Execute get-pip.py to install pip (RHEL/CentOS)
+      command: python3 /tmp/get-pip.py --force-reinstall
+      become: true
+      when: 
+        - ansible_os_family == "RedHat"
+        - pip_install_result_rhel is failed
+        - pip_alt_install_result_rhel is failed
+      register: get_pip_result_rhel
+      ignore_errors: true
       
     - name: Ensure pip3 is available (Generic)
       package:
@@ -281,6 +369,48 @@
         state: present
       become: true
       when: ansible_os_family not in ["Debian", "RedHat"]
+      register: pip_install_result_generic
+      ignore_errors: true
+      
+    - name: Install pip using get-pip.py as fallback (Generic)
+      get_url:
+        url: https://bootstrap.pypa.io/get-pip.py
+        dest: /tmp/get-pip.py
+        mode: '0755'
+      become: true
+      when: 
+        - ansible_os_family not in ["Debian", "RedHat"]
+        - pip_install_result_generic is failed
+      
+    - name: Execute get-pip.py to install pip (Generic)
+      command: python3 /tmp/get-pip.py --force-reinstall
+      become: true
+      when: 
+        - ansible_os_family not in ["Debian", "RedHat"]
+        - pip_install_result_generic is failed
+      register: get_pip_result_generic
+      ignore_errors: true
+      
+    - name: Verify pip3 is available
+      command: pip3 --version
+      register: pip3_version_check
+      changed_when: false
+      ignore_errors: true
+      
+    - name: Fail if pip3 is not available
+      fail:
+        msg: "pip3 is not available after installation attempts. Please install pip3 manually on the target host."
+      when: pip3_version_check.rc != 0
+      
+    - name: Clean up get-pip.py temporary file
+      file:
+        path: /tmp/get-pip.py
+        state: absent
+      become: true
+      when: 
+        - (pip_install_result is failed and pip_alt_install_result is failed and get_pip_result is defined)
+        - or (pip_install_result_rhel is failed and pip_alt_install_result_rhel is failed and get_pip_result_rhel is defined)
+        - or (pip_install_result_generic is failed and get_pip_result_generic is defined)
       
     - name: Check if jetson-stats is already installed
       pip:
