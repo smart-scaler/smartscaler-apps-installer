@@ -178,22 +178,15 @@ If you're deploying on a **single node** and running the command from the **same
 chmod +x setup_kubernetes.sh
 
 # Run the installation script with sudo
-./setup_kubernetes.sh
+./setup_k8s.sh
 ```
 
 #### Option B: Deploy with K3s (Lightweight Kubernetes)
 
-**Method 1: Setup and Deploy (Recommended)**
 ```bash
 # Setup, validate, and deploy in one command
 chmod +x setup_k3s.sh
 ./setup_k3s.sh
-```
-
-**Method 2: Using Generated Playbooks**
-```bash
-# Deploy K3s cluster using integrated playbook
-ansible-playbook k3s.yml
 ```
 
 **Note**: K3s deployment uses the same node configuration as kubespray from the `kubernetes_deployment` section.
