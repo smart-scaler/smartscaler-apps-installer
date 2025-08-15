@@ -4,14 +4,14 @@ k3s_cluster:
     server:
       hosts:
 
-        172.105.57.17:
+        172.232.102.187:
           ansible_user: root
           ansible_become: True
           ansible_become_method: sudo
           ansible_become_user: root
           ansible_ssh_private_key_file: /root/.ssh/k8s_rsa
           ansible_python_interpreter: /usr/bin/python3
-          private_ip: 172.105.57.17
+          private_ip: 172.232.102.187
           node_name: master-1
 
 

@@ -38,13 +38,13 @@ kubernetes_deployment:
   # Minimum 3 nodes for HA, always use odd numbers (3, 5, 7)
   control_plane_nodes:
     - name: "master-1"                # Unique identifier for the control plane node
-      ansible_host: "172.105.57.17"  # Replace with actual master-1 public IP
+      ansible_host: "172.232.102.187"  # Replace with actual master-1 public IP
       ansible_user: "root"      # SSH username for this specific node
                                      # Overrides default_ansible_user if different
       ansible_become: true            # Enable privilege escalation (sudo)
       ansible_become_method: "sudo"     # Method for privilege escalation
       ansible_become_user: "root"       # Target user for privilege escalation
-      private_ip: "172.105.57.17"      # Replace with actual master-1 private IP
+      private_ip: "172.232.102.187"      # Replace with actual master-1 private IP
                                      # Used for internal cluster communication
     # # Add more masters for HA (uncomment and configure):
     # - name: "master-2"
@@ -106,7 +106,7 @@ kubernetes_deployment:
 ###############################################################################
 k3s_deployment:
   # Master switch for K3s deployment
-  enabled: true                              # Enable K3s deployment
+  enabled: false                              # Enable K3s deployment
   
   # K3s Version Configuration
   k3s_version: "v1.33.3+k3s1"                # K3s version to install
@@ -373,6 +373,13 @@ execution_order:
   - create_ngc_secrets
   - verify_ngc_secrets
   - create_avesha_secret
+
+  # Jetson GPU Support
+  - jetson_prerequisites
+  - nvidia_device_plugin_manifest
+  - jetson_stats_node_exporter_manifest
+  - jetson_stats_node_exporter_service_manifest
+  - jetson_stats_node_exporter_servicemonitor_manifest
 
   # AMD GPU Support
   # - amd_gpu_operator_chart         # Install AMD GPU operator for AMD GPU support,enable cert-manager as well from above section.
@@ -1658,6 +1665,144 @@ manifests:
         limits:
           cpu: "500m"
           memory: "512Mi"
+
+  # NVIDIA Device Plugin DaemonSet
+  nvidia_device_plugin_manifest:
+    name: "nvidia-device-plugin-daemonset"
+    manifest_file: "files/nvidia-device-plugin-daemonset.yaml.j2"
+    namespace: "kube-system"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: "Available"
+      status: "True"
+    validate: false
+    strict_validation: false
+    dependencies:
+      - gpu_operator_chart  # Ensure GPU operator is installed first
+    variables:
+      daemonset_name: "nvidia-device-plugin-daemonset"
+      daemonset_namespace: "kube-system"
+      device_plugin_image: "harbor.saas1.smart-scaler.io/avesha/aveshadev/k8s-device-plugin:v0.14.1"
+      fail_on_init_error: "false"
+      device_plugin_path: "/var/lib/kubelet/device-plugins"
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      priority_class_name: "system-node-critical"
+      update_strategy:
+        type: "RollingUpdate"
+        rolling_update:
+          max_unavailable: 1
+          max_surge: 0
+      revision_history_limit: 10
+
+  # Jetson Stats Node Exporter DaemonSet
+  jetson_stats_node_exporter_manifest:
+    name: "jetson-stats-node-exporter"
+    manifest_file: "files/jetson-stats-node-exporter.yaml.j2"
+    namespace: "monitoring"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: "Available"
+      status: "True"
+    validate: false
+    strict_validation: false
+    dependencies:
+      - prometheus_stack  # Ensure monitoring namespace and Prometheus are available
+      - jetson_prerequisites  # Ensure Jetson prerequisites are set up
+    variables:
+      daemonset_name: "jetson-stats-node-exporter"
+      daemonset_namespace: "monitoring"
+      exporter_image: "harbor.saas1.smart-scaler.io/avesha/magiccpp1/jetson_stats_node_exporter:v0.1.1"
+      exporter_port: 9101
+      python_path: "/usr/local/lib/python3.11/site-packages"
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "64Mi"
+        limits:
+          cpu: "100m"
+          memory: "128Mi"
+      node_selector:
+        kubernetes_io_arch: "arm64"
+      tolerations:
+        - key: "node-role.kubernetes.io/master"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
+          effect: "NoSchedule"
+      update_strategy:
+        type: "RollingUpdate"
+        rolling_update:
+          max_unavailable: 1
+          max_surge: 0
+      revision_history_limit: 10
+
+  # Jetson Stats Node Exporter Service
+  jetson_stats_node_exporter_service_manifest:
+    name: "jetson-stats-node-exporter-service"
+    manifest_file: "files/jetson-stats-node-exporter-service.yaml.j2"
+    namespace: "monitoring"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubeconfig) }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: "Available"
+      status: "True"
+    validate: false
+    strict_validation: false
+    dependencies:
+      - jetson_stats_node_exporter_manifest  # Ensure the DaemonSet is deployed first
+    variables:
+      service_name: "jetson-stats-node-exporter"
+      service_namespace: "monitoring"
+      service_port: 9101
+      service_target_port: 9101
+      service_type: "NodePort"
+      prometheus_annotations:
+        prometheus_io_path: "/metrics"
+        prometheus_io_port: "9101"
+        prometheus_io_scrape: "true"
+      selector:
+        app: "jetson-stats-node-exporter"
+
+  # Jetson Stats Node Exporter ServiceMonitor
+  jetson_stats_node_exporter_servicemonitor_manifest:
+    name: "jetson-stats-node-exporter-servicemonitor"
+    manifest_file: "files/jetson-stats-node-exporter-servicemonitor.yaml.j2"
+    namespace: "monitoring"
+    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubeconfig) }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: "Available"
+      status: "True"
+    validate: false
+    strict_validation: false
+    dependencies:
+      - jetson_stats_node_exporter_service_manifest  # Ensure the service is deployed first
+      - prometheus_stack  # Ensure Prometheus operator is available
+    variables:
+      servicemonitor_name: "jetson-stats-node-exporter"
+      servicemonitor_namespace: "monitoring"
+      endpoint_interval: "30s"
+      endpoint_path: "/metrics"
+      endpoint_port: "metrics"
+      endpoint_scrape_timeout: "10s"
+      namespace_selector:
+        match_names: ["monitoring"]
+      selector:
+        app: "jetson-stats-node-exporter"
 
 ###############################################################################
 # COMMAND EXECUTION CONFIGURATION

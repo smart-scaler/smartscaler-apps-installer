@@ -205,8 +205,8 @@ sudo chown $(whoami):$(whoami) -R .
 
 # Set the KUBECONFIG environment variable
 # For Kubespray: export KUBECONFIG=output/kubeconfig
-# For K3s: export KUBECONFIG=output/k3s-kubeconfig
-export KUBECONFIG=output/kubeconfig  # or output/k3s-kubeconfig for K3s
+# For K3s: export KUBECONFIG=output/kubeconfig
+export KUBECONFIG=output/kubeconfig  # or output/kubeconfig for K3s
 
 # Verify cluster access and node status
 kubectl get nodes

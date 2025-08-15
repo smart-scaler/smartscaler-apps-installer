@@ -13,7 +13,7 @@ disable_firewalld: true
 disable_swap: true
 
 # K3s API Configuration
-api_endpoint: "172.105.57.17"
+api_endpoint: "172.232.102.187"
 api_port: 6443
 kubeconfig: ~/.kube/config.new
 

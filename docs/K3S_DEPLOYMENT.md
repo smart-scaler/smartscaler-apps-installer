@@ -226,7 +226,7 @@ k3s_deployment:
 
 ```bash
 # Export kubeconfig
-export KUBECONFIG=$PWD/output/k3s-kubeconfig
+export KUBECONFIG=$PWD/output/kubeconfig
 
 # Verify cluster
 kubectl get nodes
@@ -239,7 +239,7 @@ After K3s deployment, you can install Smart Scaler applications:
 
 ```yaml
 # In user_input.yml
-global_kubeconfig: "./output/k3s-kubeconfig"
+global_kubeconfig: "./output/kubeconfig"
 ```
 
 Then run:

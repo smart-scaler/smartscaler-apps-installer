@@ -98,14 +98,14 @@
           🔍 Check the cluster summary above for detailed results.
           
           💡 Next steps:
-          • Verify cluster is ready: kubectl get nodes --kubeconfig=output/k3s-kubeconfig
-          • Check system pods: kubectl get pods -n kube-system --kubeconfig=output/k3s-kubeconfig
-          • Test cluster access: kubectl cluster-info --kubeconfig=output/k3s-kubeconfig
-          • Export kubeconfig: export KUBECONFIG=$PWD/output/k3s-kubeconfig
+          • Verify cluster is ready: kubectl get nodes --kubeconfig=output/kubeconfig
+          • Check system pods: kubectl get pods -n kube-system --kubeconfig=output/kubeconfig
+          • Test cluster access: kubectl cluster-info --kubeconfig=output/kubeconfig
+          • Export kubeconfig: export KUBECONFIG=$PWD/output/kubeconfig
           • All output files are saved in the ./output/ directory
           
           📋 To install Smart Scaler applications on this cluster:
-          • Ensure global_kubeconfig in user_input.yml points to output/k3s-kubeconfig
+          • Ensure global_kubeconfig in user_input.yml points to output/kubeconfig
           • Run: ansible-playbook site.yml
       when: 
         - summary_enabled | default(true)

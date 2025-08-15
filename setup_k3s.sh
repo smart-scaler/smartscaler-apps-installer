@@ -481,25 +481,25 @@ print(data['kubernetes_deployment']['ssh_key_path'])
 echo -e "Copying kubeconfig from ${CONTROL_PLANE_USER}@${CONTROL_PLANE_IP}..."
 
 # Try to copy kubeconfig from the remote node
-if scp -i "${SSH_KEY_PATH}" -o StrictHostKeyChecking=no "${CONTROL_PLANE_USER}@${CONTROL_PLANE_IP}:/etc/rancher/k3s/k3s.yaml" "output/k3s-kubeconfig" 2>/dev/null; then
+if scp -i "${SSH_KEY_PATH}" -o StrictHostKeyChecking=no "${CONTROL_PLANE_USER}@${CONTROL_PLANE_IP}:/etc/rancher/k3s/k3s.yaml" "output/kubeconfig" 2>/dev/null; then
     echo -e "${GREEN}✓ Kubeconfig copied from /etc/rancher/k3s/k3s.yaml${NC}"
     
     # Fix the kubeconfig IP address (replace 127.0.0.1 with actual server IP)
     echo -e "\n${YELLOW}Fixing kubeconfig IP address...${NC}"
-    if grep -q "127.0.0.1" output/k3s-kubeconfig; then
+    if grep -q "127.0.0.1" output/kubeconfig; then
         # Replace 127.0.0.1 with actual IP
-        sed -i "s/127.0.0.1/${CONTROL_PLANE_IP}/g" output/k3s-kubeconfig
+        sed -i "s/127.0.0.1/${CONTROL_PLANE_IP}/g" output/kubeconfig
         echo -e "${GREEN}✓ Updated kubeconfig IP from 127.0.0.1 to ${CONTROL_PLANE_IP}${NC}"
     else
         echo -e "${GREEN}✓ Kubeconfig IP is already correct${NC}"
     fi
-elif scp -i "${SSH_KEY_PATH}" -o StrictHostKeyChecking=no "${CONTROL_PLANE_USER}@${CONTROL_PLANE_IP}:~/.kube/config" "output/k3s-kubeconfig" 2>/dev/null; then
+elif scp -i "${SSH_KEY_PATH}" -o StrictHostKeyChecking=no "${CONTROL_PLANE_USER}@${CONTROL_PLANE_IP}:~/.kube/config" "output/kubeconfig" 2>/dev/null; then
     echo -e "${GREEN}✓ Kubeconfig copied from ~/.kube/config${NC}"
     
     # Fix the kubeconfig IP address if needed
     echo -e "\n${YELLOW}Fixing kubeconfig IP address...${NC}"
-    if grep -q "127.0.0.1" output/k3s-kubeconfig; then
-        sed -i "s/127.0.0.1/${CONTROL_PLANE_IP}/g" output/k3s-kubeconfig
+    if grep -q "127.0.0.1" output/kubeconfig; then
+        sed -i "s/127.0.0.1/${CONTROL_PLANE_IP}/g" output/kubeconfig
         echo -e "${GREEN}✓ Updated kubeconfig IP from 127.0.0.1 to ${CONTROL_PLANE_IP}${NC}"
     else
         echo -e "${GREEN}✓ Kubeconfig IP is already correct${NC}"
@@ -510,7 +510,7 @@ else
     echo -e "  - /etc/rancher/k3s/k3s.yaml"
     echo -e "  - ~/.kube/config"
     echo -e "${YELLOW}SSH command used:${NC}"
-    echo -e "  scp -i ${SSH_KEY_PATH} ${CONTROL_PLANE_USER}@${CONTROL_PLANE_IP}:<path> output/k3s-kubeconfig"
+    echo -e "  scp -i ${SSH_KEY_PATH} ${CONTROL_PLANE_USER}@${CONTROL_PLANE_IP}:<path> output/kubeconfig"
     echo -e "${YELLOW}Please check:${NC}"
     echo -e "  1. SSH key permissions and path"
     echo -e "  2. Remote node connectivity"
@@ -518,7 +518,7 @@ else
 fi
 
 echo -e "${GREEN}K3s deployment completed successfully!${NC}"
-echo -e "Kubeconfig file will be available at: ${GREEN}output/k3s-kubeconfig${NC}"
+echo -e "Kubeconfig file will be available at: ${GREEN}output/kubeconfig${NC}"
 
 # K3s verification functions
 verify_k3s_cluster() {
@@ -719,14 +719,14 @@ verify_k3s_cluster() {
 }
 
 # Run verification if kubeconfig exists
-if [ -f "output/k3s-kubeconfig" ]; then
+if [ -f "output/kubeconfig" ]; then
     echo -e "\n${YELLOW}🔍 Running K3s cluster verification...${NC}"
-    if verify_k3s_cluster "output/k3s-kubeconfig"; then
+    if verify_k3s_cluster "output/kubeconfig"; then
         echo -e "${GREEN}✓ K3s cluster verification passed${NC}"
     else
         echo -e "${YELLOW}⚠️  K3s cluster verification completed with issues${NC}"
         echo -e "${YELLOW}Please check the cluster manually:${NC}"
-        echo -e "  export KUBECONFIG=\$PWD/output/k3s-kubeconfig"
+        echo -e "  export KUBECONFIG=\$PWD/output/kubeconfig"
         echo -e "  kubectl get nodes"
         echo -e "  kubectl get pods -n kube-system"
         echo -e "  kubectl get events -n kube-system --sort-by='.lastTimestamp'"
@@ -753,7 +753,7 @@ print(cp_nodes[0]['ansible_host'])
 "):6443"
 echo ""
 echo -e "${YELLOW}Next steps:${NC}"
-echo "1. Export kubeconfig: export KUBECONFIG=\$PWD/output/k3s-kubeconfig"
+echo "1. Export kubeconfig: export KUBECONFIG=\$PWD/output/kubeconfig"
 echo "2. Verify cluster: kubectl get nodes"
 echo "3. Check system pods: kubectl get pods -n kube-system"
 echo "4. Test cluster access: kubectl cluster-info"
