@@ -282,12 +282,38 @@
       become: true
       when: ansible_os_family not in ["Debian", "RedHat"]
       
+    - name: Check pip3 version for --break-system-packages support
+      shell: |
+        pip3_version=$(pip3 --version | grep -oE '[0-9]+\.[0-9]+' | head -1)
+        if [ -n "$pip3_version" ]; then
+          major=$(echo $pip3_version | cut -d. -f1)
+          minor=$(echo $pip3_version | cut -d. -f2)
+          if [ "$major" -gt 21 ] || ([ "$major" -eq 21 ] && [ "$minor" -ge 3 ]); then
+            echo "supported"
+          else
+            echo "not_supported"
+          fi
+        else
+          echo "unknown"
+        fi
+      register: pip3_break_support
+      changed_when: false
+      
+    - name: Set fact for pip3 break system packages support
+      set_fact:
+        pip3_supports_break_system: "{{ pip3_break_support.stdout == 'supported' }}"
+      
+    - name: Set extra_args for jetson-stats installation
+      set_fact:
+        jetson_stats_extra_args: "{{ '--break-system-packages' if pip3_supports_break_system else '' }}"
+        jetson_stats_upgrade_extra_args: "{{ '--upgrade --break-system-packages' if pip3_supports_break_system else '--upgrade' }}"
+      
     - name: Check if jetson-stats is already installed
       pip:
         name: jetson-stats
         state: present
         executable: pip3
-        extra_args: --break-system-packages
+        extra_args: "{{ jetson_stats_extra_args if jetson_stats_extra_args != '' else omit }}"
       register: jetson_stats_check
       become: true
       
@@ -295,7 +321,7 @@
       pip:
         name: jetson-stats
         state: latest
-        extra_args: --upgrade --break-system-packages
+        extra_args: "{{ jetson_stats_upgrade_extra_args }}"
         executable: pip3
       become: true
       when: 
@@ -339,7 +365,7 @@
       debug:
         msg: |
           Jetson-stats Installation Summary:
-          - Installation method: pip3 with --break-system-packages
+          - Installation method: pip3{{ ' with --break-system-packages' if pip3_supports_break_system else ' without --break-system-packages (not supported)' }}
           - Final verification: {{ jetson_stats_verification.stdout }}
         
 
