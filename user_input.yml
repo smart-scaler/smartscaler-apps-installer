@@ -365,16 +365,17 @@ execution_order:
   # - cert_manager 
 
   # Base Applications
-  - gpu_operator_chart
-  - prometheus_stack
-  - pushgateway_manifest
-  - keda_chart
-  - nim_operator_chart
-  - create_ngc_secrets
-  - verify_ngc_secrets
-  - create_avesha_secret
+  # - gpu_operator_chart
+  # - prometheus_stack
+  # - pushgateway_manifest
+  # - keda_chart
+  # - nim_operator_chart
+  # - create_ngc_secrets
+  # - verify_ngc_secrets
+  # - create_avesha_secret
 
   # Jetson GPU Support
+  - prometheus_stack
   - jetson_prerequisites
   - nvidia_device_plugin_manifest
   - jetson_stats_node_exporter_manifest
@@ -406,16 +407,16 @@ execution_order:
   # - kubeslice_worker_egs_worker_1 # Install worker after fetching secret
 
   # NIM 70B Components
-  - nim_cache_manifest_70b
-  - wait_for_nim_cache_70b
-  - nim_cache_wait_job_70b
-  - nim_service_manifest_70b
-  - keda_scaled_object_manifest_70b
-  - create_inference_pod_configmap_70b
-  - smart_scaler_inference_70b
-  - create_locust_configmap_70b
-  - locust_manifest_70b
-  - smart_scaler_mcp_server_manifest
+  # - nim_cache_manifest_70b
+  # - wait_for_nim_cache_70b
+  # - nim_cache_wait_job_70b
+  # - nim_service_manifest_70b
+  # - keda_scaled_object_manifest_70b
+  # - create_inference_pod_configmap_70b
+  # - smart_scaler_inference_70b
+  # - create_locust_configmap_70b
+  # - locust_manifest_70b
+  # - smart_scaler_mcp_server_manifest
 
   #   # NIM 1B Components
   # - nim_cache_manifest_1b
