@@ -451,23 +451,45 @@
           jetson_stats_extra_args: "{{ jetson_stats_extra_args }}"
           jetson_stats_upgrade_extra_args: "{{ jetson_stats_upgrade_extra_args }}"
       
-    - name: Check if jetson-stats is already installed
+    - name: Check if jetson-stats is already installed (with --break-system-packages)
       pip:
         name: jetson-stats
         state: present
         executable: pip3
-        extra_args: "{{ jetson_stats_extra_args if jetson_stats_extra_args != '' else omit }}"
+        extra_args: --break-system-packages
       register: jetson_stats_check
       become: true
+      when: pip3_supports_break_system
       
-    - name: Install/Upgrade jetson-stats
+    - name: Check if jetson-stats is already installed (without --break-system-packages)
+      pip:
+        name: jetson-stats
+        state: present
+        executable: pip3
+      register: jetson_stats_check
+      become: true
+      when: not pip3_supports_break_system
+      
+    - name: Install/Upgrade jetson-stats (with --break-system-packages)
       pip:
         name: jetson-stats
         state: latest
-        extra_args: "{{ jetson_stats_upgrade_extra_args }}"
+        extra_args: --upgrade --break-system-packages
         executable: pip3
       become: true
       when: 
+        - pip3_supports_break_system
+        - jetson_stats_check.changed or jetson_stats_check.installed is not defined
+      
+    - name: Install/Upgrade jetson-stats (without --break-system-packages)
+      pip:
+        name: jetson-stats
+        state: latest
+        extra_args: --upgrade
+        executable: pip3
+      become: true
+      when: 
+        - not pip3_supports_break_system
         - jetson_stats_check.changed or jetson_stats_check.installed is not defined
       
     - name: Verify jetson-stats installation
