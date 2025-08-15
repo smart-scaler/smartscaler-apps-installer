@@ -117,10 +117,13 @@
           avesha_docker_password: "{{ avesha_docker_password }}"
       when: execution_order_enabled | default(true)
 
+    - name: Set K3s inventory file
+      set_fact:
+        k3s_inventory_file: "inventory/k3s/inventory.yml"
+      when: k3s_deployment.enabled | default(false)
+
     - name: Deploy K3s cluster if enabled
       ansible.builtin.import_playbook: "k3s-ansible/playbooks/site.yml"
-      vars:
-        inventory_file: "inventory/k3s/inventory.yml"
       when: k3s_deployment.enabled | default(false)
 
   post_tasks:
@@ -129,6 +132,7 @@
       when: 
         - summary_enabled | default(true)
         - global_kubeconfig is defined
+        - not k3s_deployment.enabled | default(false)
 
     - name: Generate final summary report
       include_tasks: "tasks/summary_tracker.yml"
