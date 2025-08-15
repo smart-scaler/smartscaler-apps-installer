@@ -608,7 +608,75 @@ sudo ansible-playbook site.yml \
 
 ### Kubespray Cluster Destruction
 
-To completely remove a Kubespray Kubernetes cluster and clean up all resources, run the following command from the root directory:
+To completely remove a Kubespray Kubernetes cluster and clean up all resources, use the provided destruction script:
+
+```bash
+# Run the K8s cluster destruction script
+./destroy_k8s.sh
+```
+
+This script will automatically:
+- **Run the official Kubespray reset playbook** (if available)
+- Read node information from `user_input.yml`
+- **Verify SSH connectivity** to all cluster nodes (safety check)
+- Stop Kubernetes services on all nodes
+- Clean up Kubernetes files and directories
+- Clean up network configuration
+- Reset nodes to clean state
+- Clean up local files
+
+> 💡 **Note**: The script follows the official Kubespray reset approach first, then performs additional cleanup to ensure complete removal.
+
+> ⚠️ **Important**: The script will **stop execution** if it cannot connect to the cluster nodes. This is a safety feature to prevent accidental destruction of non-existent or inaccessible clusters.
+
+#### **When the Script "Fails":**
+
+The script may appear to "fail" in these scenarios:
+
+1. **No Cluster Running**: If you're testing on a machine without an actual Kubernetes cluster
+2. **SSH Access Issues**: If SSH keys aren't configured or nodes are unreachable
+3. **Wrong Network**: If running from a different network than the cluster
+
+#### **To Use the Script Successfully:**
+
+1. **Ensure you have an actual Kubernetes cluster running**
+2. **Verify SSH access** to all cluster nodes from your current machine
+3. **Run the script** from a location that can reach the cluster nodes
+4. **Have proper SSH keys** configured for authentication
+
+> ⚠️ **Warning**: These actions are irreversible. Make sure to backup any important data before proceeding with the cluster destruction.
+
+#### **Troubleshooting SSH Connectivity:**
+
+If the script fails with SSH connectivity errors:
+
+```bash
+# Test SSH connectivity manually
+ssh root@your-node-ip "echo 'SSH connection successful'"
+
+# Check if SSH keys are properly configured
+ls -la ~/.ssh/
+ssh-add -l
+
+# Verify the node is reachable
+ping -c 3 your-node-ip
+```
+
+#### **Expected Output When Working:**
+
+When the script runs successfully on an actual cluster, you'll see:
+```bash
+[INFO] Extracting node information from user_input.yml...
+[SUCCESS] Found nodes: your-node-ip
+[INFO] Checking SSH connectivity to all nodes...
+[SUCCESS] SSH connection to your-node-ip successful
+[WARNING] This script will completely destroy your Kubernetes cluster...
+Are you absolutely sure you want to proceed? (yes/no):
+```
+
+#### **Alternative Manual Method:**
+
+If you prefer to use the manual Kubespray reset approach:
 
 ```bash
 ansible-playbook kubespray/reset.yml -i inventory/kubespray/inventory.ini

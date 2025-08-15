@@ -10,7 +10,7 @@
 ###############################################################################
 kubernetes_deployment:
   # Master switch for Kubernetes deployment
-  enabled: false                           # Enable kubernetes deployment
+  enabled: true                           # Enable kubernetes deployment
   
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
@@ -75,7 +75,7 @@ kubernetes_deployment:
   #     private_ip: "WORKER_PRIVATE_IP"
 
 
-    # Python Configuration
+      # Python Configuration
   python_config:
     interpreter_path: "/usr/bin/python3"  # Path to Python interpreter
                                      # Used for internal cluster communication
@@ -98,57 +98,21 @@ kubernetes_deployment:
       - "443"     # HTTPS
       - "6443"    # Kubernetes API server
       - "2379"    # etcd client API
+      - "2380"    # etcd server API
+      - "10250"   # Kubelet API
+      - "10251"   # kube-scheduler
+      - "10252"   # kube-controller-manager
 
-###############################################################################
-# K3S DEPLOYMENT CONFIGURATION
-# Controls whether to deploy a new K3s cluster using k3s-ansible
-# Alternative to kubespray for lightweight Kubernetes deployment
-###############################################################################
-k3s_deployment:
-  # Master switch for K3s deployment
-  enabled: false                              # Enable K3s deployment
-  
-  # K3s Version Configuration
-  k3s_version: "v1.33.3+k3s1"                # K3s version to install
-  
-  # K3s Configuration
-  k3s_config:
-    # Network Configuration
-    service_cidr: "10.43.0.0/16"             # CIDR range for K3s services
-    cluster_cidr: "10.42.0.0/16"             # CIDR range for K3s pods
-    cluster_dns: "10.43.0.10"                 # Cluster DNS service IP
-    
-    # CNI Configuration
-    cni: "flannel"                            # CNI plugin (flannel, calico, cilium)
-    
-    # Additional K3s server arguments
-    extra_server_args: ""                     # Additional arguments for K3s server
-    
-    # Additional K3s agent arguments
-    extra_agent_args: ""                      # Additional arguments for K3s agents
-    
-    # External Database Configuration (for HA)
-    use_external_database: false              # Use external database instead of embedded etcd
-    datastore_endpoint: ""                    # External database endpoint (e.g., postgres://...)
-    
-    # Airgap Installation
-    airgap_dir: ""                            # Path to airgap directory containing K3s binaries
-    
-    # SELinux Support
-    selinux_enabled: false                    # Enable SELinux support
-    
-    # TLS Configuration
-    tls_san: []                               # Additional TLS SANs for certificates
-    
-    # Node Labels
-    node_labels: {}                            # Labels to apply to nodes
-    
-    # Node Taints
-    node_taints: {}                            # Taints to apply to nodes
-
-
-
-
+  # NVIDIA Container Runtime Configuration
+  # Required for GPU support in the cluster
+  nvidia_runtime:
+    enabled: true                           # Enable NVIDIA container runtime
+                                          # Set to true if using NVIDIA GPUs
+    install_toolkit: true                   # Install NVIDIA Container Toolkit
+                                          # Required for GPU support
+    configure_containerd: true              # Configure containerd for NVIDIA runtime
+    create_runtime_class: true              # Create Kubernetes RuntimeClass for NVIDIA
+    architecture: "amd64"                   # Architecture for NVIDIA container runtime package
 
   # Kubernetes Component Configuration
   # Core Kubernetes infrastructure choices
@@ -251,6 +215,58 @@ k3s_deployment:
       wal_dir: ""                        # Custom WAL directory (empty = default)
       data_dir: ""                       # Custom data directory (empty = default)
 
+###############################################################################
+# K3S DEPLOYMENT CONFIGURATION
+# Controls whether to deploy a new K3s cluster using k3s-ansible
+# Alternative to kubespray for lightweight Kubernetes deployment
+###############################################################################
+k3s_deployment:
+  # Master switch for K3s deployment
+  enabled: false                              # Enable K3s deployment
+  
+  # K3s Version Configuration
+  k3s_version: "v1.33.3+k3s1"                # K3s version to install
+  
+  # K3s Configuration
+  k3s_config:
+    # Network Configuration
+    service_cidr: "10.43.0.0/16"             # CIDR range for K3s services
+    cluster_cidr: "10.42.0.0/16"             # CIDR range for K3s pods
+    cluster_dns: "10.43.0.10"                 # Cluster DNS service IP
+    
+    # CNI Configuration
+    cni: "flannel"                            # CNI plugin (flannel, calico, cilium)
+    
+    # Additional K3s server arguments
+    extra_server_args: ""                     # Additional arguments for K3s server
+    
+    # Additional K3s agent arguments
+    extra_agent_args: ""                      # Additional arguments for K3s agents
+    
+    # External Database Configuration (for HA)
+    use_external_database: false              # Use external database instead of embedded etcd
+    datastore_endpoint: ""                    # External database endpoint (e.g., postgres://...)
+    
+    # Airgap Installation
+    airgap_dir: ""                            # Path to airgap directory containing K3s binaries
+    
+    # SELinux Support
+    selinux_enabled: false                    # Enable SELinux support
+    
+    # TLS Configuration
+    tls_san: []                               # Additional TLS SANs for certificates
+    
+    # Node Labels
+    node_labels: {}                            # Labels to apply to nodes
+    
+    # Node Taints
+    node_taints: {}                            # Taints to apply to nodes
+
+
+
+
+
+ 
 ###############################################################################
 # REQUIRED SETTINGS
 # These settings must be configured regardless of deployment type
