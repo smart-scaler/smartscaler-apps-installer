@@ -310,19 +310,13 @@ run_kubespray_reset() {
     
     print_status "Found Kubespray installation, running official reset playbook..."
     
-    # Change to kubespray directory and run reset
-    cd kubespray
-    
-    # Run the reset playbook
-    if ansible-playbook -i ../inventory/kubespray/hosts.yaml playbooks/reset.yml --become --become-user=root; then
+    # Run the reset playbook from root directory
+    if ansible-playbook kubespray/reset.yml -i inventory/kubespray/inventory.ini --become --become-user=root; then
         print_success "Kubespray reset playbook completed successfully"
     else
         print_warning "Kubespray reset playbook failed, continuing with manual cleanup"
         print_warning "This is normal if the cluster was already partially destroyed"
     fi
-    
-    # Return to original directory
-    cd ..
 }
 
 # Function to clean up local files
