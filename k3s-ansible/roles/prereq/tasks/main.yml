@@ -181,6 +181,35 @@
     name: apparmor
     state: present
 
+- name: Disable SELinux if enabled
+  block:
+    - name: Check if SELinux is enabled
+      ansible.builtin.command: getenforce
+      register: selinux_status
+      changed_when: false
+      ignore_errors: true
+
+    - name: Display SELinux status
+      debug:
+        msg: "Current SELinux status: {{ selinux_status.stdout | default('unknown') }}"
+
+    - name: Disable SELinux if enforcing or permissive
+      ansible.posix.selinux:
+        state: disabled
+      when: 
+        - selinux_status.stdout is defined
+        - selinux_status.stdout in ['Enforcing', 'Permissive']
+
+    - name: Verify SELinux is disabled
+      ansible.builtin.command: getenforce
+      register: selinux_verify
+      changed_when: false
+      ignore_errors: true
+
+    - name: Display SELinux verification
+      debug:
+        msg: "SELinux status after configuration: {{ selinux_verify.stdout | default('unknown') }}"
+
 - name: Gather the package facts
   ansible.builtin.package_facts:
     manager: auto
