@@ -120,10 +120,37 @@ print(' '.join(nodes))
 check_ssh_connectivity() {
     print_status "Checking SSH connectivity to all nodes..."
     
+    # Extract SSH key path from user_input.yml
+    local ssh_key_path=$(python3 -c "
+import yaml
+with open('user_input.yml', 'r') as f:
+    data = yaml.safe_load(f)
+if 'kubernetes_deployment' in data and 'ssh_key_path' in data['kubernetes_deployment']:
+    print(data['kubernetes_deployment']['ssh_key_path'])
+else:
+    print('')
+" 2>/dev/null || echo "")
+    
+    if [ -z "$ssh_key_path" ]; then
+        print_error "Could not extract SSH key path from user_input.yml"
+        exit 1
+    fi
+    
+    # Expand the SSH key path
+    ssh_key_path=$(echo "$ssh_key_path" | sed 's/^~/$HOME/')
+    
+    if [ ! -f "$ssh_key_path" ]; then
+        print_error "SSH key file not found at: $ssh_key_path"
+        exit 1
+    fi
+    
+    print_status "Using SSH key: $ssh_key_path"
+    
     for node in $ALL_NODES; do
-        if ! ssh -o ConnectTimeout=10 -o BatchMode=yes "$node" "echo 'SSH connection successful'" >/dev/null 2>&1; then
+        if ! ssh -i "$ssh_key_path" -o ConnectTimeout=10 -o BatchMode=yes -o StrictHostKeyChecking=no "$node" "echo 'SSH connection successful'" >/dev/null 2>&1; then
             print_error "Cannot connect to node $node via SSH"
             print_warning "Make sure SSH keys are properly configured and nodes are accessible"
+            print_warning "SSH key path: $ssh_key_path"
             exit 1
         fi
         print_success "SSH connection to $node successful"
@@ -133,9 +160,10 @@ check_ssh_connectivity() {
 # Function to stop K3s services on a node
 stop_k3s_services() {
     local node=$1
+    local ssh_key_path=$2
     print_status "Stopping K3s services on $node..."
     
-    ssh "$node" "
+    ssh -i "$ssh_key_path" -o StrictHostKeyChecking=no "$node" "
         # Stop K3s services
         if systemctl is-active --quiet k3s; then
             sudo systemctl stop k3s
@@ -157,9 +185,10 @@ stop_k3s_services() {
 uninstall_k3s() {
     local node=$1
     local is_master=$2
+    local ssh_key_path=$3
     print_status "Uninstalling K3s from $node (role: $([ "$is_master" = "true" ] && echo "server" || echo "agent"))..."
     
-    ssh "$node" "
+    ssh -i "$ssh_key_path" -o StrictHostKeyChecking=no "$node" "
         # Run K3s uninstall scripts based on node role (following official K3s Ansible reset approach)
         if [ \"$is_master\" = \"true\" ]; then
             # Server node - run k3s-uninstall.sh
@@ -185,9 +214,10 @@ uninstall_k3s() {
 cleanup_system_files() {
     local node=$1
     local is_master=$2
+    local ssh_key_path=$3
     print_status "Cleaning up system files and directories on $node..."
     
-    ssh "$node" "
+    ssh -i "$ssh_key_path" -o StrictHostKeyChecking=no "$node" "
         # Remove user kubeconfig (following official K3s Ansible reset approach)
         if [ -f ~/.kube/config ]; then
             rm -f ~/.kube/config
@@ -232,9 +262,10 @@ cleanup_system_files() {
 # Function to clean up network configuration
 cleanup_network() {
     local node=$1
+    local ssh_key_path=$2
     print_status "Cleaning up network configuration on $node..."
     
-    ssh "$node" "
+    ssh -i "$ssh_key_path" -o StrictHostKeyChecking=no "$node" "
         # Remove K3s network interfaces (if they exist)
         sudo ip link delete cni0 2>/dev/null || echo 'cni0 interface not found or already removed'
         sudo ip link delete flannel.1 2>/dev/null || echo 'flannel.1 interface not found or already removed'
@@ -253,9 +284,10 @@ cleanup_network() {
 cleanup_bashrc() {
     local node=$1
     local is_master=$2
+    local ssh_key_path=$3
     print_status "Cleaning up bashrc entries on $node..."
     
-    ssh "$node" "
+    ssh -i "$ssh_key_path" -o StrictHostKeyChecking=no "$node" "
         # Remove K3s commands from ~/.bashrc (following official K3s Ansible reset approach)
         if [ -f ~/.bashrc ]; then
             # Remove lines added by k3s-ansible
@@ -268,9 +300,10 @@ cleanup_bashrc() {
 # Function to reset node (optional)
 reset_node() {
     local node=$1
+    local ssh_key_path=$2
     print_warning "Resetting node $node to clean state..."
     
-    ssh "$node" "
+    ssh -i "$ssh_key_path" -o StrictHostKeyChecking=no "$node" "
         # Run k3s-killall script if it exists
         if [ -f /usr/local/bin/k3s-killall.sh ]; then
             sudo /usr/local/bin/k3s-killall.sh
@@ -383,6 +416,32 @@ main() {
     # Extract node information
     extract_nodes
     
+    # Extract SSH key path from user_input.yml
+    local ssh_key_path=$(python3 -c "
+import yaml
+with open('user_input.yml', 'r') as f:
+    data = yaml.safe_load(f)
+if 'kubernetes_deployment' in data and 'ssh_key_path' in data['kubernetes_deployment']:
+    print(data['kubernetes_deployment']['ssh_key_path'])
+else:
+    print('')
+" 2>/dev/null || echo "")
+
+    if [ -z "$ssh_key_path" ]; then
+        print_error "Could not extract SSH key path from user_input.yml"
+        exit 1
+    fi
+    
+    # Expand the SSH key path
+    ssh_key_path=$(echo "$ssh_key_path" | sed 's/^~/$HOME/')
+    
+    if [ ! -f "$ssh_key_path" ]; then
+        print_error "SSH key file not found at: $ssh_key_path"
+        exit 1
+    fi
+    
+    print_status "Using SSH key: $ssh_key_path"
+    
     # Check SSH connectivity
     check_ssh_connectivity
     
@@ -409,28 +468,28 @@ main() {
         # Stop K3s services
         current_step=$((current_step + 1))
         show_progress $current_step $total_steps
-        stop_k3s_services "$node"
+        stop_k3s_services "$node" "$ssh_key_path"
         
         # Uninstall K3s
         current_step=$((current_step + 1))
         show_progress $current_step $total_steps
-        uninstall_k3s "$node" "$is_master"
+        uninstall_k3s "$node" "$is_master" "$ssh_key_path"
         
         # Clean up system files
         current_step=$((current_step + 1))
         show_progress $current_step $total_steps
-        cleanup_system_files "$node" "$is_master"
+        cleanup_system_files "$node" "$is_master" "$ssh_key_path"
         
         # Clean up bashrc entries
-        cleanup_bashrc "$node" "$is_master"
+        cleanup_bashrc "$node" "$is_master" "$ssh_key_path"
         
         # Clean up network configuration
         current_step=$((current_step + 1))
         show_progress $current_step $total_steps
-        cleanup_network "$node"
+        cleanup_network "$node" "$ssh_key_path"
         
         # Reset node (optional)
-        reset_node "$node"
+        reset_node "$node" "$ssh_key_path"
         
         print_success "Node $node cleanup completed"
         echo
