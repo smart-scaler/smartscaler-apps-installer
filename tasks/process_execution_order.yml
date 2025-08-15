@@ -1,7 +1,17 @@
 ---
 # Process each item in execution order
-- name: Process execution items
+- name: Check if app deployment should be skipped
+  set_fact:
+    skip_app_deployment: "{{ k3s_deployment.enabled | default(false) }}"
+
+- name: Skip app deployment when K3s is enabled
+  debug:
+    msg: "Skipping app deployment because K3s deployment is enabled"
+  when: skip_app_deployment
+
+- name: Process execution items (skip if K3s enabled)
   include_tasks: tasks/process_execution_item.yml
   vars:
     execution_item: "{{ item }}"
-  loop: "{{ execution_order }}" 
+  loop: "{{ execution_order }}"
+  when: not skip_app_deployment 
