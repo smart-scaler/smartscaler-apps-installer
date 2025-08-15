@@ -240,6 +240,36 @@ cleanup_k8s_files() {
             rm -f ~/.kube/config
             echo 'Removed user kubeconfig'
         fi
+        
+        # Clean up HAProxy load balancer files and processes
+        echo 'Cleaning up HAProxy load balancer...'
+        
+        # Stop HAProxy service if running
+        if systemctl is-active --quiet haproxy; then
+            sudo systemctl stop haproxy
+            echo 'Stopped HAProxy service'
+        fi
+        
+        # Remove HAProxy configuration
+        if [ -f /etc/haproxy/haproxy.cfg ]; then
+            sudo rm -f /etc/haproxy/haproxy.cfg
+            echo 'Removed HAProxy configuration'
+        fi
+        
+        # Remove HAProxy data directory
+        if [ -d /var/lib/haproxy ]; then
+            sudo rm -rf /var/lib/haproxy
+            echo 'Removed HAProxy data directory'
+        fi
+        
+        # Kill any remaining HAProxy processes
+        sudo pkill -f haproxy 2>/dev/null || echo 'No HAProxy processes found'
+        
+        # Remove HAProxy log files
+        if [ -d /var/log/haproxy ]; then
+            sudo rm -rf /var/log/haproxy
+            echo 'Removed HAProxy log files'
+        fi
     "
 }
 
@@ -340,6 +370,27 @@ cleanup_local_files() {
         rm -rf "kubespray"
         print_success "Removed local Kubespray files"
     fi
+    
+    # Clean up local HAProxy configurations
+    print_status "Cleaning up local HAProxy configurations..."
+    
+    # Remove any local HAProxy config files
+    if [ -f "haproxy.cfg" ]; then
+        rm -f "haproxy.cfg"
+        print_success "Removed local HAProxy configuration"
+    fi
+    
+    # Remove any local HAProxy directories
+    if [ -d "haproxy" ]; then
+        rm -rf "haproxy"
+        print_success "Removed local HAProxy directory"
+    fi
+    
+    # Remove any HAProxy manifests
+    if [ -f "haproxy-manifest.yaml" ]; then
+        rm -f "haproxy-manifest.yaml"
+        print_success "Removed local HAProxy manifest"
+    fi
 }
 
 # Function to display confirmation prompt
@@ -351,9 +402,10 @@ confirm_destruction() {
     echo "  1. Run Kubespray reset playbook (if available)"
     echo "  2. Stop Kubernetes services on all nodes"
     echo "  3. Clean up Kubernetes files and directories"
-    echo "  4. Clean up network configuration"
-    echo "  5. Reset nodes to clean state"
-    echo "  6. Clean up local files"
+    echo "  4. Clean up HAProxy load balancer (if present)"
+    echo "  5. Clean up network configuration"
+    echo "  6. Reset nodes to clean state"
+    echo "  7. Clean up local files"
     echo
     echo "Nodes to be affected: $ALL_NODES"
     echo
