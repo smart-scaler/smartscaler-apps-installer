@@ -11,7 +11,7 @@ Ansible-based installer for Smart Scaler components and Kubernetes cluster deplo
 4. [Instructions to Deploy SmartScaler Apps](#4-instructions-to-deploy-smartscaler-apps) *(Depends on NIM profiles 70b(~20-25 mins), 8b(~10-15 mins), 1b(~10 mins))*  
 5. [Example Test Run Steps](#example-test-run-steps) *(~15 mins)*  
 6. [Execution Order Control](#execution-order-control) *(optional) (~1 min)*  
-7. [Destroying the Kubernetes Cluster](#destroying-the-kubernetes-cluster) *(~5 mins)*  
+7. [Destroying the Kubernetes Cluster](#destroying-the-kubernetes-cluster) *(~2 mins)*  
 8. [Documentation Links](#documentation-links)  
 9. [Troubleshooting](#troubleshooting)
 
@@ -621,87 +621,24 @@ This command will:
 
 ### K3s Cluster Destruction
 
-To completely remove a K3s cluster and clean up all resources, follow these steps:
-
-#### Step 1: Stop K3s Service on All Nodes
+To completely remove a K3s cluster and clean up all resources, use the provided destruction script:
 
 ```bash
-# On each node (master and workers), stop the K3s service
-sudo systemctl stop k3s
-sudo systemctl stop k3s-agent  # For worker nodes
+# Run the K3s cluster destruction script
+./destroy_k3s.sh
 ```
 
-#### Step 2: Uninstall K3s from All Nodes
-
-```bash
-# On each node, run the K3s uninstall script
-sudo /usr/local/bin/k3s-uninstall.sh
-
-# For worker nodes, also run:
-sudo /usr/local/bin/k3s-agent-uninstall.sh
-```
-
-#### Step 3: Clean Up System Files and Directories
-
-```bash
-# Remove K3s data directories
-sudo rm -rf /var/lib/rancher/k3s
-sudo rm -rf /var/lib/kubelet
-sudo rm -rf /etc/rancher
-
-# Remove K3s binary and configuration files
-sudo rm -f /usr/local/bin/k3s
-sudo rm -f /usr/local/bin/k3s-agent
-sudo rm -f /usr/local/bin/kubectl
-sudo rm -f /usr/local/bin/crictl
-sudo rm -f /usr/local/bin/ctr
-
-# Remove systemd service files
-sudo rm -f /etc/systemd/system/k3s.service
-sudo rm -f /etc/systemd/system/k3s-agent.service
-
-# Reload systemd daemon
-sudo systemctl daemon-reload
-```
-
-#### Step 4: Clean Up Network Configuration
-
-```bash
-# Remove K3s network interfaces (if they exist)
-sudo ip link delete cni0 2>/dev/null || true
-sudo ip link delete flannel.1 2>/dev/null || true
-
-# Flush iptables rules (be careful in production environments)
-sudo iptables -F
-sudo iptables -t nat -F
-sudo iptables -t mangle -F
-sudo iptables -X
-```
-
-#### Step 5: Reset Node (Optional - Use with Caution)
-
-If you want to completely reset the node to a clean state:
-
-```bash
-# Reset the node (this will remove all data and configurations)
-sudo k3s-killall.sh  # If the script exists
-sudo reboot
-```
-
-#### Alternative: Automated K3s Cleanup with Ansible
-
-You can also use the provided Ansible playbook for automated cleanup:
-
-```bash
-# Run the K3s cleanup playbook
-ansible-playbook k3s-ansible/playbooks/reset.yml -i inventory/k3s/inventory.yml
-```
-
-This will automatically:
+This script will automatically:
+- Read node information from `user_input.yml`
 - Stop K3s services on all nodes
-- Run uninstall scripts
+- Uninstall K3s (server/agent based on node role)
 - Clean up system files and directories
-- Reset network configuration
+- Clean up bashrc entries
+- Clean up network configuration
+- Reset nodes to clean state
+- Clean up local files
+
+> 💡 **Note**: The script follows the official K3s Ansible reset approach and requires SSH access to all cluster nodes.
 
 > ⚠️ **Warning**: These actions are irreversible. Make sure to backup any important data before proceeding with the cluster destruction.
 
