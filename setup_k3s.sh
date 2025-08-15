@@ -152,7 +152,6 @@ if [ ! -d "k3s-ansible" ]; then
     echo -e "${YELLOW}Please ensure the k3s-ansible directory is present in your workspace${NC}"
     echo -e "${YELLOW}Do NOT clone from GitHub - always use the local copy${NC}"
     exit 1
-fi
 else
     echo -e "${GREEN}✓ Using existing local k3s-ansible copy${NC}"
     echo -e "${YELLOW}ℹ️  Using local copy (no git tracking)${NC}"

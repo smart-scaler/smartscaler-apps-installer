@@ -10,12 +10,12 @@
 ###############################################################################
 kubernetes_deployment:
   # Master switch for Kubernetes deployment
-  enabled: true                           # Enable kubernetes deployment
+  enabled: false                           # Enable kubernetes deployment
   
   # API Server Configuration
   # Defines how clients will connect to the Kubernetes API server
   api_server:
-    host: "PUBLIC_IP"        # Load balancer VIP or first master for initial setup
+    host: "172.232.102.187"        # Load balancer VIP or first master for initial setup
     port: 6443                   # Standard Kubernetes API port (will be load balanced)
                                 # Standard Kubernetes API port - change only if required
     bind_address: "0.0.0.0"      # Listen on all interfaces
@@ -222,7 +222,7 @@ kubernetes_deployment:
 ###############################################################################
 k3s_deployment:
   # Master switch for K3s deployment
-  enabled: false                              # Enable K3s deployment
+  enabled: true                              # Enable K3s deployment
   
   # K3s Version Configuration
   k3s_version: "v1.33.3+k3s1"                # K3s version to install
