@@ -1,0 +1,5 @@
+---
+# Deploy K3s cluster
+- name: Deploy K3s cluster
+  ansible.builtin.import_playbook: "k3s-ansible/playbooks/site.yml"
+  when: k3s_deployment.enabled | default(false)
