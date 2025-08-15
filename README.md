@@ -533,6 +533,13 @@ The deployment process follows a specific execution order defined in `user_input
 - `create_locust_configmap_8b` - Load test configuration
 - `locust_manifest_8b` - Load testing setup
 
+#### Jetson GPU Support Components
+- `jetson_prerequisites` - Jetson-specific system prerequisites and configurations
+- `nvidia_device_plugin_manifest` - NVIDIA device plugin DaemonSet for GPU resource management
+- `jetson_stats_node_exporter_manifest` - Jetson stats node exporter DaemonSet for metrics collection
+- `jetson_stats_node_exporter_service_manifest` - Service for exposing Jetson metrics
+- `jetson_stats_node_exporter_servicemonitor_manifest` - ServiceMonitor for Prometheus integration
+
 ### Controlling Execution
 
 To execute specific components, use the `execution_order` variable with a list of components:
@@ -577,6 +584,15 @@ sudo ansible-playbook site.yml \
 # Execute all NIM 70B components
 sudo ansible-playbook site.yml \
   --extra-vars "execution_order=['nim_cache_manifest_70b','wait_for_nim_cache_70b','nim_cache_wait_job_70b','nim_service_manifest_70b','keda_scaled_object_manifest_70b','create_inference_pod_configmap_70b','smart_scaler_inference_70b','create_locust_configmap_70b','locust_manifest_70b']" \
+  -e "ngc_api_key=$NGC_API_KEY" \
+  -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
+  -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \
+  -e "avesha_docker_password=$AVESHA_DOCKER_PASSWORD" \
+  -vv
+
+# Execute Jetson GPU Support components
+sudo ansible-playbook site.yml \
+  --extra-vars "execution_order=['jetson_prerequisites','nvidia_device_plugin_manifest','jetson_stats_node_exporter_manifest','jetson_stats_node_exporter_service_manifest','jetson_stats_node_exporter_servicemonitor_manifest']" \
   -e "ngc_api_key=$NGC_API_KEY" \
   -e "ngc_docker_api_key=$NGC_DOCKER_API_KEY" \
   -e "avesha_docker_username=$AVESHA_DOCKER_USERNAME" \
