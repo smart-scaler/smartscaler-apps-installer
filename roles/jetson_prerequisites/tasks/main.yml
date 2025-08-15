@@ -405,9 +405,13 @@
     - name: Check pip3 version for --break-system-packages support
       shell: |
         pip3_version=$(pip3 --version | grep -oE '[0-9]+\.[0-9]+' | head -1)
+        echo "Raw pip3 version output: $(pip3 --version)"
+        echo "Extracted version: $pip3_version"
         if [ -n "$pip3_version" ]; then
           major=$(echo $pip3_version | cut -d. -f1)
           minor=$(echo $pip3_version | cut -d. -f2)
+          echo "Major version: $major"
+          echo "Minor version: $minor"
           if [ "$major" -gt 21 ] || ([ "$major" -eq 21 ] && [ "$minor" -ge 3 ]); then
             echo "supported"
           else
@@ -426,8 +430,14 @@
     - name: Debug pip3 version check results
       debug:
         msg: |
-          pip3_break_support.stdout: "{{ pip3_break_support.stdout }}"
-          pip3_supports_break_system: "{{ pip3_supports_break_system }}"
+          Full pip3_break_support.stdout:
+          "{{ pip3_break_support.stdout }}"
+          
+          pip3_supports_break_system variable:
+          "{{ pip3_supports_break_system }}"
+          
+          Raw pip3_break_support output:
+          "{{ pip3_break_support }}"
       
     - name: Clean up get-pip.py temporary file
       file:
@@ -450,6 +460,15 @@
           pip3_supports_break_system: "{{ pip3_supports_break_system }}"
           jetson_stats_extra_args: "{{ jetson_stats_extra_args }}"
           jetson_stats_upgrade_extra_args: "{{ jetson_stats_upgrade_extra_args }}"
+      
+    - name: Debug conditional logic for jetson-stats installation
+      debug:
+        msg: |
+          About to run jetson-stats installation tasks:
+          - pip3_supports_break_system = "{{ pip3_supports_break_system }}"
+          - This should determine which task runs:
+            * If true: 'with --break-system-packages' tasks
+            * If false: 'without --break-system-packages' tasks
       
     - name: Check if jetson-stats is already installed (with --break-system-packages)
       pip:
