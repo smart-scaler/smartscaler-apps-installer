@@ -337,7 +337,7 @@ execution_order_enabled: true                # Required: Must be enabled for ord
 # Required Kubeconfig Settings
 global_control_plane_ip: "PUBLIC_IP"         # Provide the public IP for metallb/Nginx
 global_kubeconfig: "output/kubeconfig"        # Required: Path to kubeconfig file
-global_kubecontext: "kubernetes-admin@cluster.local"  # Required: Kubernetes context
+global_kubecontext: "default"  # Required: Kubernetes context
 use_global_context: true                     # Required: Use global context
 
 # Required Helm Settings
@@ -1753,7 +1753,7 @@ manifests:
     manifest_file: "files/jetson-stats-node-exporter-service.yaml.j2"
     namespace: "monitoring"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
-    kubecontext: "{{ kubecontext | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
     wait: true
     wait_timeout: 300
     wait_condition:
@@ -1782,7 +1782,7 @@ manifests:
     manifest_file: "files/jetson-stats-node-exporter-servicemonitor.yaml.j2"
     namespace: "monitoring"
     kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
-    kubecontext: "{{ kubecontext | default(global_kubeconfig) }}"
+    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
     wait: true
     wait_timeout: 300
     wait_condition:
