@@ -108,29 +108,101 @@
 
 - name: Install NVIDIA Container Toolkit
   block:
-    - name: Add NVIDIA Container Toolkit repository (Debian/Ubuntu)
+    - name: Try to add NVIDIA Container Toolkit repository with detected version
       apt_repository:
-        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/libnvidia-container/stable/{{ nvidia_ubuntu_version }}/{{ nvidia_arch_deb }} /"
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/libnvidia-container/stable/{{ ansible_distribution | lower }}{{ ansible_distribution_major_version }}/{{ nvidia_arch_deb }} /"
         state: present
         filename: nvidia-container-toolkit
         update_cache: true
+      register: nvidia_repo_attempt
+      failed_when: false
       when: ansible_os_family == "Debian"
 
-    - name: Add NVIDIA Container Runtime repository (Debian/Ubuntu)
+    - name: Fallback to ubuntu18.04 repository if detected version fails (ARM64)
       apt_repository:
-        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/nvidia-container-runtime/stable/{{ nvidia_ubuntu_version }}/{{ nvidia_arch_deb }} /"
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/libnvidia-container/stable/ubuntu18.04/{{ nvidia_arch_deb }} /"
+        state: present
+        filename: nvidia-container-toolkit
+        update_cache: true
+      when: 
+        - ansible_os_family == "Debian"
+        - nvidia_arch_deb == 'arm64'
+        - nvidia_repo_attempt is failed or nvidia_repo_attempt.rc != 0
+
+    - name: Fallback to ubuntu20.04 repository if detected version fails (AMD64)
+      apt_repository:
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/libnvidia-container/stable/ubuntu20.04/{{ nvidia_arch_deb }} /"
+        state: present
+        filename: nvidia-container-toolkit
+        update_cache: true
+      when: 
+        - ansible_os_family == "Debian"
+        - nvidia_arch_deb == 'amd64'
+        - nvidia_repo_attempt is failed or nvidia_repo_attempt.rc != 0
+
+    - name: Try to add NVIDIA Container Runtime repository with detected version
+      apt_repository:
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/nvidia-container-runtime/stable/{{ ansible_distribution | lower }}{{ ansible_distribution_major_version }}/{{ nvidia_arch_deb }} /"
         state: present
         filename: nvidia-container-runtime
         update_cache: true
+      register: nvidia_runtime_repo_attempt
+      failed_when: false
       when: ansible_os_family == "Debian"
 
-    - name: Add NVIDIA Docker repository (Debian/Ubuntu)
+    - name: Fallback to ubuntu18.04 repository if detected version fails (ARM64) - Runtime
       apt_repository:
-        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/nvidia-docker/{{ nvidia_ubuntu_version }}/{{ nvidia_arch_deb }} /"
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/nvidia-container-runtime/stable/ubuntu18.04/{{ nvidia_arch_deb }} /"
+        state: present
+        filename: nvidia-container-runtime
+        update_cache: true
+      when: 
+        - ansible_os_family == "Debian"
+        - nvidia_arch_deb == 'arm64'
+        - nvidia_runtime_repo_attempt is failed or nvidia_runtime_repo_attempt.rc != 0
+
+    - name: Fallback to ubuntu20.04 repository if detected version fails (AMD64) - Runtime
+      apt_repository:
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/nvidia-container-runtime/stable/ubuntu20.04/{{ nvidia_arch_deb }} /"
+        state: present
+        filename: nvidia-container-runtime
+        update_cache: true
+      when: 
+        - ansible_os_family == "Debian"
+        - nvidia_arch_deb == 'amd64'
+        - nvidia_runtime_repo_attempt is failed or nvidia_runtime_repo_attempt.rc != 0
+
+    - name: Try to add NVIDIA Docker repository with detected version
+      apt_repository:
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/nvidia-docker/{{ ansible_distribution | lower }}{{ ansible_distribution_major_version }}/{{ nvidia_arch_deb }} /"
         state: present
         filename: nvidia-docker
         update_cache: true
+      register: nvidia_docker_repo_attempt
+      failed_when: false
       when: ansible_os_family == "Debian"
+
+    - name: Fallback to ubuntu18.04 repository if detected version fails (ARM64) - Docker
+      apt_repository:
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/nvidia-docker/ubuntu18.04/{{ nvidia_arch_deb }} /"
+        state: present
+        filename: nvidia-docker
+        update_cache: true
+      when: 
+        - ansible_os_family == "Debian"
+        - nvidia_arch_deb == 'arm64'
+        - nvidia_docker_repo_attempt is failed or nvidia_docker_repo_attempt.rc != 0
+
+    - name: Fallback to ubuntu20.04 repository if detected version fails (AMD64) - Docker
+      apt_repository:
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/nvidia-docker/ubuntu20.04/{{ nvidia_arch_deb }} /"
+        state: present
+        filename: nvidia-docker
+        update_cache: true
+      when: 
+        - ansible_os_family == "Debian"
+        - nvidia_arch_deb == 'amd64'
+        - nvidia_docker_repo_attempt is failed or nvidia_docker_repo_attempt.rc != 0
 
     - name: Add NVIDIA repository (RHEL/CentOS)
       yum_repository:
