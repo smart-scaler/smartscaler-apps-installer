@@ -316,6 +316,42 @@ reset_node() {
     "
 }
 
+# Function to run K3s Ansible reset playbook
+run_k3s_reset() {
+    print_status "Running K3s Ansible reset playbook..."
+    
+    # Check if k3s-ansible directory exists
+    if [ ! -d "k3s-ansible" ]; then
+        print_warning "k3s-ansible directory not found, skipping official reset"
+        print_warning "This means we'll only do manual cleanup"
+        return 0
+    fi
+    
+    # Check if k3s-ansible inventory exists
+    if [ ! -d "inventory/k3s" ]; then
+        print_warning "K3s inventory not found, skipping official reset"
+        print_warning "This means we'll only do manual cleanup"
+        return 0
+    fi
+    
+    # Check if k3s-ansible reset playbook exists
+    if [ ! -f "k3s-ansible/playbooks/reset.yml" ]; then
+        print_warning "K3s Ansible reset playbook not found, skipping official reset"
+        print_warning "This means we'll only do manual cleanup"
+        return 0
+    fi
+    
+    print_status "Found K3s Ansible installation, running official reset playbook..."
+    
+    # Run the reset playbook
+    if ansible-playbook -i inventory/k3s/inventory.yml k3s-ansible/playbooks/reset.yml --become --become-user=root; then
+        print_success "K3s Ansible reset playbook completed successfully"
+    else
+        print_warning "K3s Ansible reset playbook failed, continuing with manual cleanup"
+        print_warning "This is normal if the cluster was already partially destroyed"
+    fi
+}
+
 # Function to clean up local files
 cleanup_local_files() {
     print_status "Cleaning up local K3s files..."
@@ -332,11 +368,8 @@ cleanup_local_files() {
         print_success "Removed local K3s inventory"
     fi
     
-    # Remove local K3s ansible files
-    if [ -d "k3s-ansible" ]; then
-        rm -rf "k3s-ansible"
-        print_success "Removed local K3s ansible files"
-    fi
+    # Note: We do NOT remove k3s-ansible directory as it's the local copy we want to maintain
+    print_status "Keeping local k3s-ansible directory (local copy policy)"
 }
 
 # Function to display confirmation prompt
@@ -345,13 +378,14 @@ confirm_destruction() {
     print_warning "This script will completely destroy your K3s cluster and remove all data!"
     echo
     echo "The following actions will be performed (following official K3s Ansible reset approach):"
-    echo "  1. Stop K3s services on all nodes"
-    echo "  2. Uninstall K3s from all nodes (server/agent based on role)"
-    echo "  3. Clean up system files and directories"
-    echo "  4. Clean up bashrc entries"
-    echo "  5. Clean up network configuration"
-    echo "  6. Reset nodes to clean state"
-    echo "  7. Clean up local files"
+    echo "  1. Run K3s Ansible reset playbook (if available)"
+    echo "  2. Stop K3s services on all nodes"
+    echo "  3. Uninstall K3s from all nodes (server/agent based on role)"
+    echo "  4. Clean up system files and directories"
+    echo "  5. Clean up bashrc entries"
+    echo "  6. Clean up network configuration"
+    echo "  7. Reset nodes to clean state"
+    echo "  8. Clean up local files"
     echo
     echo "Nodes to be affected: $ALL_NODES"
     echo
@@ -451,9 +485,14 @@ else:
     print_status "Starting K3s cluster destruction..."
     echo
     
-    # Calculate total steps (4 main steps per node + bashrc cleanup + local cleanup)
-    local total_steps=$(( $(echo "$ALL_NODES" | wc -w) * 5 + 1 ))
+    # Calculate total steps (K3s reset + 4 main steps per node + bashrc cleanup + local cleanup)
+    local total_steps=$(( 1 + $(echo "$ALL_NODES" | wc -w) * 5 + 1 ))
     local current_step=0
+    
+    # Step 1: Run K3s Ansible reset playbook (if available)
+    current_step=$((current_step + 1))
+    show_progress $current_step $total_steps
+    run_k3s_reset
     
     # Process each node
     for node in $ALL_NODES; do
