@@ -147,48 +147,22 @@ echo "" >> output/ansible.log
 # NOTE: This script maintains a local copy of k3s-ansible without git tracking
 # to preserve customizations and prevent accidental updates
 if [ ! -d "k3s-ansible" ]; then
-    echo -e "${YELLOW}Initial setup: Creating local k3s-ansible copy...${NC}"
-    
-    # Clone fresh copy for initial setup
-    git clone https://github.com/k3s-io/k3s-ansible.git
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Failed to clone k3s-ansible repository${NC}"
-        exit 1
-    fi
-    
-    # Detach from git to maintain local copy
-    echo -e "${YELLOW}Detaching from git to maintain local copy...${NC}"
-    cd k3s-ansible
-    rm -rf .git
-    echo -e "${GREEN}✓ Git repository detached, maintaining local copy${NC}"
-    cd ..
-    
-    echo -e "${GREEN}✓ Local k3s-ansible copy created successfully${NC}"
-echo -e "${YELLOW}ℹ️  This is now a local copy - no git updates will occur${NC}"
-echo -e "${YELLOW}ℹ️  To update: run files/k3s/update_k3s_ansible.sh or remove k3s-ansible/ directory and re-run this script${NC}"
-echo -e "${YELLOW}ℹ️  Update script location: files/k3s/update_k3s_ansible.sh${NC}"
+    echo -e "${RED}ERROR: k3s-ansible directory not found!${NC}"
+    echo -e "${YELLOW}This directory should contain the local copy of k3s-ansible${NC}"
+    echo -e "${YELLOW}Please ensure the k3s-ansible directory is present in your workspace${NC}"
+    echo -e "${YELLOW}Do NOT clone from GitHub - always use the local copy${NC}"
+    exit 1
+fi
 else
     echo -e "${GREEN}✓ Using existing local k3s-ansible copy${NC}"
     echo -e "${YELLOW}ℹ️  Using local copy (no git tracking)${NC}"
     
     # Verify local copy is functional
     if [ ! -f "k3s-ansible/playbooks/site.yml" ]; then
-        echo -e "${RED}Local k3s-ansible copy appears corrupted. Removing and recreating...${NC}"
-        rm -rf k3s-ansible
-        
-        # Re-clone and detach
-        git clone https://github.com/k3s-io/k3s-ansible.git
-        if [ $? -ne 0 ]; then
-            echo -e "${RED}Failed to clone k3s-ansible repository${NC}"
-            exit 1
-        fi
-        
-        cd k3s-ansible
-        rm -rf .git
-        echo -e "${GREEN}✓ Git repository detached, maintaining local copy${NC}"
-        cd ..
-        
-        echo -e "${GREEN}✓ Local k3s-ansible copy recreated successfully${NC}"
+        echo -e "${RED}Local k3s-ansible copy appears corrupted or incomplete${NC}"
+        echo -e "${YELLOW}Please ensure the k3s-ansible directory contains all required files${NC}"
+        echo -e "${YELLOW}Do NOT clone from GitHub - always use the local copy${NC}"
+        exit 1
     fi
     
     # Check if our custom Jetson role is present

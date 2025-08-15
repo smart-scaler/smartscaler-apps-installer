@@ -630,6 +630,7 @@ To completely remove a K3s cluster and clean up all resources, use the provided 
 
 This script will automatically:
 - Read node information from `user_input.yml`
+- **Verify SSH connectivity** to all cluster nodes (safety check)
 - Stop K3s services on all nodes
 - Uninstall K3s (server/agent based on node role)
 - Clean up system files and directories
@@ -640,7 +641,54 @@ This script will automatically:
 
 > 💡 **Note**: The script follows the official K3s Ansible reset approach and requires SSH access to all cluster nodes.
 
+> ⚠️ **Important**: All scripts use **local copies** of k3s-ansible. Never clone from GitHub - always use the local `k3s-ansible/` directory in your workspace.
+
+> ⚠️ **Important**: The script will **stop execution** if it cannot connect to the cluster nodes. This is a safety feature to prevent accidental destruction of non-existent or inaccessible clusters.
+
+#### **When the Script "Fails":**
+
+The script may appear to "fail" in these scenarios:
+
+1. **No Cluster Running**: If you're testing on a machine without an actual K3s cluster
+2. **SSH Access Issues**: If SSH keys aren't configured or nodes are unreachable
+3. **Wrong Network**: If running from a different network than the cluster
+
+#### **To Use the Script Successfully:**
+
+1. **Ensure you have an actual K3s cluster running**
+2. **Verify SSH access** to all cluster nodes from your current machine
+3. **Run the script** from a location that can reach the cluster nodes
+4. **Have proper SSH keys** configured for authentication
+
 > ⚠️ **Warning**: These actions are irreversible. Make sure to backup any important data before proceeding with the cluster destruction.
+
+#### **Troubleshooting SSH Connectivity:**
+
+If the script fails with SSH connectivity errors:
+
+```bash
+# Test SSH connectivity manually
+ssh root@172.232.102.187 "echo 'SSH connection successful'"
+
+# Check if SSH keys are properly configured
+ls -la ~/.ssh/
+ssh-add -l
+
+# Verify the node is reachable
+ping -c 3 172.232.102.187
+```
+
+#### **Expected Output When Working:**
+
+When the script runs successfully on an actual cluster, you'll see:
+```bash
+[INFO] Extracting node information from user_input.yml...
+[SUCCESS] Found nodes: 172.232.102.187
+[INFO] Checking SSH connectivity to all nodes...
+[SUCCESS] SSH connection to 172.232.102.187 successful
+[WARNING] This script will completely destroy your K3s cluster...
+Are you absolutely sure you want to proceed? (yes/no):
+```
 
 # Example Test Run Steps
 
