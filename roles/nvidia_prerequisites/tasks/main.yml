@@ -21,7 +21,10 @@
     nvidia_arch: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
     nvidia_arch_deb: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
     nvidia_arch_rpm: "{{ 'aarch64' if ansible_architecture in ['aarch64', 'arm64'] else 'x86_64' }}"
-    # Map Ubuntu versions to available NVIDIA repositories
+  when: nvidia_enabled | default(false)
+
+- name: Map Ubuntu versions to available NVIDIA repositories
+  set_fact:
     nvidia_ubuntu_version: >-
       {%- if ansible_distribution == 'Ubuntu' -%}
         {%- if nvidia_arch_deb == 'arm64' -%}
