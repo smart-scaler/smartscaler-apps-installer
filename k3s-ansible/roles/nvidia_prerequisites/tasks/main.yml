@@ -91,11 +91,27 @@
 
 - name: Install NVIDIA Container Toolkit
   block:
-    - name: Add NVIDIA repository (Debian/Ubuntu)
+    - name: Add NVIDIA Container Toolkit repository (Debian/Ubuntu)
       apt_repository:
-        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/libnvidia-container/{{ ansible_distribution | lower }}/{{ nvidia_arch_deb }} /"
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/libnvidia-container/stable/{{ ansible_distribution | lower }}{{ ansible_distribution_major_version }}/{{ nvidia_arch_deb }} /"
         state: present
         filename: nvidia-container-toolkit
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Add NVIDIA Container Runtime repository (Debian/Ubuntu)
+      apt_repository:
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/nvidia-container-runtime/stable/{{ ansible_distribution | lower }}{{ ansible_distribution_major_version }}/{{ nvidia_arch_deb }} /"
+        state: present
+        filename: nvidia-container-runtime
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Add NVIDIA Docker repository (Debian/Ubuntu)
+      apt_repository:
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/nvidia-docker/{{ ansible_distribution | lower }}{{ ansible_distribution_major_version }}/{{ nvidia_arch_deb }} /"
+        state: present
+        filename: nvidia-docker
         update_cache: true
       when: ansible_os_family == "Debian"
 
@@ -103,7 +119,7 @@
       yum_repository:
         name: nvidia-container-toolkit
         description: NVIDIA Container Toolkit Repository
-        baseurl: https://nvidia.github.io/libnvidia-container/rhel7/{{ nvidia_arch_rpm }}/
+        baseurl: https://nvidia.github.io/libnvidia-container/stable/rhel{{ ansible_distribution_major_version }}/{{ nvidia_arch_rpm }}/
         gpgcheck: false
         enabled: true
       when: ansible_os_family == "RedHat"
