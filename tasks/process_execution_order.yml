@@ -1,17 +1,65 @@
 ---
 # Process each item in execution order
-- name: Check if app deployment should be skipped
-  set_fact:
-    skip_app_deployment: "{{ k3s_deployment.enabled | default(false) }}"
+# This now runs AFTER K3s deployment with proper kubeconfig
 
-- name: Skip app deployment when K3s is enabled
-  debug:
-    msg: "Skipping app deployment because K3s deployment is enabled"
-  when: skip_app_deployment
+- name: Verify K3s cluster is ready before proceeding
+  block:
+    - name: Check if kubeconfig is available
+      stat:
+        path: "{{ global_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+      register: kubeconfig_check
 
-- name: Process execution items (skip if K3s enabled)
+    - name: Display kubeconfig status for execution order
+      debug:
+        msg: |
+          Execution Order Kubeconfig Status:
+          - Path: {{ global_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}
+          - Exists: {{ kubeconfig_check.stat.exists }}
+          - Size: {{ kubeconfig_check.stat.size if kubeconfig_check.stat.exists else 'N/A' }}
+
+    - name: Test cluster connectivity before execution order
+      command: kubectl --kubeconfig "{{ global_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}" get nodes
+      register: execution_order_cluster_check
+      failed_when: false
+      changed_when: false
+      when: kubeconfig_check.stat.exists
+
+    - name: Display cluster status for execution order
+      debug:
+        msg: |
+          Cluster Status for Execution Order:
+          - Connectivity: {{ 'SUCCESS' if execution_order_cluster_check.rc == 0 else 'FAILED' }}
+          - Response: {{ execution_order_cluster_check.stdout if execution_order_cluster_check.rc == 0 else execution_order_cluster_check.stderr }}
+
+  when: k3s_deployment.enabled | default(false)
+
+- name: Process execution items with proper kubeconfig
   include_tasks: tasks/process_execution_item.yml
   vars:
     execution_item: "{{ item }}"
+    kubeconfig_path: "{{ global_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
   loop: "{{ execution_order }}"
-  when: not skip_app_deployment 
+  when: 
+    - execution_order_enabled | default(true)
+    - k3s_deployment.enabled | default(false)
+    - kubeconfig_check.stat.exists
+    - execution_order_cluster_check.rc == 0
+
+- name: Skip execution order if K3s not ready
+  debug:
+    msg: |
+      ⚠️  Execution order skipped because:
+      {%- if not k3s_deployment.enabled %}
+      - K3s deployment is not enabled
+      {%- endif %}
+      {%- if not kubeconfig_check.stat.exists %}
+      - Kubeconfig is not available
+      {%- endif %}
+      {%- if execution_order_cluster_check.rc != 0 %}
+      - Cluster is not accessible
+      {%- endif %}
+      
+      🔧 Ensure K3s is deployed and ready before running execution order.
+  when: 
+    - execution_order_enabled | default(true)
+    - (not k3s_deployment.enabled) or (not kubeconfig_check.stat.exists) or (execution_order_cluster_check.rc != 0) 

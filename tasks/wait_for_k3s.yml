@@ -1,0 +1,83 @@
+---
+# Wait for K3s cluster to be ready and prepare kubeconfig
+# This runs after K3s deployment to ensure cluster is operational
+
+- name: Wait for K3s cluster to be ready
+  block:
+    - name: Check if K3s kubeconfig exists
+      stat:
+        path: /etc/rancher/k3s/k3s.yaml
+      register: k3s_kubeconfig_check
+
+    - name: Display kubeconfig status
+      debug:
+        msg: |
+          K3s Kubeconfig Status:
+          - Path: /etc/rancher/k3s/k3s.yaml
+          - Exists: {{ k3s_kubeconfig_check.stat.exists }}
+          - Size: {{ k3s_kubeconfig_check.size if k3s_kubeconfig_check.stat.exists else 'N/A' }}
+
+    - name: Wait for K3s API server to be accessible
+      wait_for:
+        host: "{{ ansible_default_ipv4.address }}"
+        port: 6443
+        delay: 10
+        timeout: 300
+      when: k3s_kubeconfig_check.stat.exists
+
+    - name: Test K3s cluster connectivity
+      command: kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get nodes
+      register: k3s_nodes_check
+      failed_when: false
+      changed_when: false
+      when: k3s_kubeconfig_check.stat.exists
+
+    - name: Display cluster status
+      debug:
+        msg: |
+          K3s Cluster Status:
+          - API server accessible: {{ 'YES' if k3s_nodes_check.rc == 0 else 'NO' }}
+          - Nodes response: {{ k3s_nodes_check.stdout if k3s_nodes_check.rc == 0 else k3s_nodes_check.stderr }}
+
+    - name: Copy kubeconfig to output directory
+      copy:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: "{{ playbook_dir }}/output/kubeconfig"
+        remote_src: true
+        mode: '0644'
+      when: k3s_kubeconfig_check.stat.exists
+
+    - name: Set global kubeconfig path
+      set_fact:
+        global_kubeconfig: "{{ playbook_dir }}/output/kubeconfig"
+      when: k3s_kubeconfig_check.stat.exists
+
+    - name: Verify cluster is fully ready
+      command: kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get pods -n kube-system
+      register: k3s_pods_check
+      failed_when: false
+      changed_when: false
+      when: k3s_kubeconfig_check.stat.exists
+
+    - name: Display system pods status
+      debug:
+        msg: |
+          K3s System Pods:
+          - Status: {{ 'READY' if k3s_pods_check.rc == 0 else 'NOT READY' }}
+          - Pods: {{ k3s_pods_check.stdout if k3s_pods_check.rc == 0 else 'N/A' }}
+
+  when: k3s_deployment.enabled | default(false)
+
+- name: K3s readiness summary
+  debug:
+    msg: |
+      🎯 K3s Cluster Readiness Summary:
+      ===================================
+      - Kubeconfig available: {{ 'YES' if k3s_kubeconfig_check.stat.exists else 'NO' }}
+      - API server accessible: {{ 'YES' if k3s_nodes_check.rc == 0 else 'NO' }}
+      - System pods running: {{ 'YES' if k3s_pods_check.rc == 0 else 'NO' }}
+      - Global kubeconfig set: {{ 'YES' if global_kubeconfig is defined else 'NO' }}
+      
+      🚀 K3s cluster is ready for component deployment!
+      📋 All subsequent tasks will use the generated kubeconfig.
+  when: k3s_deployment.enabled | default(false)

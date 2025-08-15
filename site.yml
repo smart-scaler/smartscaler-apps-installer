@@ -107,7 +107,25 @@
       include_tasks: "tasks/validate_prerequisites.yml"
       when: validate_prerequisites.enabled | default(true)
 
-    - name: Include execution order
+    # PHASE 1: Deploy K3s cluster FIRST (if enabled)
+    - name: Deploy K3s cluster if enabled
+      include_tasks: "tasks/deploy_k3s.yml"
+      when: k3s_deployment.enabled | default(false)
+
+    # PHASE 2: Wait for K3s to be ready and get kubeconfig
+    - name: Wait for K3s cluster to be ready
+      include_tasks: "tasks/wait_for_k3s.yml"
+      when: k3s_deployment.enabled | default(false)
+
+    # PHASE 3: Configure NVIDIA and other K8s-dependent components
+    - name: Configure NVIDIA for Kubernetes (Post-K3s)
+      include_tasks: "tasks/configure_nvidia_k8s.yml"
+      when: 
+        - k3s_deployment.enabled | default(false)
+        - nvidia_enabled | default(false)
+
+    # PHASE 4: Deploy all other components with proper kubeconfig
+    - name: Include execution order for remaining components
       include_tasks: "tasks/process_execution_order.yml"
       vars:
         execution_vars:
@@ -115,11 +133,9 @@
           ngc_docker_api_key: "{{ ngc_docker_api_key }}"
           avesha_docker_username: "{{ avesha_docker_username }}"
           avesha_docker_password: "{{ avesha_docker_password }}"
-      when: execution_order_enabled | default(true)
-
-    - name: Deploy K3s cluster if enabled
-      include_tasks: "tasks/deploy_k3s.yml"
-      when: k3s_deployment.enabled | default(false)
+      when: 
+        - execution_order_enabled | default(true)
+        - k3s_deployment.enabled | default(false)
 
   post_tasks:
     - name: Collect Kubernetes cluster information
@@ -127,7 +143,6 @@
       when: 
         - summary_enabled | default(true)
         - global_kubeconfig is defined
-        - not k3s_deployment.enabled | default(false)
 
     - name: Generate final summary report
       include_tasks: "tasks/summary_tracker.yml"
