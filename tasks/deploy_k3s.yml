@@ -1,4 +1,6 @@
 ---
 # Deploy K3s cluster
 - name: Deploy K3s cluster
-  ansible.builtin.import_playbook: "k3s-ansible/playbooks/site.yml"
+  command: "ansible-playbook -i inventory/k3s/inventory.yml k3s-ansible/playbooks/site.yml"
+  delegate_to: localhost
+  become: false
