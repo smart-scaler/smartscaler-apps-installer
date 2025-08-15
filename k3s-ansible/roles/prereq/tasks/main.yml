@@ -183,20 +183,50 @@
 
 - name: Disable SELinux if enabled
   block:
+    - name: Check if SELinux is available
+      ansible.builtin.stat:
+        path: /etc/selinux/config
+      register: selinux_config_exists
+
+    - name: Install SELinux Python library for RedHat systems
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - libselinux-python3
+        - libselinux
+      when: 
+        - selinux_config_exists.stat.exists
+        - ansible_os_family == "RedHat"
+
+    - name: Install SELinux Python library for Debian systems
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - python3-selinux
+        - selinux-utils
+      when: 
+        - selinux_config_exists.stat.exists
+        - ansible_os_family == "Debian"
+
     - name: Check if SELinux is enabled
       ansible.builtin.command: getenforce
       register: selinux_status
       changed_when: false
       ignore_errors: true
+      when: selinux_config_exists.stat.exists
 
     - name: Display SELinux status
       debug:
         msg: "Current SELinux status: {{ selinux_status.stdout | default('unknown') }}"
+      when: selinux_config_exists.stat.exists
 
     - name: Disable SELinux if enforcing or permissive
       ansible.posix.selinux:
         state: disabled
       when: 
+        - selinux_config_exists.stat.exists
         - selinux_status.stdout is defined
         - selinux_status.stdout in ['Enforcing', 'Permissive']
 
@@ -205,10 +235,17 @@
       register: selinux_verify
       changed_when: false
       ignore_errors: true
+      when: selinux_config_exists.stat.exists
 
     - name: Display SELinux verification
       debug:
         msg: "SELinux status after configuration: {{ selinux_verify.stdout | default('unknown') }}"
+      when: selinux_config_exists.stat.exists
+
+    - name: Display SELinux not available message
+      debug:
+        msg: "SELinux not available on this system - skipping configuration"
+      when: not selinux_config_exists.stat.exists
 
 - name: Gather the package facts
   ansible.builtin.package_facts:
