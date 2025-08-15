@@ -227,18 +227,25 @@
         timeout: 300
       when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
 
-    - name: Create RuntimeClass manifest
-      copy:
-        dest: /tmp/nvidia-runtime-class.yaml
-        content: |
-          apiVersion: node.k8s.io/v1
-          kind: RuntimeClass
-          metadata:
-            name: nvidia
-          handler: nvidia
-          scheduling:
-            nodeSelector:
-              nvidia.com/gpu.present: "true"
+    - name: Create RuntimeClass manifest using shell command
+      shell: |
+        cat > /tmp/nvidia-runtime-class.yaml << 'EOF'
+        apiVersion: node.k8s.io/v1
+        kind: RuntimeClass
+        metadata:
+          name: nvidia
+        handler: nvidia
+        scheduling:
+          nodeSelector:
+            nvidia.com/gpu.present: "true"
+        EOF
+      args:
+        creates: /tmp/nvidia-runtime-class.yaml
+      when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
+
+    - name: Set proper permissions on RuntimeClass manifest
+      file:
+        path: /tmp/nvidia-runtime-class.yaml
         mode: '0644'
         owner: root
         group: root
