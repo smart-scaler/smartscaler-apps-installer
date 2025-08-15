@@ -175,7 +175,7 @@ If you're deploying on a **single node** and running the command from the **same
 
 ```bash
 # Make the script executable
-chmod +x setup_kubernetes.sh
+chmod +x setup_k8s.sh
 
 # Run the installation script with sudo
 ./setup_k8s.sh
