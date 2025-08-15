@@ -7,9 +7,9 @@ metadata:
     app: jetson-stats-node-exporter
     version: v0.1.1
   annotations:
-    prometheus.io/path: {{ manifest_vars.prometheus_annotations.prometheus_io_path }}
-    prometheus.io/port: {{ manifest_vars.prometheus_annotations.prometheus_io_port | string }}
-    prometheus.io/scrape: {{ manifest_vars.prometheus_annotations.prometheus_io_scrape | string }}
+    prometheus.io/path: "{{ manifest_vars.prometheus_annotations.prometheus_io_path }}"
+    prometheus.io/port: "{{ manifest_vars.prometheus_annotations.prometheus_io_port }}"
+    prometheus.io/scrape: "{{ manifest_vars.prometheus_annotations.prometheus_io_scrape }}"
 spec:
   ports:
     - name: metrics
