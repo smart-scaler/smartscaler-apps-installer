@@ -1,8 +1,8 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ daemonset_name }}
-  namespace: {{ daemonset_namespace }}
+  name: {{ manifest_vars.daemonset_name }}
+  namespace: {{ manifest_vars.daemonset_namespace }}
 spec:
   selector:
     matchLabels:
@@ -15,18 +15,18 @@ spec:
       volumes:
         - name: device-plugin
           hostPath:
-            path: {{ device_plugin_path }}
+            path: {{ manifest_vars.device_plugin_path }}
             type: ''
       containers:
         - name: nvidia-device-plugin-ctr
-          image: {{ device_plugin_image }}
+          image: {{ manifest_vars.device_plugin_image }}
           env:
             - name: FAIL_ON_INIT_ERROR
-              value: '{{ fail_on_init_error }}'
+              value: '{{ manifest_vars.fail_on_init_error }}'
           resources: {}
           volumeMounts:
             - name: device-plugin
-              mountPath: {{ device_plugin_path }}
+              mountPath: {{ manifest_vars.device_plugin_path }}
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           imagePullPolicy: Always
@@ -41,15 +41,15 @@ spec:
       securityContext: {}
       schedulerName: default-scheduler
       tolerations:
-{% for toleration in tolerations %}
+{% for toleration in manifest_vars.tolerations %}
         - key: "{{ toleration.key }}"
           operator: "{{ toleration.operator }}"
           effect: "{{ toleration.effect }}"
 {% endfor %}
-      priorityClassName: {{ priority_class_name }}
+      priorityClassName: {{ manifest_vars.priority_class_name }}
   updateStrategy:
-    type: {{ update_strategy.type }}
+    type: {{ manifest_vars.update_strategy.type }}
     rollingUpdate:
-      maxUnavailable: {{ update_strategy.rolling_update.max_unavailable }}
-      maxSurge: {{ update_strategy.rolling_update.max_surge }}
-  revisionHistoryLimit: {{ revision_history_limit }}
+      maxUnavailable: {{ manifest_vars.update_strategy.rolling_update.max_unavailable }}
+      maxSurge: {{ manifest_vars.update_strategy.rolling_update.max_surge }}
+  revisionHistoryLimit: {{ manifest_vars.revision_history_limit }}

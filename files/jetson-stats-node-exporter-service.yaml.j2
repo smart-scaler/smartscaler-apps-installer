@@ -1,24 +1,24 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ service_name }}
-  namespace: {{ service_namespace }}
+  name: {{ manifest_vars.service_name }}
+  namespace: {{ manifest_vars.service_namespace }}
   labels:
     app: jetson-stats-node-exporter
     version: v0.1.1
   annotations:
-    prometheus.io/path: {{ prometheus_annotations.prometheus_io_path }}
-    prometheus.io/port: {{ prometheus_annotations.prometheus_io_port | string }}
-    prometheus.io/scrape: {{ prometheus_annotations.prometheus_io_scrape | string }}
+    prometheus.io/path: {{ manifest_vars.prometheus_annotations.prometheus_io_path }}
+    prometheus.io/port: {{ manifest_vars.prometheus_annotations.prometheus_io_port | string }}
+    prometheus.io/scrape: {{ manifest_vars.prometheus_annotations.prometheus_io_scrape | string }}
 spec:
   ports:
     - name: metrics
       protocol: TCP
-      port: {{ service_port }}
-      targetPort: {{ service_target_port }}
+      port: {{ manifest_vars.service_port }}
+      targetPort: {{ manifest_vars.service_target_port }}
   selector:
-    app: {{ selector.app }}
-  type: {{ service_type }}
+    app: {{ manifest_vars.selector.app }}
+  type: {{ manifest_vars.service_type }}
   sessionAffinity: None
   externalTrafficPolicy: Cluster
   ipFamilies:

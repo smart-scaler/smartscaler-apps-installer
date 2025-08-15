@@ -1,19 +1,19 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ servicemonitor_name }}
-  namespace: {{ servicemonitor_namespace }}
+  name: {{ manifest_vars.servicemonitor_name }}
+  namespace: {{ manifest_vars.servicemonitor_namespace }}
   labels:
     app: jetson-stats-node-exporter
     version: v0.1.1
 spec:
   endpoints:
-    - interval: {{ endpoint_interval }}
-      path: {{ endpoint_path }}
-      port: {{ endpoint_port }}
-      scrapeTimeout: {{ endpoint_scrape_timeout }}
+    - interval: {{ manifest_vars.endpoint_interval }}
+      path: {{ manifest_vars.endpoint_path }}
+      port: {{ manifest_vars.endpoint_port }}
+      scrapeTimeout: {{ manifest_vars.endpoint_scrape_timeout }}
   namespaceSelector:
-    matchNames: {{ namespace_selector.match_names }}
+    matchNames: {{ manifest_vars.namespace_selector.match_names }}
   selector:
     matchLabels:
-      app: {{ selector.app }}
+      app: {{ manifest_vars.selector.app }}

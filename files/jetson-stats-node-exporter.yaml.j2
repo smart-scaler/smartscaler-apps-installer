@@ -1,8 +1,8 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ daemonset_name }}
-  namespace: {{ daemonset_namespace }}
+  name: {{ manifest_vars.daemonset_name }}
+  namespace: {{ manifest_vars.daemonset_namespace }}
   labels:
     app: jetson-stats-node-exporter
     version: v0.1.1
@@ -43,33 +43,33 @@ spec:
             type: Directory
       containers:
         - name: jetson-stats-node-exporter
-          image: {{ exporter_image }}
+          image: {{ manifest_vars.exporter_image }}
           command:
             - python3
             - '-m'
             - jetson_stats_node_exporter
             - '--port'
-            - '{{ exporter_port | string }}'
+            - '{{ manifest_vars.exporter_port | string }}'
           ports:
             - name: metrics
-              containerPort: {{ exporter_port }}
+              containerPort: {{ manifest_vars.exporter_port }}
               protocol: TCP
           env:
             - name: PYTHONPATH
-              value: {{ python_path }}
+              value: {{ manifest_vars.python_path }}
             - name: JETSON_STATS_NODE_EXPORTER_PORT
-              value: '{{ exporter_port | string }}'
+              value: '{{ manifest_vars.exporter_port | string }}'
             - name: PORT
-              value: '{{ exporter_port | string }}'
+              value: '{{ manifest_vars.exporter_port | string }}'
             - name: HOST
               value: 0.0.0.0
           resources:
             limits:
-              cpu: {{ resources.limits.cpu }}
-              memory: {{ resources.limits.memory }}
+              cpu: {{ manifest_vars.resources.limits.cpu }}
+              memory: {{ manifest_vars.resources.limits.memory }}
             requests:
-              cpu: {{ resources.requests.cpu }}
-              memory: {{ resources.requests.memory }}
+              cpu: {{ manifest_vars.resources.requests.cpu }}
+              memory: {{ manifest_vars.resources.requests.memory }}
           volumeMounts:
             - name: jtop-sock
               readOnly: true
@@ -92,7 +92,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /metrics
-              port: {{ exporter_port }}
+              port: {{ manifest_vars.exporter_port }}
               scheme: HTTP
             initialDelaySeconds: 60
             timeoutSeconds: 10
@@ -102,7 +102,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /metrics
-              port: {{ exporter_port }}
+              port: {{ manifest_vars.exporter_port }}
               scheme: HTTP
             initialDelaySeconds: 30
             timeoutSeconds: 5
@@ -116,21 +116,21 @@ spec:
       terminationGracePeriodSeconds: 30
       dnsPolicy: ClusterFirst
       nodeSelector:
-        kubernetes.io/arch: {{ node_selector.kubernetes_io_arch }}
+        kubernetes.io/arch: {{ manifest_vars.node_selector.kubernetes_io_arch }}
       securityContext:
         runAsUser: 0
         runAsGroup: 0
         fsGroup: 0
       schedulerName: default-scheduler
       tolerations:
-{% for toleration in tolerations %}
+{% for toleration in manifest_vars.tolerations %}
         - key: "{{ toleration.key }}"
           operator: "{{ toleration.operator }}"
           effect: "{{ toleration.effect }}"
 {% endfor %}
   updateStrategy:
-    type: {{ update_strategy.type }}
+    type: {{ manifest_vars.update_strategy.type }}
     rollingUpdate:
-      maxUnavailable: {{ update_strategy.rolling_update.max_unavailable }}
-      maxSurge: {{ update_strategy.rolling_update.max_surge }}
-  revisionHistoryLimit: {{ revision_history_limit }}
+      maxUnavailable: {{ manifest_vars.update_strategy.rolling_update.max_unavailable }}
+      maxSurge: {{ manifest_vars.update_strategy.rolling_update.max_surge }}
+  revisionHistoryLimit: {{ manifest_vars.revision_history_limit }}
