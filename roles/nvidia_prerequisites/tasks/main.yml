@@ -130,7 +130,7 @@
       when: 
         - ansible_os_family == "Debian"
         - nvidia_arch_deb == 'arm64'
-        - nvidia_repo_attempt is failed or nvidia_repo_attempt.rc != 0
+        - nvidia_repo_attempt is failed
 
     - name: Fallback to ubuntu20.04 repository if detected version fails (AMD64)
       apt_repository:
@@ -141,7 +141,7 @@
       when: 
         - ansible_os_family == "Debian"
         - nvidia_arch_deb == 'amd64'
-        - nvidia_repo_attempt is failed or nvidia_repo_attempt.rc != 0
+        - nvidia_repo_attempt is failed
 
     - name: Try to add NVIDIA Container Runtime repository with detected version
       apt_repository:
@@ -162,7 +162,7 @@
       when: 
         - ansible_os_family == "Debian"
         - nvidia_arch_deb == 'arm64'
-        - nvidia_runtime_repo_attempt is failed or nvidia_runtime_repo_attempt.rc != 0
+        - nvidia_runtime_repo_attempt is failed
 
     - name: Fallback to ubuntu20.04 repository if detected version fails (AMD64) - Runtime
       apt_repository:
@@ -173,7 +173,7 @@
       when: 
         - ansible_os_family == "Debian"
         - nvidia_arch_deb == 'amd64'
-        - nvidia_runtime_repo_attempt is failed or nvidia_runtime_repo_attempt.rc != 0
+        - nvidia_runtime_repo_attempt is failed
 
     - name: Try to add NVIDIA Docker repository with detected version
       apt_repository:
@@ -194,7 +194,7 @@
       when: 
         - ansible_os_family == "Debian"
         - nvidia_arch_deb == 'arm64'
-        - nvidia_docker_repo_attempt is failed or nvidia_docker_repo_attempt.rc != 0
+        - nvidia_docker_repo_attempt is failed
 
     - name: Fallback to ubuntu20.04 repository if detected version fails (AMD64) - Docker
       apt_repository:
@@ -205,7 +205,7 @@
       when: 
         - ansible_os_family == "Debian"
         - nvidia_arch_deb == 'amd64'
-        - nvidia_docker_repo_attempt is failed or nvidia_docker_repo_attempt.rc != 0
+        - nvidia_docker_repo_attempt is failed
 
     - name: Add NVIDIA repository (RHEL/CentOS)
       yum_repository:
