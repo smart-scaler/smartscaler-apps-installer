@@ -204,6 +204,9 @@
               scheduling:
                 nodeSelector:
                   nvidia.com/gpu.present: "true"
+            mode: '0644'
+            owner: root
+            group: root
           when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
 
         - name: Apply RuntimeClass (will be applied when cluster is ready)
