@@ -24,7 +24,9 @@
     # Map Ubuntu versions to available NVIDIA repositories
     nvidia_ubuntu_version: >-
       {%- if ansible_distribution == 'Ubuntu' -%}
-        {%- if ansible_distribution_major_version | int >= 22 -%}
+        {%- if nvidia_arch_deb == 'arm64' -%}
+          ubuntu18.04
+        {%- elif ansible_distribution_major_version | int >= 22 -%}
           ubuntu20.04
         {%- elif ansible_distribution_major_version | int >= 20 -%}
           ubuntu20.04
