@@ -57,43 +57,52 @@ check_user_input() {
 extract_nodes() {
     print_status "Extracting node information from user_input.yml..."
     
-    # Extract master nodes
+    # Extract master nodes from control_plane_nodes array (under kubernetes_deployment)
     MASTER_NODES=$(python3 -c "
 import yaml
 with open('user_input.yml', 'r') as f:
     data = yaml.safe_load(f)
 masters = []
-for host, config in data.get('hosts', {}).items():
-    if config.get('is_master', False):
-        masters.append(config.get('ansible_host', host))
+if 'kubernetes_deployment' in data and 'control_plane_nodes' in data['kubernetes_deployment']:
+    for node in data['kubernetes_deployment']['control_plane_nodes']:
+        if 'ansible_host' in node:
+            masters.append(node['ansible_host'])
 print(' '.join(masters))
 " 2>/dev/null || echo "")
     
-    # Extract worker nodes
+    # Extract worker nodes from worker_nodes array (under kubernetes_deployment)
     WORKER_NODES=$(python3 -c "
 import yaml
 with open('user_input.yml', 'r') as f:
     data = yaml.safe_load(f)
 workers = []
-for host, config in data.get('hosts', {}).items():
-    if not config.get('is_master', False):
-        workers.append(config.get('ansible_host', host))
+if 'kubernetes_deployment' in data and 'worker_nodes' in data['kubernetes_deployment']:
+    for node in data['kubernetes_deployment']['worker_nodes']:
+        if 'ansible_host' in node:
+            workers.append(node['ansible_host'])
 print(' '.join(workers))
 " 2>/dev/null || echo "")
     
-    # Extract all nodes
+    # Extract all nodes (masters + workers)
     ALL_NODES=$(python3 -c "
 import yaml
 with open('user_input.yml', 'r') as f:
     data = yaml.safe_load(f)
 nodes = []
-for host, config in data.get('hosts', {}).items():
-    nodes.append(config.get('ansible_host', host))
+if 'kubernetes_deployment' in data and 'control_plane_nodes' in data['kubernetes_deployment']:
+    for node in data['kubernetes_deployment']['control_plane_nodes']:
+        if 'ansible_host' in node:
+            nodes.append(node['ansible_host'])
+if 'kubernetes_deployment' in data and 'worker_nodes' in data['kubernetes_deployment']:
+    for node in data['kubernetes_deployment']['worker_nodes']:
+        if 'ansible_host' in node:
+            nodes.append(node['ansible_host'])
 print(' '.join(nodes))
 " 2>/dev/null || echo "")
     
     if [ -z "$ALL_NODES" ]; then
         print_error "Could not extract node information from user_input.yml"
+        print_error "Make sure control_plane_nodes and/or worker_nodes are defined in user_input.yml"
         exit 1
     fi
     
