@@ -1,7 +1,7 @@
 ---
-# NVIDIA Prerequisites Role - Main Tasks
-# This role detects NVIDIA GPUs and installs container runtime support
-# Works for BOTH K3s and Kubespray deployments
+# NVIDIA Prerequisites Role
+# This role installs NVIDIA Container Toolkit and related components
+# System-level installation happens first, K8s configuration happens after cluster is ready
 
 - name: Check if NVIDIA prerequisites are enabled
   set_fact:
@@ -11,10 +11,6 @@
 - name: Skip NVIDIA prerequisites if disabled
   meta: end_play
   when: not nvidia_enabled | default(false)
-
-- name: Gather system facts
-  setup:
-  when: nvidia_enabled | default(false)
 
 - name: Detect system architecture for NVIDIA repositories
   set_fact:
@@ -190,93 +186,12 @@
         update_cache: true
       when: ansible_os_family == "RedHat"
 
-    - name: Install NVIDIA Container Toolkit
-      package:
-        name: nvidia-container-toolkit
-        state: present
-        update_cache: true
-
-    - name: Install NVIDIA Container Runtime
-      package:
-        name: nvidia-container-runtime
-        state: present
-        update_cache: true
-
-    - name: Configure containerd for NVIDIA runtime
-      block:
-        - name: Backup containerd config
-          copy:
-            src: /etc/containerd/config.toml
-            dest: /etc/containerd/config.toml.backup
-            remote_src: true
-          when: nvidia_prerequisites.container_runtime.configure_containerd | default(true)
-
-        - name: Update containerd config for NVIDIA
-          replace:
-            path: /etc/containerd/config.toml
-            regexp: '^\s*#\s*\[plugins\."io\.containerd\.grpc\.v1\.cri"\.containerd\.runtimes\]'
-            replace: '[plugins."io.containerd.grpc.v1.cri".containerd.runtimes]'
-          when: nvidia_prerequisites.container_runtime.configure_containerd | default(true)
-
-        - name: Add NVIDIA runtime configuration to containerd
-          blockinfile:
-            path: /etc/containerd/config.toml
-            block: |
-              [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
-                privileged_without_host_devices = false
-                runtime_engine = ""
-                runtime_root = ""
-                runtime_type = "io.containerd.runc.v2"
-                [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
-                  BinaryName = "/usr/bin/nvidia-container-runtime"
-                  SystemdCgroup = false
-            marker: "# {mark} NVIDIA runtime configuration"
-            insertafter: '^\s*\[plugins\."io\.containerd\.grpc\.v1\.cri"\.containerd\.runtimes\]'
-          when: nvidia_prerequisites.container_runtime.configure_containerd | default(true)
-
-        - name: Restart containerd service
-          systemd:
-            name: containerd
-            state: restarted
-            daemon_reload: true
-          when: nvidia_prerequisites.container_runtime.configure_containerd | default(true)
-
-      when: nvidia_prerequisites.container_runtime.configure_containerd | default(true)
-
-    - name: Create Kubernetes RuntimeClass for NVIDIA
-      block:
-        - name: Create RuntimeClass manifest
-          copy:
-            dest: /tmp/nvidia-runtime-class.yaml
-            content: |
-              apiVersion: node.k8s.io/v1
-              kind: RuntimeClass
-              metadata:
-                name: nvidia
-              handler: nvidia
-              scheduling:
-                nodeSelector:
-                  nvidia.com/gpu.present: "true"
-            mode: '0644'
-            owner: root
-            group: root
-          when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
-
-        - name: Apply RuntimeClass (will be applied when cluster is ready)
-          command: kubectl apply -f /tmp/nvidia-runtime-class.yaml
-          register: runtime_class_result
-          failed_when: false
-          changed_when: false
-          when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
-
-      when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
-
   when: 
     - nvidia_enabled | default(false)
     - has_nvidia_gpus | default(false)
     - nvidia_prerequisites.container_runtime.install_toolkit | default(true)
 
-- name: Verify NVIDIA installation
+- name: Verify NVIDIA system installation
   block:
     - name: Test NVIDIA Container Runtime
       command: nvidia-container-cli info
@@ -290,15 +205,60 @@
       failed_when: false
       changed_when: false
 
-    - name: Display NVIDIA verification results
+    - name: Display NVIDIA system verification results
       debug:
         msg: |
-          NVIDIA Installation Verification:
+          NVIDIA System Installation Verification:
           - Container CLI: {{ 'PASS' if nvidia_cli_test.rc == 0 else 'FAIL' }}
           - Runtime Version: {{ nvidia_runtime_version.stdout if nvidia_runtime_version.rc == 0 else 'FAIL' }}
-          - Runtime Class: {{ 'CREATED' if nvidia_prerequisites.container_runtime.create_runtime_class | default(true) else 'SKIPPED' }}
 
-    - name: Create test container to verify GPU access
+  when: 
+    - nvidia_enabled | default(false)
+    - has_nvidia_gpus | default(false)
+
+# Kubernetes configuration tasks - these should run AFTER K3s is installed and ready
+- name: Configure NVIDIA for Kubernetes (Post-K3s Installation)
+  block:
+    - name: Wait for Kubernetes cluster to be ready
+      wait_for:
+        host: "{{ ansible_default_ipv4.address }}"
+        port: 6443
+        delay: 10
+        timeout: 300
+      when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
+
+    - name: Create RuntimeClass manifest
+      copy:
+        dest: /tmp/nvidia-runtime-class.yaml
+        content: |
+          apiVersion: node.k8s.io/v1
+          kind: RuntimeClass
+          metadata:
+            name: nvidia
+          handler: nvidia
+          scheduling:
+            nodeSelector:
+              nvidia.com/gpu.present: "true"
+        mode: '0644'
+        owner: root
+        group: root
+      when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
+
+    - name: Apply RuntimeClass to Kubernetes cluster
+      command: kubectl apply -f /tmp/nvidia-runtime-class.yaml
+      register: runtime_class_result
+      failed_when: false
+      changed_when: false
+      when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
+
+    - name: Display RuntimeClass creation result
+      debug:
+        msg: |
+          RuntimeClass Creation:
+          - Status: {{ 'SUCCESS' if runtime_class_result.rc == 0 else 'FAILED' }}
+          - Output: {{ runtime_class_result.stdout if runtime_class_result.rc == 0 else runtime_class_result.stderr }}
+
+    - name: Test GPU access with Kubernetes (optional)
       docker_container:
         name: nvidia-test
         image: nvidia/cuda:11.0-base-ubuntu18.04
@@ -321,6 +281,7 @@
   when: 
     - nvidia_enabled | default(false)
     - has_nvidia_gpus | default(false)
+    - nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
 
 - name: NVIDIA Prerequisites Summary
   debug:
@@ -330,9 +291,9 @@
       - Role enabled: {{ nvidia_enabled }}
       - NVIDIA GPUs detected: {{ has_nvidia_gpus | default(false) }}
       - Container toolkit installed: {{ nvidia_prerequisites.container_runtime.install_toolkit | default(true) }}
-      - Containerd configured: {{ nvidia_prerequisites.container_runtime.configure_containerd | default(true) }}
-      - Runtime class created: {{ nvidia_prerequisites.container_runtime.create_runtime_class | default(true) }}
+      - Runtime class creation: {{ nvidia_prerequisites.container_runtime.create_runtime_class | default(true) }}
       - GPU access verified: {{ nvidia_prerequisites.verification.test_gpu_access | default(true) }}
       
-      🚀 NVIDIA support is now ready for {{ ansible_distribution }} {{ ansible_distribution_version }}!
+      🚀 NVIDIA system support is ready for {{ ansible_distribution }} {{ ansible_distribution_version }}!
+      📋 Kubernetes RuntimeClass will be created after K3s cluster is ready.
   when: nvidia_enabled | default(false)
