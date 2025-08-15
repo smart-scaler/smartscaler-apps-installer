@@ -21,6 +21,19 @@
     nvidia_arch: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
     nvidia_arch_deb: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
     nvidia_arch_rpm: "{{ 'aarch64' if ansible_architecture in ['aarch64', 'arm64'] else 'x86_64' }}"
+    # Map Ubuntu versions to available NVIDIA repositories
+    nvidia_ubuntu_version: >-
+      {%- if ansible_distribution == 'Ubuntu' -%}
+        {%- if ansible_distribution_major_version | int >= 22 -%}
+          ubuntu20.04
+        {%- elif ansible_distribution_major_version | int >= 20 -%}
+          ubuntu20.04
+        {%- else -%}
+          ubuntu18.04
+        {%- endif -%}
+      {%- else -%}
+        {{ ansible_distribution | lower }}{{ ansible_distribution_major_version }}
+      {%- endif -%}
   when: nvidia_enabled | default(false)
 
 - name: Display architecture detection results
@@ -28,8 +41,10 @@
     msg: |
       Architecture Detection for NVIDIA:
       - System architecture: {{ ansible_architecture }}
+      - Distribution: {{ ansible_distribution }} {{ ansible_distribution_major_version }}
       - NVIDIA repository arch (Debian): {{ nvidia_arch_deb }}
       - NVIDIA repository arch (RHEL): {{ nvidia_arch_rpm }}
+      - NVIDIA Ubuntu version mapping: {{ nvidia_ubuntu_version }}
       - Using repository arch: {{ nvidia_arch }}
   when: nvidia_enabled | default(false)
 
@@ -93,7 +108,7 @@
   block:
     - name: Add NVIDIA Container Toolkit repository (Debian/Ubuntu)
       apt_repository:
-        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/libnvidia-container/stable/{{ ansible_distribution | lower }}{{ ansible_distribution_major_version }}/{{ nvidia_arch_deb }} /"
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/libnvidia-container/stable/{{ nvidia_ubuntu_version }}/{{ nvidia_arch_deb }} /"
         state: present
         filename: nvidia-container-toolkit
         update_cache: true
@@ -101,7 +116,7 @@
 
     - name: Add NVIDIA Container Runtime repository (Debian/Ubuntu)
       apt_repository:
-        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/nvidia-container-runtime/stable/{{ ansible_distribution | lower }}{{ ansible_distribution_major_version }}/{{ nvidia_arch_deb }} /"
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/nvidia-container-runtime/stable/{{ nvidia_ubuntu_version }}/{{ nvidia_arch_deb }} /"
         state: present
         filename: nvidia-container-runtime
         update_cache: true
@@ -109,7 +124,7 @@
 
     - name: Add NVIDIA Docker repository (Debian/Ubuntu)
       apt_repository:
-        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/nvidia-docker/{{ ansible_distribution | lower }}{{ ansible_distribution_major_version }}/{{ nvidia_arch_deb }} /"
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/nvidia-docker/{{ nvidia_ubuntu_version }}/{{ nvidia_arch_deb }} /"
         state: present
         filename: nvidia-docker
         update_cache: true
