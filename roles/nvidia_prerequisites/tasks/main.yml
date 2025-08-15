@@ -16,6 +16,23 @@
   setup:
   when: nvidia_enabled | default(false)
 
+- name: Detect system architecture for NVIDIA repositories
+  set_fact:
+    nvidia_arch: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
+    nvidia_arch_deb: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
+    nvidia_arch_rpm: "{{ 'aarch64' if ansible_architecture in ['aarch64', 'arm64'] else 'x86_64' }}"
+  when: nvidia_enabled | default(false)
+
+- name: Display architecture detection results
+  debug:
+    msg: |
+      Architecture Detection for NVIDIA:
+      - System architecture: {{ ansible_architecture }}
+      - NVIDIA repository arch (Debian): {{ nvidia_arch_deb }}
+      - NVIDIA repository arch (RHEL): {{ nvidia_arch_rpm }}
+      - Using repository arch: {{ nvidia_arch }}
+  when: nvidia_enabled | default(false)
+
 - name: Check for NVIDIA GPUs using multiple detection methods
   block:
     - name: Check for NVIDIA GPUs using nvidia-smi
@@ -74,9 +91,9 @@
 
 - name: Install NVIDIA Container Toolkit
   block:
-    - name: Add NVIDIA repository
+    - name: Add NVIDIA repository (Debian/Ubuntu)
       apt_repository:
-        repo: "deb [arch={{ nvidia_prerequisites.container_runtime.architecture }}] https://nvidia.github.io/libnvidia-container/{{ ansible_distribution | lower }}/amd64 /"
+        repo: "deb [arch={{ nvidia_arch_deb }}] https://nvidia.github.io/libnvidia-container/{{ ansible_distribution | lower }}/{{ nvidia_arch_deb }} /"
         state: present
         filename: nvidia-container-toolkit
         update_cache: true
@@ -86,7 +103,7 @@
       yum_repository:
         name: nvidia-container-toolkit
         description: NVIDIA Container Toolkit Repository
-        baseurl: https://nvidia.github.io/libnvidia-container/rhel7/x86_64/
+        baseurl: https://nvidia.github.io/libnvidia-container/rhel7/{{ nvidia_arch_rpm }}/
         gpgcheck: false
         enabled: true
       when: ansible_os_family == "RedHat"
