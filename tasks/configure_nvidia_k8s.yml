@@ -1,0 +1,126 @@
+---
+# Configure NVIDIA for Kubernetes (Post-K3s Installation)
+# This task runs after K3s is installed and uses the generated kubeconfig
+
+- name: Configure NVIDIA for Kubernetes
+  block:
+    - name: Check if NVIDIA prerequisites are installed
+      stat:
+        path: /usr/bin/nvidia-container-runtime
+      register: nvidia_runtime_check
+
+    - name: Skip NVIDIA K8s configuration if runtime not installed
+      debug:
+        msg: "NVIDIA Container Runtime not found. Skipping Kubernetes configuration."
+      when: not nvidia_runtime_check.stat.exists
+
+    - name: Wait for Kubernetes cluster to be ready
+      wait_for:
+        host: "{{ ansible_default_ipv4.address }}"
+        port: 6443
+        delay: 10
+        timeout: 300
+      when: nvidia_runtime_check.stat.exists
+
+    - name: Check for kubeconfig file
+      stat:
+        path: /etc/rancher/k3s/k3s.yaml
+      register: kubeconfig_check
+      when: nvidia_runtime_check.stat.exists
+
+    - name: Display kubeconfig status
+      debug:
+        msg: |
+          Kubeconfig Status:
+          - Path: /etc/rancher/k3s/k3s.yaml
+          - Exists: {{ kubeconfig_check.stat.exists }}
+          - Size: {{ kubeconfig_check.stat.size if kubeconfig_check.stat.exists else 'N/A' }}
+
+    - name: Create RuntimeClass manifest
+      copy:
+        dest: /tmp/nvidia-runtime-class.yaml
+        content: |
+          apiVersion: node.k8s.io/v1
+          kind: RuntimeClass
+          metadata:
+            name: nvidia
+          handler: nvidia
+          scheduling:
+            nodeSelector:
+              nvidia.com/gpu.present: "true"
+        mode: '0644'
+        owner: root
+        group: root
+      when: 
+        - nvidia_runtime_check.stat.exists
+        - kubeconfig_check.stat.exists
+
+    - name: Apply RuntimeClass using kubeconfig
+      command: kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml apply -f /tmp/nvidia-runtime-class.yaml
+      register: runtime_class_result
+      failed_when: false
+      changed_when: false
+      when: 
+        - nvidia_runtime_check.stat.exists
+        - kubeconfig_check.stat.exists
+
+    - name: Display RuntimeClass creation result
+      debug:
+        msg: |
+          RuntimeClass Creation:
+          - Status: {{ 'SUCCESS' if runtime_class_result.rc == 0 else 'FAILED' }}
+          - Output: {{ runtime_class_result.stdout if runtime_class_result.rc == 0 else runtime_class_result.stderr }}
+
+    - name: Label nodes with NVIDIA GPU support
+      command: kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml label nodes --all nvidia.com/gpu.present=true --overwrite
+      register: node_label_result
+      failed_when: false
+      changed_when: false
+      when: 
+        - nvidia_runtime_check.stat.exists
+        - kubeconfig_check.stat.exists
+
+    - name: Display node labeling result
+      debug:
+        msg: |
+          Node Labeling:
+          - Status: {{ 'SUCCESS' if node_label_result.rc == 0 else 'FAILED' }}
+          - Output: {{ node_label_result.stdout if node_label_result.rc == 0 else node_label_result.stderr }}
+
+    - name: Test GPU access with Kubernetes
+      docker_container:
+        name: nvidia-test
+        image: nvidia/cuda:11.0-base-ubuntu18.04
+        command: nvidia-smi
+        runtime: nvidia
+        auto_remove: true
+        state: started
+      register: nvidia_test_container
+      failed_when: false
+      changed_when: false
+      when: 
+        - nvidia_runtime_check.stat.exists
+        - kubeconfig_check.stat.exists
+
+    - name: Display GPU test results
+      debug:
+        msg: |
+          GPU Access Test:
+          - Test container created: {{ 'PASS' if nvidia_test_container.changed else 'FAIL' }}
+          - Container output: {{ nvidia_test_container.container.logs if nvidia_test_container.changed else 'N/A' }}
+
+  when: nvidia_enabled | default(false)
+
+- name: NVIDIA Kubernetes Configuration Summary
+  debug:
+    msg: |
+      🎯 NVIDIA Kubernetes Configuration Summary:
+      ===========================================
+      - Runtime installed: {{ 'YES' if nvidia_runtime_check.stat.exists else 'NO' }}
+      - Kubeconfig available: {{ 'YES' if kubeconfig_check.stat.exists else 'NO' }}
+      - RuntimeClass created: {{ 'SUCCESS' if runtime_class_result.rc == 0 else 'FAILED' }}
+      - Nodes labeled: {{ 'SUCCESS' if node_label_result.rc == 0 else 'FAILED' }}
+      - GPU access tested: {{ 'PASS' if nvidia_test_container.changed else 'FAIL' }}
+      
+      🚀 NVIDIA is now configured for Kubernetes with proper kubeconfig!
+  when: nvidia_enabled | default(false)

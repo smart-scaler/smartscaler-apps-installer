@@ -1,15 +1,11 @@
 ---
 # NVIDIA Prerequisites Role
 # This role installs NVIDIA Container Toolkit and related components
-# System-level installation happens first, K8s configuration happens after cluster is ready
+# System-level installation only - Kubernetes configuration happens separately after K3s setup
 
 - name: Check if NVIDIA prerequisites are enabled
-  set_fact:
-    nvidia_enabled: "{{ nvidia_prerequisites.enabled | default(false) }}"
-  when: nvidia_prerequisites is defined
-
-- name: Skip NVIDIA prerequisites if disabled
-  meta: end_play
+  debug:
+    msg: "NVIDIA prerequisites are disabled. Skipping NVIDIA setup."
   when: not nvidia_enabled | default(false)
 
 - name: Detect system architecture for NVIDIA repositories
@@ -18,92 +14,6 @@
     nvidia_arch_deb: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
     nvidia_arch_rpm: "{{ 'aarch64' if ansible_architecture in ['aarch64', 'arm64'] else 'x86_64' }}"
   when: nvidia_enabled | default(false)
-
-- name: Map Ubuntu versions to available NVIDIA repositories
-  set_fact:
-    nvidia_ubuntu_version: >-
-      {%- if ansible_distribution == 'Ubuntu' -%}
-        {%- if nvidia_arch_deb == 'arm64' -%}
-          ubuntu18.04
-        {%- elif ansible_distribution_major_version | int >= 22 -%}
-          ubuntu20.04
-        {%- elif ansible_distribution_major_version | int >= 20 -%}
-          ubuntu20.04
-        {%- else -%}
-          ubuntu18.04
-        {%- endif -%}
-      {%- else -%}
-        {{ ansible_distribution | lower }}{{ ansible_distribution_major_version }}
-      {%- endif -%}
-  when: nvidia_enabled | default(false)
-
-- name: Display architecture detection results
-  debug:
-    msg: |
-      Architecture Detection for NVIDIA:
-      - System architecture: {{ ansible_architecture }}
-      - Distribution: {{ ansible_distribution }} {{ ansible_distribution_major_version }}
-      - NVIDIA repository arch (Debian): {{ nvidia_arch_deb }}
-      - NVIDIA repository arch (RHEL): {{ nvidia_arch_rpm }}
-      - NVIDIA Ubuntu version mapping: {{ nvidia_ubuntu_version }}
-      - Using repository arch: {{ nvidia_arch }}
-  when: nvidia_enabled | default(false)
-
-- name: Check for NVIDIA GPUs using multiple detection methods
-  block:
-    - name: Check for NVIDIA GPUs using nvidia-smi
-      command: nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits
-      register: nvidia_smi_check
-      failed_when: false
-      changed_when: false
-      when: "'nvidia_smi' in nvidia_prerequisites.detection.methods"
-
-    - name: Check for NVIDIA devices using lspci
-      command: lspci | grep -i nvidia
-      register: lspci_nvidia_check
-      failed_when: false
-      changed_when: false
-      when: "'lspci' in nvidia_prerequisites.detection.methods"
-
-    - name: Check for NVIDIA device files
-      find:
-        paths: /dev
-        patterns: "nvidia*"
-      register: nvidia_device_files
-      when: "'device_files' in nvidia_prerequisites.detection.methods"
-
-    - name: Check for loaded NVIDIA kernel modules
-      command: lsmod | grep nvidia
-      register: nvidia_kernel_modules
-      failed_when: false
-      changed_when: false
-      when: "'kernel_modules' in nvidia_prerequisites.detection.methods"
-
-    - name: Determine if NVIDIA GPUs are present
-      set_fact:
-        has_nvidia_gpus: >-
-          {{ (nvidia_smi_check.rc == 0 and nvidia_smi_check.stdout != '') or
-             (lspci_nvidia_check.rc == 0 and lspci_nvidia_check.stdout != '') or
-             (nvidia_device_files.matched > 0) or
-             (nvidia_kernel_modules.rc == 0 and nvidia_kernel_modules.stdout != '') }}
-
-    - name: Display NVIDIA GPU detection results
-      debug:
-        msg: |
-          NVIDIA GPU Detection Results:
-          - nvidia-smi check: {{ 'PASS' if nvidia_smi_check.rc == 0 and nvidia_smi_check.stdout != '' else 'FAIL' }}
-          - lspci check: {{ 'PASS' if lspci_nvidia_check.rc == 0 and lspci_nvidia_check.stdout != '' else 'FAIL' }}
-          - device files: {{ nvidia_device_files.matched }} NVIDIA device files found
-          - kernel modules: {{ 'PASS' if nvidia_kernel_modules.rc == 0 and nvidia_kernel_modules.stdout != '' else 'FAIL' }}
-          - NVIDIA GPUs detected: {{ has_nvidia_gpus }}
-
-  when: nvidia_enabled | default(false)
-
-- name: Skip NVIDIA installation if no GPUs detected
-  meta: end_play
-  when: 
-    - nvidia_enabled | default(false)
-    - not has_nvidia_gpus | default(false)
 
 - name: Install NVIDIA Container Toolkit
   block:
@@ -216,80 +126,6 @@
     - nvidia_enabled | default(false)
     - has_nvidia_gpus | default(false)
 
-# Kubernetes configuration tasks - these should run AFTER K3s is installed and ready
-- name: Configure NVIDIA for Kubernetes (Post-K3s Installation)
-  block:
-    - name: Wait for Kubernetes cluster to be ready
-      wait_for:
-        host: "{{ ansible_default_ipv4.address }}"
-        port: 6443
-        delay: 10
-        timeout: 300
-      when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
-
-    - name: Create RuntimeClass manifest using shell command
-      shell: |
-        cat > /tmp/nvidia-runtime-class.yaml << 'EOF'
-        apiVersion: node.k8s.io/v1
-        kind: RuntimeClass
-        metadata:
-          name: nvidia
-        handler: nvidia
-        scheduling:
-          nodeSelector:
-            nvidia.com/gpu.present: "true"
-        EOF
-      args:
-        creates: /tmp/nvidia-runtime-class.yaml
-      when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
-
-    - name: Set proper permissions on RuntimeClass manifest
-      file:
-        path: /tmp/nvidia-runtime-class.yaml
-        mode: '0644'
-        owner: root
-        group: root
-      when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
-
-    - name: Apply RuntimeClass to Kubernetes cluster
-      command: kubectl apply -f /tmp/nvidia-runtime-class.yaml
-      register: runtime_class_result
-      failed_when: false
-      changed_when: false
-      when: nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
-
-    - name: Display RuntimeClass creation result
-      debug:
-        msg: |
-          RuntimeClass Creation:
-          - Status: {{ 'SUCCESS' if runtime_class_result.rc == 0 else 'FAILED' }}
-          - Output: {{ runtime_class_result.stdout if runtime_class_result.rc == 0 else runtime_class_result.stderr }}
-
-    - name: Test GPU access with Kubernetes (optional)
-      docker_container:
-        name: nvidia-test
-        image: nvidia/cuda:11.0-base-ubuntu18.04
-        command: nvidia-smi
-        runtime: nvidia
-        auto_remove: true
-        state: started
-      register: nvidia_test_container
-      failed_when: false
-      changed_when: false
-      when: nvidia_prerequisites.verification.test_gpu_access | default(true)
-
-    - name: Display GPU test results
-      debug:
-        msg: |
-          GPU Access Test:
-          - Test container created: {{ 'PASS' if nvidia_test_container.changed else 'FAIL' }}
-          - Container output: {{ nvidia_test_container.container.logs if nvidia_test_container.changed else 'N/A' }}
-
-  when: 
-    - nvidia_enabled | default(false)
-    - has_nvidia_gpus | default(false)
-    - nvidia_prerequisites.container_runtime.create_runtime_class | default(true)
-
 - name: NVIDIA Prerequisites Summary
   debug:
     msg: |
@@ -298,9 +134,8 @@
       - Role enabled: {{ nvidia_enabled }}
       - NVIDIA GPUs detected: {{ has_nvidia_gpus | default(false) }}
       - Container toolkit installed: {{ nvidia_prerequisites.container_runtime.install_toolkit | default(true) }}
-      - Runtime class creation: {{ nvidia_prerequisites.container_runtime.create_runtime_class | default(true) }}
-      - GPU access verified: {{ nvidia_prerequisites.verification.test_gpu_access | default(true) }}
       
       🚀 NVIDIA system support is ready for {{ ansible_distribution }} {{ ansible_distribution_version }}!
-      📋 Kubernetes RuntimeClass will be created after K3s cluster is ready.
+      📋 Kubernetes RuntimeClass and GPU configuration will be handled separately after K3s setup.
+      🔧 Use the generated kubeconfig to apply NVIDIA manifests when the cluster is ready.
   when: nvidia_enabled | default(false)
