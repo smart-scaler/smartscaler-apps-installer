@@ -31,7 +31,7 @@
           - Connectivity: {{ 'SUCCESS' if execution_order_cluster_check.rc == 0 else 'FAILED' }}
           - Response: {{ execution_order_cluster_check.stdout if execution_order_cluster_check.rc == 0 else execution_order_cluster_check.stderr }}
 
-  when: k3s_deployment.enabled | default(false)
+  when: not (k3s_deployment.enabled | default(false) or kubernetes_deployment.enabled | default(false))
 
 - name: Process execution items with proper kubeconfig
   include_tasks: tasks/process_execution_item.yml
@@ -41,7 +41,7 @@
   loop: "{{ execution_order }}"
   when: 
     - execution_order_enabled | default(true)
-    - k3s_deployment.enabled | default(false)
+    - not (k3s_deployment.enabled | default(false) or kubernetes_deployment.enabled | default(false))
     - kubeconfig_check.stat.exists
     - execution_order_cluster_check.rc == 0
 
@@ -49,8 +49,11 @@
   debug:
     msg: |
       ⚠️  Execution order skipped because:
-      {%- if not k3s_deployment.enabled %}
-      - K3s deployment is not enabled
+      {%- if k3s_deployment.enabled %}
+      - K3s deployment is enabled (execution order runs after deployment)
+      {%- endif %}
+      {%- if kubernetes_deployment.enabled %}
+      - Kubernetes deployment is enabled (execution order runs after deployment)
       {%- endif %}
       {%- if not kubeconfig_check.stat.exists %}
       - Kubeconfig is not available
@@ -59,7 +62,7 @@
       - Cluster is not accessible
       {%- endif %}
       
-      🔧 Ensure K3s is deployed and ready before running execution order.
+      🔧 Execution order will run after cluster deployment is complete.
   when: 
     - execution_order_enabled | default(true)
-    - (not k3s_deployment.enabled) or (not kubeconfig_check.stat.exists) or (execution_order_cluster_check.rc != 0) 
+    - ((k3s_deployment.enabled | default(false) or kubernetes_deployment.enabled | default(false)) or (not kubeconfig_check.stat.exists) or (execution_order_cluster_check.rc != 0)) 

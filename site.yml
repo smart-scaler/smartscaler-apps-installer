@@ -135,7 +135,7 @@
           avesha_docker_password: "{{ avesha_docker_password }}"
       when: 
         - execution_order_enabled | default(true)
-        - k3s_deployment.enabled | default(false)
+        - not (k3s_deployment.enabled | default(false) or kubernetes_deployment.enabled | default(false))
 
   post_tasks:
     - name: Collect Kubernetes cluster information
