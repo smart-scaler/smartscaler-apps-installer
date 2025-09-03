@@ -1,0 +1,49 @@
+---
+# Control Node Prerequisites - Setup local environment for deployment
+
+- name: Check required packages
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Install required Python packages
+  ansible.builtin.pip:
+    name:
+      - pyyaml
+      - jinja2
+    state: present
+  become: false
+
+- name: Setup locale if needed
+  block:
+    - name: Check if en_US.UTF-8 locale exists
+      ansible.builtin.command: locale -a
+      register: available_locales
+      changed_when: false
+      failed_when: false
+
+    - name: Generate en_US.UTF-8 locale if missing
+      ansible.builtin.locale_gen:
+        name: en_US.UTF-8
+        state: present
+      become: true
+      when: "'en_US.utf8' not in available_locales.stdout"
+
+    - name: Set locale environment variables
+      ansible.builtin.set_fact:
+        ansible_env: "{{ ansible_env | combine({'LANG': 'en_US.UTF-8', 'LC_ALL': 'en_US.UTF-8'}) }}"
+
+- name: Ensure output directory exists
+  ansible.builtin.file:
+    path: output
+    state: directory
+    mode: '0755'
+
+- name: Initialize deployment log
+  ansible.builtin.lineinfile:
+    path: output/ansible.log
+    line: |
+      ==================================================================================
+      {{ deployment_type | upper }} DEPLOYMENT STARTED: {{ ansible_date_time.iso8601 }}
+      ==================================================================================
+    create: true
+    mode: '0644'

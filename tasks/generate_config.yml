@@ -1,0 +1,35 @@
+---
+# Configuration Generation - Generate inventory and group vars
+
+- name: Generate deployment configuration
+  ansible.builtin.command: "python3 files/{{ target_deployment }}/generate_{{ target_deployment }}_config.py"
+  register: config_generation
+  changed_when: true
+
+- name: Display configuration generation results
+  ansible.builtin.debug:
+    msg: "{{ config_generation.stdout_lines }}"
+  when: config_generation.stdout_lines is defined
+
+- name: Verify generated files exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: generated_files
+  loop:
+    - "inventory/{{ target_deployment }}/inventory.yml"
+    - "inventory/{{ target_deployment }}/group_vars/all.yml"
+
+- name: Assert all required files were generated
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: "Required file {{ item.item }} was not generated"
+  loop: "{{ generated_files.results }}"
+
+- name: Display generated configuration files
+  ansible.builtin.debug:
+    msg: |
+      ✅ Generated configuration files:
+      {% for file in generated_files.results %}
+      - {{ file.item }}: {{ 'Found' if file.stat.exists else 'Missing' }}
+      {% endfor %}

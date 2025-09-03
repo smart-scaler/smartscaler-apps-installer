@@ -14,9 +14,9 @@ def main():
 
     # Generate inventory
     inventory_template = '''---
-microk8s_cluster:
+all:
   children:
-    all:
+    microk8s_cluster:
       hosts:
 {% for node in control_plane_nodes %}
         {{ node['ansible_host'] }}:
@@ -44,14 +44,13 @@ microk8s_cluster:
           node_role: worker
 {% endfor %}
 {% endif %}
-
-  vars:
-    microk8s_channel: {{ microk8s_channel }}
-    microk8s_addons: {{ microk8s_addons }}
-    microk8s_additional_addons: {{ microk8s_additional_addons }}
-    smart_scaler_namespace: {{ smart_scaler_namespace }}
-    enable_nvidia_support: {{ enable_nvidia_support }}
-    ansible_python_interpreter: /usr/bin/python3
+      vars:
+        microk8s_channel: {{ microk8s_channel }}
+        microk8s_addons: {{ microk8s_addons }}
+        microk8s_additional_addons: {{ microk8s_additional_addons }}
+        smart_scaler_namespace: {{ smart_scaler_namespace }}
+        enable_nvidia_support: {{ enable_nvidia_support }}
+        ansible_python_interpreter: /usr/bin/python3
 '''
 
     # Get MicroK8s configuration

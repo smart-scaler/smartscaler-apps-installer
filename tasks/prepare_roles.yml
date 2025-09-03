@@ -1,0 +1,41 @@
+---
+# Role Preparation - Copy custom roles to deployment-specific ansible directory
+
+- name: Ensure deployment ansible directory exists
+  ansible.builtin.file:
+    path: "{{ target_deployment }}-ansible/roles"
+    state: directory
+    mode: '0755'
+  when: target_deployment in ['microk8s', 'k3s']
+
+- name: Copy custom prerequisite roles
+  ansible.builtin.copy:
+    src: "roles/{{ item }}"
+    dest: "{{ target_deployment }}-ansible/roles/"
+    mode: preserve
+  loop:
+    - jetson_prerequisites
+    - nvidia_prerequisites
+  when: target_deployment in ['microk8s', 'k3s']
+
+- name: Check if prerequisite roles are enabled
+  ansible.builtin.set_fact:
+    jetson_enabled: "{{ user_config.get('jetson_prerequisites', {}).get('enabled', false) }}"
+    nvidia_enabled: "{{ user_config.get('nvidia_prerequisites', {}).get('enabled', false) }}"
+
+- name: Display role preparation status
+  ansible.builtin.debug:
+    msg: |
+      Role Preparation Status:
+      - Jetson Prerequisites: {{ 'Enabled' if jetson_enabled else 'Disabled' }}
+      - NVIDIA Prerequisites: {{ 'Enabled' if nvidia_enabled else 'Disabled' }}
+      - Custom roles copied to: {{ target_deployment }}-ansible/roles/
+
+- name: Log role preparation
+  ansible.builtin.lineinfile:
+    path: output/ansible.log
+    line: |
+      ROLE PREPARATION COMPLETED: {{ ansible_date_time.iso8601 }}
+      - Jetson Prerequisites: {{ 'Enabled' if jetson_enabled else 'Disabled' }}
+      - NVIDIA Prerequisites: {{ 'Enabled' if nvidia_enabled else 'Disabled' }}
+    create: true

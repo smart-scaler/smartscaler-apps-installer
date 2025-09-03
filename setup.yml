@@ -1,0 +1,71 @@
+---
+- name: Smart Scaler Deployment Setup
+  hosts: localhost
+  gather_facts: true
+  vars:
+    deployment_type: "{{ deployment_type | default('kubernetes') }}"
+    
+  pre_tasks:
+    - name: Validate deployment type
+      ansible.builtin.fail:
+        msg: "Invalid deployment type. Must be one of: kubernetes, k3s, microk8s"
+      when: deployment_type not in ['kubernetes', 'k3s', 'microk8s']
+    
+    - name: Display deployment information
+      ansible.builtin.debug:
+        msg: |
+          🚀 Smart Scaler Deployment Setup
+          ================================
+          Deployment Type: {{ deployment_type | upper }}
+          Working Directory: {{ ansible_env.PWD }}
+          User: {{ ansible_user_id }}
+
+  tasks:
+    - name: Control node prerequisites
+      include_tasks: tasks/setup_control_node.yml
+      
+    - name: Load and validate configuration
+      include_tasks: tasks/validate_configuration.yml
+      vars:
+        config_type: "{{ deployment_type }}"
+        
+    - name: Setup deployment directories
+      include_tasks: tasks/setup_directories.yml
+      vars:
+        target_deployment: "{{ deployment_type }}"
+        
+    - name: Install required Ansible collections
+      include_tasks: tasks/install_collections.yml
+      vars:
+        target_deployment: "{{ deployment_type }}"
+        
+    - name: Generate deployment configuration
+      include_tasks: tasks/generate_config.yml
+      vars:
+        target_deployment: "{{ deployment_type }}"
+        
+    - name: Test connectivity to target nodes
+      include_tasks: tasks/test_connectivity.yml
+      vars:
+        target_deployment: "{{ deployment_type }}"
+        
+    - name: Prepare deployment roles
+      include_tasks: tasks/prepare_roles.yml
+      vars:
+        target_deployment: "{{ deployment_type }}"
+
+  post_tasks:
+    - name: Display setup completion
+      ansible.builtin.debug:
+        msg: |
+          ✅ {{ deployment_type | upper }} setup completed successfully!
+          
+          Generated files:
+          - Configuration: inventory/{{ deployment_type }}/
+          - Logs: output/ansible.log
+          
+          Next steps:
+          1. Review generated configuration
+          2. Run: ansible-playbook {{ deployment_type }}.yml
+          
+          For more information, see docs/{{ deployment_type | upper }}_DEPLOYMENT.md

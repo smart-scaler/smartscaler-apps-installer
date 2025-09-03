@@ -1,0 +1,34 @@
+---
+# Ansible Collections Installation - Install required collections for deployment
+
+- name: Check required collections based on deployment type
+  ansible.builtin.set_fact:
+    required_collections: |
+      {%- if target_deployment == 'microk8s' -%}
+      ['community.general', 'ansible.posix']
+      {%- elif target_deployment == 'k3s' -%}
+      ['ansible.posix']
+      {%- else -%}
+      ['ansible.posix']
+      {%- endif -%}
+
+- name: List installed collections
+  ansible.builtin.command: ansible-galaxy collection list
+  register: installed_collections
+  changed_when: false
+  failed_when: false
+
+- name: Install required Ansible collections
+  ansible.builtin.command: "ansible-galaxy collection install {{ item }}"
+  loop: "{{ required_collections }}"
+  when: item not in installed_collections.stdout
+  register: collection_install
+  changed_when: "'was installed successfully' in collection_install.stdout"
+
+- name: Display collection installation status
+  ansible.builtin.debug:
+    msg: |
+      Required collections for {{ target_deployment | upper }}:
+      {% for collection in required_collections %}
+      - {{ collection }}: {{ 'Installed' if collection in installed_collections.stdout else 'Newly installed' }}
+      {% endfor %}

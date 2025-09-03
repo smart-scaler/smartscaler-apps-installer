@@ -1,0 +1,20 @@
+---
+# Directory Setup - Create necessary directories for deployment
+
+- name: Create inventory directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "inventory/{{ target_deployment }}"
+    - "inventory/{{ target_deployment }}/group_vars"
+    - "output"
+
+- name: Display directory setup
+  ansible.builtin.debug:
+    msg: |
+      Created directories:
+      - inventory/{{ target_deployment }}/
+      - inventory/{{ target_deployment }}/group_vars/
+      - output/

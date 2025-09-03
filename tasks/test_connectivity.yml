@@ -1,0 +1,23 @@
+---
+# Connectivity Testing - Test SSH connectivity to target nodes
+
+- name: Test SSH connectivity to target nodes
+  ansible.builtin.command: "python3 files/{{ target_deployment }}/test_ssh_connectivity.py"
+  register: connectivity_test
+  changed_when: false
+
+- name: Display connectivity test results
+  ansible.builtin.debug:
+    msg: "{{ connectivity_test.stdout_lines }}"
+  when: connectivity_test.stdout_lines is defined
+
+- name: Log connectivity test to deployment log
+  ansible.builtin.lineinfile:
+    path: output/ansible.log
+    line: |
+      SSH CONNECTIVITY TEST COMPLETED: {{ ansible_date_time.iso8601 }}
+      Status: {{ 'PASSED' if connectivity_test.rc == 0 else 'FAILED' }}
+      {% if connectivity_test.rc != 0 %}
+      Error: {{ connectivity_test.stderr }}
+      {% endif %}
+    create: true

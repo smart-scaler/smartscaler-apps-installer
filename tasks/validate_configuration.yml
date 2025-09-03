@@ -1,0 +1,44 @@
+---
+# Configuration Validation - Validate user_input.yml for deployment type
+
+- name: Load user_input.yml
+  ansible.builtin.include_vars:
+    file: user_input.yml
+    name: user_config
+
+- name: Validate deployment configuration exists
+  ansible.builtin.assert:
+    that:
+      - user_config[config_type + '_deployment'] is defined
+      - user_config[config_type + '_deployment'].enabled is defined
+    fail_msg: "{{ config_type }}_deployment section not found or incomplete in user_input.yml"
+
+- name: Check if deployment is enabled
+  ansible.builtin.assert:
+    that:
+      - user_config[config_type + '_deployment'].enabled | bool
+    fail_msg: "{{ config_type }} deployment is disabled. Set {{ config_type }}_deployment.enabled: true"
+
+- name: Validate kubernetes_deployment section (required for node info)
+  ansible.builtin.assert:
+    that:
+      - user_config.kubernetes_deployment is defined
+      - user_config.kubernetes_deployment.control_plane_nodes is defined
+      - user_config.kubernetes_deployment.control_plane_nodes | length > 0
+      - user_config.kubernetes_deployment.ssh_key_path is defined
+    fail_msg: "kubernetes_deployment section with node configuration is required"
+
+- name: Set deployment facts
+  ansible.builtin.set_fact:
+    deployment_config: "{{ user_config[config_type + '_deployment'] }}"
+    node_config: "{{ user_config.kubernetes_deployment }}"
+    
+- name: Display configuration summary
+  ansible.builtin.debug:
+    msg: |
+      Configuration Summary:
+      - Deployment Type: {{ config_type | upper }}
+      - Enabled: {{ deployment_config.enabled }}
+      - Control Plane Nodes: {{ node_config.control_plane_nodes | length }}
+      - Worker Nodes: {{ node_config.get('worker_nodes', []) | length }}
+      - SSH Key: {{ node_config.ssh_key_path }}
