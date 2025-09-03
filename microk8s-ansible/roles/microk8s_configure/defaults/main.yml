@@ -1,0 +1,28 @@
+---
+# MicroK8s Configuration Defaults
+
+# Essential add-ons to enable by default
+microk8s_addons:
+  - dns
+  - storage
+  - ingress
+
+# Optional additional add-ons (can be overridden in user_input.yml)
+# Available add-ons include: dashboard, metrics-server, prometheus, cert-manager, 
+# istio, knative, kubeflow, etc.
+microk8s_additional_addons: []
+
+# Examples of additional add-ons:
+# microk8s_additional_addons:
+#   - dashboard
+#   - metrics-server
+#   - prometheus
+
+# Timeout for add-on enablement (seconds)
+microk8s_addon_timeout: 300
+
+# Whether to create kubectl alias
+create_kubectl_alias: true
+
+# Whether to generate kubeconfig files
+generate_kubeconfig: true

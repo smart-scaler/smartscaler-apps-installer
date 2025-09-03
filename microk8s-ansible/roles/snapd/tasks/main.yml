@@ -1,0 +1,66 @@
+---
+- name: Update apt cache (Ubuntu/Debian)
+  ansible.builtin.apt:
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Install snapd package (Ubuntu/Debian)
+  ansible.builtin.apt:
+    name: snapd
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Install snapd package (RedHat/CentOS)
+  ansible.builtin.yum:
+    name: snapd
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Install snapd package (SUSE)
+  ansible.builtin.zypper:
+    name: snapd
+    state: present
+  when: ansible_os_family == "Suse"
+
+- name: Enable snapd socket
+  ansible.builtin.systemd:
+    name: snapd.socket
+    enabled: true
+    state: started
+
+- name: Start snapd service
+  ansible.builtin.systemd:
+    name: snapd
+    enabled: true
+    state: started
+
+- name: Wait for snapd to be ready
+  ansible.builtin.command: snap wait system seed.loaded
+  register: snap_wait_result
+  until: snap_wait_result.rc == 0
+  retries: 30
+  delay: 10
+  changed_when: false
+
+- name: Create symbolic link for classic snap support
+  ansible.builtin.file:
+    src: /var/lib/snapd/snap
+    dest: /snap
+    state: link
+  ignore_errors: true  # This might already exist
+
+- name: Update snap core
+  community.general.snap:
+    name: core
+    state: present
+  retries: 3
+  delay: 10
+
+- name: Verify snapd installation
+  ansible.builtin.command: snap version
+  register: snap_version_output
+  changed_when: false
+
+- name: Display snapd version
+  ansible.builtin.debug:
+    msg: "Snapd version: {{ snap_version_output.stdout_lines[0] }}"

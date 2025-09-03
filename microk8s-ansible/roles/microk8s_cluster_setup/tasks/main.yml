@@ -1,0 +1,151 @@
+---
+- name: Wait for MicroK8s cluster to be fully ready
+  ansible.builtin.command: microk8s status --wait-ready
+  register: cluster_ready_check
+  until: cluster_ready_check.rc == 0
+  retries: 60
+  delay: 10
+  changed_when: false
+
+- name: Check if this is a multi-node setup
+  ansible.builtin.set_fact:
+    is_multinode: "{{ groups['microk8s_cluster'] | length > 1 }}"
+
+- name: Multi-node cluster setup
+  when: is_multinode | bool
+  block:
+    - name: Generate join token on primary node
+      ansible.builtin.command: microk8s add-node
+      register: join_token_output
+      changed_when: true
+      run_once: true
+
+    - name: Extract join command from token output
+      ansible.builtin.set_fact:
+        join_command: "{{ join_token_output.stdout_lines | select('match', '^microk8s join .*') | first }}"
+      run_once: true
+
+    - name: Join additional nodes to cluster
+      ansible.builtin.command: "{{ hostvars[groups['microk8s_cluster'][0]]['join_command'] }}"
+      when: inventory_hostname != groups['microk8s_cluster'][0]
+      register: join_result
+      changed_when: true
+      retries: 3
+      delay: 30
+
+    - name: Wait for all nodes to be ready
+      ansible.builtin.command: microk8s kubectl get nodes --no-headers
+      register: nodes_status
+      until: 
+        - nodes_status.rc == 0
+        - (nodes_status.stdout_lines | select('search', 'Ready') | list | length) == (groups['microk8s_cluster'] | length)
+      retries: 30
+      delay: 15
+      changed_when: false
+      run_once: true
+
+- name: Get cluster information
+  ansible.builtin.command: microk8s kubectl cluster-info
+  register: cluster_info
+  changed_when: false
+  run_once: true
+
+- name: Display cluster information
+  ansible.builtin.debug:
+    msg: |
+      MicroK8s Cluster Information:
+      {{ cluster_info.stdout }}
+  run_once: true
+
+- name: Get all nodes status
+  ansible.builtin.command: microk8s kubectl get nodes -o wide
+  register: all_nodes_status
+  changed_when: false
+  run_once: true
+
+- name: Display all nodes status
+  ansible.builtin.debug:
+    msg: |
+      All MicroK8s Nodes:
+      {{ all_nodes_status.stdout }}
+  run_once: true
+
+- name: Get all system pods status
+  ansible.builtin.command: microk8s kubectl get pods -n kube-system
+  register: system_pods_status
+  changed_when: false
+  run_once: true
+
+- name: Display system pods status
+  ansible.builtin.debug:
+    msg: |
+      System Pods Status:
+      {{ system_pods_status.stdout }}
+  run_once: true
+
+- name: Create namespace for Smart Scaler if specified
+  ansible.builtin.command: microk8s kubectl create namespace "{{ smart_scaler_namespace | default('smart-scaler') }}"
+  register: namespace_creation
+  failed_when: 
+    - namespace_creation.rc != 0
+    - "'already exists' not in namespace_creation.stderr"
+  changed_when: "'already exists' not in namespace_creation.stderr"
+  run_once: true
+  when: smart_scaler_namespace is defined
+
+- name: Verify cluster health
+  ansible.builtin.command: microk8s kubectl get componentstatuses
+  register: component_status
+  changed_when: false
+  run_once: true
+  ignore_errors: true
+
+- name: Display component status
+  ansible.builtin.debug:
+    msg: |
+      Cluster Component Status:
+      {{ component_status.stdout | default('Component status not available (this is normal in newer Kubernetes versions)') }}
+  run_once: true
+
+- name: Generate and save kubeconfig to local machine
+  block:
+    - name: Get kubeconfig content
+      ansible.builtin.command: microk8s config
+      register: kubeconfig_content
+      changed_when: false
+
+    - name: Save kubeconfig to localhost
+      ansible.builtin.copy:
+        content: "{{ kubeconfig_content.stdout }}"
+        dest: "{{ playbook_dir }}/../output/kubeconfig"
+        mode: '0600'
+      delegate_to: localhost
+      become: false
+
+    - name: Fix kubeconfig server IP to use actual node IP
+      ansible.builtin.replace:
+        path: "{{ playbook_dir }}/../output/kubeconfig"
+        regexp: 'server: https://127\.0\.0\.1:16443'
+        replace: "server: https://{{ ansible_default_ipv4.address }}:16443"
+      delegate_to: localhost
+      become: false
+
+  run_once: true
+
+- name: Display cluster setup completion
+  ansible.builtin.debug:
+    msg: |
+      🎉 MicroK8s cluster setup completed successfully!
+      
+      Cluster Details:
+      - Nodes: {{ groups['microk8s_cluster'] | length }}
+      - Primary Node: {{ groups['microk8s_cluster'][0] }}
+      - API Endpoint: https://{{ hostvars[groups['microk8s_cluster'][0]]['ansible_default_ipv4']['address'] }}:16443
+      
+      Kubeconfig saved to: {{ playbook_dir }}/../output/kubeconfig
+      
+      Next steps:
+      1. Export kubeconfig: export KUBECONFIG={{ playbook_dir }}/../output/kubeconfig
+      2. Test access: kubectl get nodes
+      3. Check pods: kubectl get pods --all-namespaces
+  run_once: true

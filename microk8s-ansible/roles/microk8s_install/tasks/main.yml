@@ -1,0 +1,73 @@
+---
+- name: Check if MicroK8s is already installed
+  ansible.builtin.command: microk8s version
+  register: microk8s_version_check
+  failed_when: false
+  changed_when: false
+
+- name: Display current MicroK8s version if installed
+  ansible.builtin.debug:
+    msg: "MicroK8s is already installed: {{ microk8s_version_check.stdout }}"
+  when: microk8s_version_check.rc == 0
+
+- name: Install MicroK8s via snap
+  community.general.snap:
+    name: microk8s
+    classic: true
+    channel: "{{ microk8s_channel | default('latest/stable') }}"
+  when: microk8s_version_check.rc != 0
+  register: microk8s_install_result
+  retries: 3
+  delay: 30
+
+- name: Add ansible user to microk8s group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: microk8s
+    append: true
+  when: ansible_user is defined and ansible_user != "root"
+
+- name: Add root user to microk8s group
+  ansible.builtin.user:
+    name: root
+    groups: microk8s
+    append: true
+
+- name: Set permissions for MicroK8s directory
+  ansible.builtin.file:
+    path: /var/snap/microk8s
+    owner: root
+    group: microk8s
+    mode: '0755'
+    recurse: true
+  ignore_errors: true
+
+- name: Wait for MicroK8s to be ready
+  ansible.builtin.command: microk8s status --wait-ready
+  register: microk8s_status
+  until: microk8s_status.rc == 0
+  retries: 30
+  delay: 10
+  changed_when: false
+
+- name: Verify MicroK8s installation
+  ansible.builtin.command: microk8s version
+  register: microk8s_final_version
+  changed_when: false
+
+- name: Display MicroK8s installation status
+  ansible.builtin.debug:
+    msg: |
+      MicroK8s installation completed:
+      Version: {{ microk8s_final_version.stdout }}
+      
+- name: Check MicroK8s node status
+  ansible.builtin.command: microk8s kubectl get nodes
+  register: microk8s_nodes
+  changed_when: false
+
+- name: Display MicroK8s node status
+  ansible.builtin.debug:
+    msg: |
+      MicroK8s node status:
+      {{ microk8s_nodes.stdout }}

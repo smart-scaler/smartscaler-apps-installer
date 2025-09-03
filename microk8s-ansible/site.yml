@@ -1,0 +1,35 @@
+---
+- name: Jetson Prerequisites (All Nodes)
+  hosts: all
+  gather_facts: true
+  become: true
+  roles:
+    - role: jetson_prerequisites
+
+- name: NVIDIA Prerequisites (All Nodes)
+  hosts: all
+  gather_facts: true
+  become: true
+  roles:
+    - role: nvidia_prerequisites
+
+- name: Cluster preparation
+  hosts: microk8s_cluster
+  gather_facts: true
+  become: true
+  roles:
+    - role: prereq
+    - role: snapd
+
+- name: Setup MicroK8s cluster
+  hosts: microk8s_cluster
+  become: true
+  roles:
+    - role: microk8s_install
+    - role: microk8s_configure
+
+- name: Configure MicroK8s cluster
+  hosts: microk8s_cluster[0]  # Only run on first node for cluster-wide operations
+  become: true
+  roles:
+    - role: microk8s_cluster_setup

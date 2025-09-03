@@ -1,0 +1,20 @@
+---
+# MicroK8s Cluster Setup Defaults
+
+# Namespace to create for Smart Scaler applications
+smart_scaler_namespace: "smart-scaler"
+
+# Whether to create Smart Scaler namespace
+create_smart_scaler_namespace: true
+
+# Cluster readiness timeout (seconds)
+cluster_readiness_timeout: 600
+
+# Node join timeout (seconds)
+node_join_timeout: 300
+
+# Whether to save kubeconfig to output directory
+save_kubeconfig: true
+
+# Output directory for kubeconfig (relative to playbook directory)
+kubeconfig_output_path: "../output/kubeconfig"

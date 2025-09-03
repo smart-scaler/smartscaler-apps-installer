@@ -265,9 +265,69 @@ k3s_deployment:
 
 
 
+###############################################################################
+# MICROK8S DEPLOYMENT CONFIGURATION
+# Controls whether to deploy a new MicroK8s cluster using snap
+###############################################################################
+microk8s_deployment:
+  # Master switch for MicroK8s deployment
+  enabled: false                             # Enable MicroK8s deployment
+  
+  # MicroK8s Version Configuration
+  microk8s_channel: "latest/stable"          # MicroK8s snap channel to install
+                                             # Options: latest/stable, latest/candidate, 1.32/stable, etc.
+  
+  # MicroK8s Configuration
+  microk8s_config:
+    # Essential add-ons to enable by default
+    addons:
+      - dns                                   # CoreDNS for cluster DNS
+      - storage                               # Local path storage provisioner
+      - ingress                               # NGINX ingress controller
+    
+    # Additional optional add-ons (can be enabled as needed)
+    additional_addons: []
+    # Examples of additional add-ons:
+    # additional_addons:
+    #   - dashboard                           # Kubernetes dashboard
+    #   - metrics-server                      # Metrics server for resource monitoring
+    #   - prometheus                          # Prometheus monitoring
+    #   - cert-manager                        # Certificate management
+    #   - gpu                                 # GPU support for NVIDIA devices
+    
+    # Multi-node cluster configuration
+    cluster_setup:
+      # Whether to create a multi-node cluster (if multiple nodes defined)
+      enable_clustering: true                 # Enable multi-node clustering
+      join_timeout: 300                       # Timeout for nodes to join (seconds)
+    
+    # Network Configuration (MicroK8s defaults)
+    network:
+      service_cidr: "10.152.183.0/24"        # CIDR range for MicroK8s services
+      pod_cidr: "10.1.0.0/16"                # CIDR range for MicroK8s pods
+      api_port: 16443                         # MicroK8s API server port
+    
+    # Container Configuration
+    container_runtime:
+      enable_nvidia_support: true             # Enable NVIDIA GPU support if detected
+      configure_registry: false               # Configure private registry (if needed)
+    
+    # Storage Configuration
+    storage:
+      default_storage_class: "microk8s-hostpath"  # Default storage class
+      enable_nfs: false                       # Enable NFS storage support
+    
+    # Security Configuration
+    security:
+      enable_rbac: true                       # Enable RBAC (Role-Based Access Control)
+      enable_pod_security: true              # Enable Pod Security Standards
+    
+    # High Availability Configuration
+    ha_config:
+      enable_ha: false                        # Enable HA mode (requires 3+ nodes)
+      datastore: "dqlite"                     # Datastore type for HA (dqlite)
 
 
- 
 ###############################################################################
 # REQUIRED SETTINGS
 # These settings must be configured regardless of deployment type

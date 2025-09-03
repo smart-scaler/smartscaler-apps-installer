@@ -1,0 +1,163 @@
+---
+- name: Ensure MicroK8s is ready before configuration
+  ansible.builtin.command: microk8s status --wait-ready
+  register: microk8s_ready_check
+  until: microk8s_ready_check.rc == 0
+  retries: 30
+  delay: 10
+  changed_when: false
+
+- name: Enable essential MicroK8s add-ons
+  ansible.builtin.command: microk8s enable {{ item }}
+  register: addon_enable_result
+  changed_when: "'is already enabled' not in addon_enable_result.stdout"
+  failed_when: 
+    - addon_enable_result.rc != 0
+    - "'is already enabled' not in addon_enable_result.stdout"
+  loop: "{{ microk8s_addons | default(['dns', 'storage', 'ingress']) }}"
+
+- name: Enable additional MicroK8s add-ons if specified
+  ansible.builtin.command: microk8s enable {{ item }}
+  register: additional_addon_result
+  changed_when: "'is already enabled' not in additional_addon_result.stdout"
+  failed_when: 
+    - additional_addon_result.rc != 0
+    - "'is already enabled' not in additional_addon_result.stdout"
+  loop: "{{ microk8s_additional_addons | default([]) }}"
+  when: microk8s_additional_addons is defined
+
+- name: Check if NVIDIA GPU support should be enabled
+  ansible.builtin.set_fact:
+    should_enable_gpu: "{{ enable_nvidia_support | default(false) | bool and (hostvars[inventory_hostname]['is_jetson'] | default(false) or ansible_facts.get('nvidia_gpu_detected', false)) }}"
+
+- name: Enable GPU add-on for NVIDIA support
+  ansible.builtin.command: microk8s enable gpu
+  register: gpu_addon_result
+  changed_when: "'is already enabled' not in gpu_addon_result.stdout"
+  failed_when: 
+    - gpu_addon_result.rc != 0
+    - "'is already enabled' not in gpu_addon_result.stdout"
+  when: 
+    - should_enable_gpu | bool
+    - "'gpu' not in (microk8s_addons | default([]) + microk8s_additional_addons | default([]))"
+
+- name: Display GPU add-on enablement status
+  ansible.builtin.debug:
+    msg: |
+      GPU Add-on Status:
+      - NVIDIA Support Enabled: {{ enable_nvidia_support | default(false) }}
+      - Jetson Device Detected: {{ hostvars[inventory_hostname]['is_jetson'] | default(false) }}
+      - Should Enable GPU: {{ should_enable_gpu | default(false) }}
+      {% if should_enable_gpu | bool %}
+      - GPU Add-on: {{ 'Enabled' if gpu_addon_result is defined and gpu_addon_result.rc == 0 else 'Failed to enable' }}
+      {% endif %}
+
+- name: Verify GPU add-on functionality
+  block:
+    - name: Wait for GPU add-on to be ready
+      ansible.builtin.command: microk8s kubectl get nodes -o json
+      register: node_gpu_check
+      until: "'nvidia.com/gpu' in node_gpu_check.stdout"
+      retries: 30
+      delay: 10
+      changed_when: false
+      failed_when: false
+
+    - name: Check GPU resources on nodes
+      ansible.builtin.command: microk8s kubectl get nodes -o custom-columns="NAME:.metadata.name,GPU:.status.allocatable.nvidia\.com/gpu"
+      register: gpu_resources
+      changed_when: false
+      failed_when: false
+
+    - name: Display GPU resource status
+      ansible.builtin.debug:
+        msg: |
+          GPU Resource Status:
+          {{ gpu_resources.stdout if gpu_resources.rc == 0 else 'Failed to get GPU resources' }}
+
+  when: 
+    - should_enable_gpu | bool
+    - gpu_addon_result is defined
+    - gpu_addon_result.rc == 0
+
+- name: Check enabled add-ons
+  ansible.builtin.command: microk8s status
+  register: microk8s_addons_status
+  changed_when: false
+
+- name: Display enabled add-ons
+  ansible.builtin.debug:
+    msg: |
+      MicroK8s add-ons status:
+      {{ microk8s_addons_status.stdout }}
+
+- name: Configure kubectl alias for the current user
+  ansible.builtin.lineinfile:
+    path: "{{ ansible_env.HOME }}/.bashrc"
+    line: "alias kubectl='microk8s kubectl'"
+    create: true
+  when: ansible_user is defined and ansible_user != "root"
+
+- name: Configure kubectl alias for root user
+  ansible.builtin.lineinfile:
+    path: "/root/.bashrc"
+    line: "alias kubectl='microk8s kubectl'"
+    create: true
+
+- name: Create .kube directory for ansible user
+  ansible.builtin.file:
+    path: "{{ ansible_env.HOME }}/.kube"
+    state: directory
+    mode: '0755'
+  when: ansible_user is defined and ansible_user != "root"
+
+- name: Create .kube directory for root user
+  ansible.builtin.file:
+    path: "/root/.kube"
+    state: directory
+    mode: '0755'
+
+- name: Generate kubeconfig for ansible user
+  ansible.builtin.shell: microk8s config > {{ ansible_env.HOME }}/.kube/config
+  when: ansible_user is defined and ansible_user != "root"
+  changed_when: true
+
+- name: Generate kubeconfig for root user
+  ansible.builtin.shell: microk8s config > /root/.kube/config
+  changed_when: true
+
+- name: Set correct permissions on kubeconfig for ansible user
+  ansible.builtin.file:
+    path: "{{ ansible_env.HOME }}/.kube/config"
+    mode: '0600'
+    owner: "{{ ansible_user }}"
+  when: ansible_user is defined and ansible_user != "root"
+
+- name: Set correct permissions on kubeconfig for root user
+  ansible.builtin.file:
+    path: "/root/.kube/config"
+    mode: '0600'
+    owner: root
+
+- name: Test kubectl connectivity
+  ansible.builtin.command: microk8s kubectl get nodes
+  register: kubectl_test
+  changed_when: false
+
+- name: Display kubectl test results
+  ansible.builtin.debug:
+    msg: |
+      kubectl connectivity test:
+      {{ kubectl_test.stdout }}
+
+- name: Configure MicroK8s to start at boot
+  ansible.builtin.systemd:
+    name: snap.microk8s.daemon-cluster-agent
+    enabled: true
+    state: started
+
+- name: Configure MicroK8s APIserver to start at boot
+  ansible.builtin.systemd:
+    name: snap.microk8s.daemon-apiserver
+    enabled: true
+    state: started

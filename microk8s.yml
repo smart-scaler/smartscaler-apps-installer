@@ -1,0 +1,113 @@
+---
+- name: Deploy MicroK8s Cluster Only
+  hosts: localhost
+  gather_facts: true
+  become: true
+  become_method: sudo
+  vars_files:
+    - user_input.yml
+  vars:
+    inventory_dir: "{{ playbook_dir }}/inventory"
+    microk8s_dir: "{{ playbook_dir }}/microk8s"
+
+  pre_tasks:
+    - name: Load and verify user_input.yml
+      block:
+        - name: Load user_input.yml content
+          include_vars:
+            file: user_input.yml
+            name: user_input
+
+        - name: Set global facts
+          set_fact:
+            microk8s_deployment: "{{ user_input.microk8s_deployment }}"
+            kubernetes_deployment: "{{ user_input.kubernetes_deployment }}"
+          when: user_input.microk8s_deployment is defined
+
+        - name: Verify microk8s_deployment section exists
+          fail:
+            msg: "microk8s_deployment section not found in user_input.yml"
+          when: user_input.microk8s_deployment is not defined
+
+        - name: Display loaded configuration
+          debug:
+            msg: |
+              Loaded configuration:
+              - MicroK8s enabled: {{ microk8s_deployment.enabled }}
+              - MicroK8s version: {{ microk8s_deployment.microk8s_version }}
+              - API Server: {{ kubernetes_deployment.api_server.host }}
+
+    - name: Check if MicroK8s deployment is enabled
+      debug:
+        msg: "MicroK8s deployment is disabled in user_input.yml. Skipping all tasks."
+      when: not microk8s_deployment.enabled | default(false)
+
+    - name: Validate prerequisites
+      include_tasks: "tasks/common_prerequisites.yml"
+      when: 
+        - microk8s_deployment.enabled | default(false)
+        - not (skip_prerequisites | default(false) | bool)
+
+    - name: Validate MicroK8s-specific prerequisites
+      include_tasks: "tasks/validate_prerequisites.yml"
+      when: 
+        - microk8s_deployment.enabled | default(false)
+        - not (skip_prerequisites | default(false) | bool)
+
+    - name: Ensure inventory directory exists
+      file:
+        path: "{{ inventory_dir }}"
+        state: directory
+        mode: '0755'
+      when: microk8s_deployment.enabled | default(false)
+
+  tasks:
+    - name: Deploy MicroK8s Cluster
+      import_playbook: "{{ playbook_dir }}/microk8s-ansible/site.yml"
+      vars:
+        inventory_file: "{{ inventory_dir }}/microk8s/inventory.yml"
+      when: microk8s_deployment.enabled | default(false)
+
+  post_tasks:
+    - name: Initialize summary tracking
+      include_tasks: "tasks/summary_tracker.yml"
+      when: 
+        - summary_enabled | default(true)
+        - microk8s_deployment.enabled | default(false)
+
+    - name: Collect and generate MicroK8s cluster summary
+      include_tasks: "tasks/summary_tracker.yml"
+      vars:
+        generate_summary_report: false  # Don't show app summary for MicroK8s-only deployment
+        generate_microk8s_summary_report: true
+        should_save_summary: "{{ save_summary_to_file | default(true) }}"
+      when: 
+        - summary_enabled | default(true)
+        - microk8s_deployment.enabled | default(false)
+
+    - name: Display MicroK8s deployment completion message
+      debug:
+        msg: |
+          
+          🎉 MicroK8s cluster deployment completed!
+          
+          {% if save_summary_to_file | default(true) %}
+          📄 Summary report saved to: output/installation_summary_{{ ansible_date_time.epoch }}.md
+          {% endif %}
+          
+          🔍 Check the cluster summary above for detailed results.
+          
+          💡 Next steps:
+          • Verify cluster is ready: microk8s kubectl get nodes
+          • Check system pods: microk8s kubectl get pods -n kube-system
+          • Test cluster access: microk8s kubectl cluster-info
+          • Get kubeconfig: microk8s config > output/kubeconfig
+          • Export kubeconfig: export KUBECONFIG=$PWD/output/kubeconfig
+          • All output files are saved in the ./output/ directory
+          
+          📋 To install Smart Scaler applications on this cluster:
+          • Ensure global_kubeconfig in user_input.yml points to output/kubeconfig
+          • Run: ansible-playbook site.yml
+      when: 
+        - summary_enabled | default(true)
+        - microk8s_deployment.enabled | default(false)

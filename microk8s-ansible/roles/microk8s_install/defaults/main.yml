@@ -1,0 +1,16 @@
+---
+# MicroK8s Installation Defaults
+
+# MicroK8s snap channel to install from
+# Available channels: latest/stable, latest/candidate, latest/beta, latest/edge
+# Version-specific channels: 1.32/stable, 1.31/stable, etc.
+microk8s_channel: "latest/stable"
+
+# Timeout for snap installation (seconds)
+microk8s_install_timeout: 300
+
+# Retries for snap installation
+microk8s_install_retries: 3
+
+# Delay between retries (seconds)
+microk8s_install_delay: 30

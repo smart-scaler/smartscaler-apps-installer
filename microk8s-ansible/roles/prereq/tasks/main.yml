@@ -1,0 +1,243 @@
+---
+- name: Enforce minimum Ansible version
+  ansible.builtin.assert:
+    that:
+      - ansible_version.full is version('2.14', '>=')
+    msg: "Minimum ansible-core version required is 2.14"
+
+- name: Install Dependent Ubuntu Packages
+  when: ansible_distribution in ['Ubuntu']
+  ansible.builtin.apt:
+    name: 
+      - curl
+      - iptables
+      - iptables-persistent
+    update_cache: true
+    state: present
+
+- name: Enable IPv4 forwarding
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    reload: true
+
+- name: Enable IPv6 forwarding
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: "1"
+    state: present
+    reload: true
+  when: ansible_all_ipv6_addresses | length > 0
+
+- name: Populate service facts
+  ansible.builtin.service_facts:
+
+- name: Allow UFW Exceptions for MicroK8s
+  when:
+    - ansible_facts.services['ufw'] is defined
+    - ansible_facts.services['ufw'].state == 'running'
+  block:
+    - name: Get ufw status
+      ansible.builtin.command:
+        cmd: ufw status
+      changed_when: false
+      register: ufw_status
+
+    - name: If ufw enabled, open MicroK8s API port
+      when:
+        - "'Status: active' in ufw_status['stdout']"
+      community.general.ufw:
+        rule: allow
+        port: "16443"
+        proto: tcp
+
+    - name: If ufw enabled, open MicroK8s ports
+      when:
+        - "'Status: active' in ufw_status['stdout']"
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "10250"  # Kubelet API
+        - "10255"  # Kubelet readonly API
+        - "25000"  # MicroK8s API
+
+    - name: If ufw enabled, allow default CIDRs for MicroK8s
+      when:
+        - "'Status: active' in ufw_status['stdout']"
+      community.general.ufw:
+        rule: allow
+        src: '{{ item }}'
+      loop:
+        - "10.152.183.0/24"  # Default MicroK8s service CIDR
+        - "10.1.0.0/16"      # Default MicroK8s pod CIDR
+
+- name: Allow Firewalld Exceptions for MicroK8s
+  when:
+    - ansible_facts.services['firewalld.service'] is defined
+    - ansible_facts.services['firewalld.service'].state == 'running'
+  block:
+    - name: If firewalld enabled, open MicroK8s API port
+      ansible.posix.firewalld:
+        port: "16443/tcp"
+        zone: internal
+        state: enabled
+        permanent: true
+        immediate: true
+
+    - name: If firewalld enabled, open MicroK8s ports
+      ansible.posix.firewalld:
+        port: "{{ item }}"
+        zone: internal
+        state: enabled
+        permanent: true
+        immediate: true
+      with_items:
+        - 10250/tcp  # Kubelet API
+        - 10255/tcp  # Kubelet readonly API
+        - 25000/tcp  # MicroK8s API
+        - 8472/udp   # Flannel VXLAN (if using Flannel)
+
+    - name: If firewalld enabled, allow default CIDRs for MicroK8s
+      ansible.posix.firewalld:
+        source: "{{ item }}"
+        zone: trusted
+        state: enabled
+        permanent: true
+        immediate: true
+      loop:
+        - "10.152.183.0/24"  # Default MicroK8s service CIDR
+        - "10.1.0.0/16"      # Default MicroK8s pod CIDR
+
+- name: Add br_netfilter to /etc/modules-load.d/
+  ansible.builtin.copy:
+    content: "br_netfilter"
+    dest: /etc/modules-load.d/br_netfilter.conf
+    mode: "u=rw,g=,o="
+  when: (ansible_os_family == 'RedHat' or ansible_distribution == 'Archlinux')
+
+- name: Load br_netfilter
+  community.general.modprobe:
+    name: br_netfilter
+    state: present
+  when: (ansible_os_family == 'RedHat' or ansible_distribution == 'Archlinux')
+
+- name: Set bridge-nf-call-iptables (just to be sure)
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: "1"
+    state: present
+    reload: true
+  when: (ansible_os_family == 'RedHat' or ansible_distribution == 'Archlinux')
+  loop:
+    - net.bridge.bridge-nf-call-iptables
+    - net.bridge.bridge-nf-call-ip6tables
+
+- name: Check for Apparmor existence
+  ansible.builtin.stat:
+    path: /sys/module/apparmor/parameters/enabled
+  register: apparmor_enabled
+
+- name: Check if Apparmor is enabled
+  when: apparmor_enabled.stat.exists
+  ansible.builtin.command: cat /sys/module/apparmor/parameters/enabled
+  register: apparmor_status
+  changed_when: false
+
+- name: Install Apparmor Parser [Suse]
+  when:
+    - ansible_os_family == 'Suse'
+    - apparmor_status is defined
+    - apparmor_status.stdout == "Y"
+  ansible.builtin.package:
+    name: apparmor-parser
+    state: present
+
+- name: Install Apparmor Parser [Debian]
+  when:
+    - ansible_distribution == 'Debian'
+    - ansible_facts['distribution_major_version'] == "11"
+    - apparmor_status is defined
+    - apparmor_status.stdout == "Y"
+  ansible.builtin.package:
+    name: apparmor
+    state: present
+
+- name: Disable SELinux if enabled
+  block:
+    - name: Check if SELinux is available
+      ansible.builtin.stat:
+        path: /etc/selinux/config
+      register: selinux_config_exists
+
+    - name: Install SELinux Python library for RedHat systems
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - libselinux-python3
+        - libselinux
+      when: 
+        - selinux_config_exists.stat.exists
+        - ansible_os_family == "RedHat"
+
+    - name: Install SELinux Python library for Debian systems
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - python3-selinux
+        - selinux-utils
+      when: 
+        - selinux_config_exists.stat.exists
+        - ansible_os_family == "Debian"
+
+    - name: Check if SELinux is enabled
+      ansible.builtin.command: getenforce
+      register: selinux_status
+      changed_when: false
+      ignore_errors: true
+      when: selinux_config_exists.stat.exists
+
+    - name: Display SELinux status
+      debug:
+        msg: "Current SELinux status: {{ selinux_status.stdout | default('unknown') }}"
+      when: selinux_config_exists.stat.exists
+
+    - name: Disable SELinux if enforcing or permissive
+      ansible.posix.selinux:
+        state: disabled
+      when: 
+        - selinux_config_exists.stat.exists
+        - selinux_status.stdout is defined
+        - selinux_status.stdout in ['Enforcing', 'Permissive']
+
+    - name: Display SELinux not available message
+      debug:
+        msg: "SELinux not available on this system - skipping configuration"
+      when: not selinux_config_exists.stat.exists
+
+- name: Add /usr/local/bin to sudo secure_path
+  ansible.builtin.lineinfile:
+    line: 'Defaults    secure_path = /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin'
+    regexp: "Defaults(\\s)*secure_path(\\s)*="
+    state: present
+    insertafter: EOF
+    path: /etc/sudoers
+    validate: 'visudo -cf %s'
+  when: ansible_os_family == 'RedHat'
+
+- name: Disable swap
+  ansible.builtin.command: swapoff -a
+  when: ansible_swaptotal_mb > 0
+  changed_when: true
+
+- name: Disable swap permanently
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    line: '# \1'
+    backrefs: true
+  when: ansible_swaptotal_mb > 0
