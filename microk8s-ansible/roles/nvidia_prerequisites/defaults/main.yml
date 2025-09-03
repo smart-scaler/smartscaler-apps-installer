@@ -1,0 +1,68 @@
+---
+# NVIDIA Prerequisites Role Defaults
+
+# Enable/disable NVIDIA GPU detection and container runtime setup
+nvidia_prerequisites:
+  enabled: true
+  
+  # NVIDIA Container Runtime Configuration
+  container_runtime:
+    # Install NVIDIA Container Toolkit
+    install_toolkit: true
+    
+    # Configure containerd for NVIDIA runtime
+    configure_containerd: true
+    
+    # Create Kubernetes RuntimeClass for NVIDIA
+    create_runtime_class: true
+    
+    # Architecture for NVIDIA container runtime package
+    architecture: "amd64"
+  
+  # NVIDIA Driver Configuration
+  driver:
+    # Automatically install NVIDIA drivers (use with caution)
+    auto_install: false
+    
+    # Driver version to install (latest, specific version, or auto)
+    version: "latest"
+    
+    # Installation method: package, runfile, or container
+    install_method: "package"
+  
+  # GPU Detection and Validation
+  detection:
+    # Enable automatic GPU detection
+    enabled: true
+    
+    # Detection methods to use
+    methods:
+      - nvidia_smi                         # Use nvidia-smi command
+      - lspci                              # Use lspci to find NVIDIA devices
+      - device_files                       # Check for /dev/nvidia* files
+      - kernel_modules                     # Check for loaded nvidia kernel modules
+  
+  # Verification Settings
+  verification:
+    # Test GPU access from containers
+    test_gpu_access: true
+    
+    # Create test pod to verify GPU functionality
+    create_test_pod: true
+    
+    # Timeout for verification tests (seconds)
+    timeout: 300
+  
+  # Advanced Settings
+  advanced:
+    # Enable NVIDIA Multi-Process Service
+    enable_mps: false
+    
+    # Enable Unified Virtual Memory
+    enable_uvm: true
+    
+    # Enable persistent mode for GPUs
+    enable_persistent_mode: true
+    
+    # Verbose output during installation
+    verbose: false

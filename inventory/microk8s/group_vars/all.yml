@@ -1,0 +1,45 @@
+---
+# MicroK8s Group Variables
+# Generated automatically for MicroK8s deployment
+
+microk8s_channel: latest/stable
+ansible_python_interpreter: /usr/bin/python3
+
+# MicroK8s Add-ons Configuration
+microk8s_addons: ['dns', 'storage', 'ingress']
+microk8s_additional_addons: []
+
+# MicroK8s Network Configuration
+service_cidr: 10.152.183.0/24
+pod_cidr: 10.1.0.0/16
+api_port: 16443
+
+# MicroK8s API Configuration
+api_endpoint: "13.222.96.239"
+kubeconfig: ~/.kube/config
+
+# Cluster Configuration
+cluster_context: "smart-scaler-microk8s-master-1"
+cluster_name: "smart-scaler-microk8s-master-1"
+
+# Smart Scaler Configuration
+smart_scaler_namespace: smart-scaler
+create_smart_scaler_namespace: True
+
+# Multi-node Configuration
+enable_clustering: True
+join_timeout: 300
+
+# Security Configuration
+enable_rbac: True
+enable_pod_security: True
+
+# NVIDIA Support
+enable_nvidia_support: True
+
+# Storage Configuration
+default_storage_class: microk8s-hostpath
+
+# High Availability Configuration
+enable_ha: False
+datastore: dqlite

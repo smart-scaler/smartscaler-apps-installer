@@ -1,0 +1,141 @@
+---
+# NVIDIA Prerequisites Role
+# This role installs NVIDIA Container Toolkit and related components
+# System-level installation only - Kubernetes configuration happens separately after K3s setup
+
+- name: Check if NVIDIA prerequisites are enabled
+  debug:
+    msg: "NVIDIA prerequisites are disabled. Skipping NVIDIA setup."
+  when: not nvidia_enabled | default(false)
+
+- name: Detect system architecture for NVIDIA repositories
+  set_fact:
+    nvidia_arch: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
+    nvidia_arch_deb: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
+    nvidia_arch_rpm: "{{ 'aarch64' if ansible_architecture in ['aarch64', 'arm64'] else 'x86_64' }}"
+  when: nvidia_enabled | default(false)
+
+- name: Install NVIDIA Container Toolkit
+  block:
+    # Simple approach: Try system packages first, then minimal repository fallback
+    - name: Try to install NVIDIA packages from system repositories
+      package:
+        name: 
+          - nvidia-container-toolkit
+          - nvidia-container-runtime
+          - nvidia-docker2
+        state: present
+        update_cache: true
+      register: nvidia_system_install
+      failed_when: false
+      when: ansible_os_family == "Debian"
+
+    - name: Check if system installation was successful
+      set_fact:
+        nvidia_installed: "{{ nvidia_system_install is not failed }}"
+
+    - name: Display system installation result
+      debug:
+        msg: |
+          NVIDIA System Package Installation: {{ 'SUCCESS' if nvidia_installed else 'FAILED' }}
+          If failed, will try minimal repository approach.
+
+    # Only proceed with repositories if system packages failed
+    - name: Add minimal NVIDIA repository (Ubuntu 18.04 ARM64 fallback)
+      apt_repository:
+        repo: "deb [arch=arm64] https://nvidia.github.io/libnvidia-container/stable/ubuntu18.04/arm64 /"
+        state: present
+        filename: nvidia-container-toolkit
+        update_cache: true
+      when: 
+        - ansible_os_family == "Debian"
+        - not nvidia_installed
+        - ansible_architecture in ['aarch64', 'arm64']
+
+    - name: Add minimal NVIDIA repository (Ubuntu 20.04 AMD64 fallback)
+      apt_repository:
+        repo: "deb [arch=amd64] https://nvidia.github.io/libnvidia-container/stable/ubuntu20.04/amd64 /"
+        state: present
+        filename: nvidia-container-toolkit
+        update_cache: true
+      when: 
+        - ansible_os_family == "Debian"
+        - not nvidia_installed
+        - ansible_architecture not in ['aarch64', 'arm64']
+
+    # Install from repositories if system packages failed
+    - name: Install NVIDIA packages from repositories
+      package:
+        name: 
+          - nvidia-container-toolkit
+          - nvidia-container-runtime
+          - nvidia-docker2
+        state: present
+        update_cache: true
+      when: 
+        - ansible_os_family == "Debian"
+        - not nvidia_installed
+
+    # RHEL/CentOS support
+    - name: Add NVIDIA repository (RHEL/CentOS)
+      yum_repository:
+        name: nvidia-container-toolkit
+        description: NVIDIA Container Toolkit Repository
+        baseurl: https://nvidia.github.io/libnvidia-container/stable/rhel{{ ansible_distribution_major_version }}/{{ 'aarch64' if ansible_architecture in ['aarch64', 'arm64'] else 'x86_64' }}/
+        gpgcheck: false
+        enabled: true
+      when: ansible_os_family == "RedHat"
+
+    - name: Install NVIDIA packages (RHEL/CentOS)
+      package:
+        name: 
+          - nvidia-container-toolkit
+          - nvidia-container-runtime
+          - nvidia-docker
+        state: present
+        update_cache: true
+      when: ansible_os_family == "RedHat"
+
+  when: 
+    - nvidia_enabled | default(false)
+    - has_nvidia_gpus | default(false)
+    - nvidia_prerequisites.container_runtime.install_toolkit | default(true)
+
+- name: Verify NVIDIA system installation
+  block:
+    - name: Test NVIDIA Container Runtime
+      command: nvidia-container-cli info
+      register: nvidia_cli_test
+      failed_when: false
+      changed_when: false
+
+    - name: Check NVIDIA runtime version
+      command: nvidia-container-runtime --version
+      register: nvidia_runtime_version
+      failed_when: false
+      changed_when: false
+
+    - name: Display NVIDIA system verification results
+      debug:
+        msg: |
+          NVIDIA System Installation Verification:
+          - Container CLI: {{ 'PASS' if nvidia_cli_test.rc == 0 else 'FAIL' }}
+          - Runtime Version: {{ nvidia_runtime_version.stdout if nvidia_runtime_version.rc == 0 else 'FAIL' }}
+
+  when: 
+    - nvidia_enabled | default(false)
+    - has_nvidia_gpus | default(false)
+
+- name: NVIDIA Prerequisites Summary
+  debug:
+    msg: |
+      🎯 NVIDIA Prerequisites Summary:
+      =================================
+      - Role enabled: {{ nvidia_enabled }}
+      - NVIDIA GPUs detected: {{ has_nvidia_gpus | default(false) }}
+      - Container toolkit installed: {{ nvidia_prerequisites.container_runtime.install_toolkit | default(true) }}
+      
+      🚀 NVIDIA system support is ready for {{ ansible_distribution }} {{ ansible_distribution_version }}!
+      📋 Kubernetes RuntimeClass and GPU configuration will be handled separately after K3s setup.
+      🔧 Use the generated kubeconfig to apply NVIDIA manifests when the cluster is ready.
+  when: nvidia_enabled | default(false)

@@ -1,0 +1,20 @@
+---
+# Example Jetson Prerequisites Playbook
+# 🚀 Platform Support: Works for BOTH K3s and Kubespray deployments!
+# Use this role before any Kubernetes deployment to ensure Jetson nodes are properly configured
+- name: Example Jetson Prerequisites Playbook
+  hosts: all
+  become: true
+  gather_facts: true
+  
+  vars:
+    jetson_prerequisites:
+      enabled: true
+      jetson_stats:
+        force_reinstall: false
+        upgrade: true
+        python_version: "python3"
+      verbose: true
+  
+  roles:
+    - jetson_prerequisites

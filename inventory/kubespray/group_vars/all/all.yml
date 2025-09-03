@@ -78,10 +78,9 @@ etcd_snapshot_count: 100000
 
 
 ## NVIDIA Runtime Configuration
-nvidia_accelerator_enabled: true
-nvidia_driver_install_container: true
-nvidia_container_runtime_package_architecture: amd64
-
+nvidia_accelerator_enabled: false
+nvidia_driver_install_container: false
+nvidia_container_runtime_package_architecture: arm
 
 ## Security Configuration
 rbac_enabled: true
