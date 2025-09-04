@@ -389,9 +389,25 @@
       📋 Quick setup: Run 'source ./set-credentials.sh' for interactive setup
   when: not resolved_ngc_api_key or not resolved_ngc_docker_api_key or not resolved_avesha_docker_username or not resolved_avesha_docker_password
 
-- name: Validate kubeconfig settings
+- name: Validate kubeconfig settings (skip for new MicroK8s deployments)
   block:
-    - name: Get cluster info
+    - name: Check if kubeconfig file exists
+      stat:
+        path: "{{ global_kubeconfig }}"
+      register: kubeconfig_stat
+      become: false
+
+    - name: Display kubeconfig status
+      debug:
+        msg: |
+          📁 Kubeconfig file status:
+          - Path: {{ global_kubeconfig }}
+          - Exists: {{ kubeconfig_stat.stat.exists }}
+          - Size: {{ kubeconfig_stat.stat.size | default('N/A') }} bytes
+          
+          💡 For MicroK8s deployments: kubeconfig will be generated after cluster deployment
+
+    - name: Get cluster info (only if kubeconfig exists)
       kubernetes.core.k8s_cluster_info:
         kubeconfig: "{{ global_kubeconfig }}"
         context: "{{ global_kubecontext | default(omit) }}"
@@ -399,6 +415,7 @@
       become: false
       environment:
         KUBECONFIG: "{{ global_kubeconfig }}"
+      when: kubeconfig_stat.stat.exists
 
     - name: Debug cluster info
       debug:
@@ -407,6 +424,17 @@
           - API Server: {{ k8s_cluster_info.connection.host }}
           - Context: {{ global_kubecontext | default("current-context") }}
           - Server Version: {{ k8s_cluster_info.version.server.kubernetes.gitVersion }}
+      when: k8s_cluster_info is defined and k8s_cluster_info.connection is defined
+
+    - name: Show kubeconfig validation result
+      debug:
+        msg: |
+          {% if kubeconfig_stat.stat.exists %}
+          ✅ Kubeconfig validation passed - cluster is accessible
+          {% else %}
+          ⚠️  Kubeconfig file doesn't exist yet - this is expected for new MicroK8s deployments
+          {% endif %}
+  when: not (microk8s_deployment.enabled | default(false))
 
 # Include common prerequisites
 - name: Include common prerequisites
@@ -426,6 +454,11 @@
         - kubernetes_deployment is defined
         - kubernetes_deployment.enabled | bool
 
+    - name: Check if kubeconfig exists for cluster access test
+      stat:
+        path: "{{ global_kubeconfig }}"
+      register: kubeconfig_file_stat
+      
     - name: Check Kubernetes cluster access
       shell: |
         export PATH=$PATH:/usr/local/bin
@@ -434,6 +467,7 @@
       changed_when: false
       failed_when: false
       delegate_to: localhost
+      when: kubeconfig_file_stat.stat.exists
 
     - name: Verify cluster access
       fail:
@@ -444,7 +478,21 @@
           3. Cluster connectivity
           
           Error: {{ cluster_info.stderr }}
-      when: cluster_info.rc != 0 
+      when: 
+        - kubeconfig_file_stat.stat.exists
+        - cluster_info.rc != 0
+
+    - name: Show cluster access result
+      debug:
+        msg: |
+          {% if not kubeconfig_file_stat.stat.exists %}
+          ⚠️  Kubeconfig file doesn't exist - cluster access check skipped
+          (This is normal for new MicroK8s deployments)
+          {% elif cluster_info.rc == 0 %}
+          ✅ Cluster access validated successfully
+          {% else %}
+          ❌ Cluster access failed
+          {% endif %} 
 
 - name: Display Application Skip Prerequisites Warning
   debug:
