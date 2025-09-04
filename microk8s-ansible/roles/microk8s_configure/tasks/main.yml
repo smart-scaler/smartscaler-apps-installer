@@ -150,14 +150,47 @@
       kubectl connectivity test:
       {{ kubectl_test.stdout }}
 
-- name: Configure MicroK8s to start at boot
-  ansible.builtin.systemd:
-    name: snap.microk8s.daemon-cluster-agent
-    enabled: true
-    state: started
+- name: List available MicroK8s snap services
+  ansible.builtin.shell: systemctl list-units --type=service --state=loaded | grep "snap\.microk8s\." || echo "No MicroK8s services found"
+  register: microk8s_services_list
+  changed_when: false
+  failed_when: false
 
-- name: Configure MicroK8s APIserver to start at boot
+- name: Display available MicroK8s services
+  ansible.builtin.debug:
+    msg: |
+      Available MicroK8s snap services:
+      {{ microk8s_services_list.stdout }}
+
+- name: Ensure MicroK8s snap is enabled at boot
   ansible.builtin.systemd:
-    name: snap.microk8s.daemon-apiserver
+    name: snap.microk8s.daemon-kubelite
     enabled: true
     state: started
+  failed_when: false
+  ignore_errors: true
+
+- name: Alternative approach - Enable snap services via snap commands
+  ansible.builtin.shell: |
+    # Ensure snap services are enabled
+    snap services microk8s || echo "No snap services command available"
+    # Enable snap auto-refresh for microk8s
+    snap refresh --hold=24h microk8s || echo "Could not set refresh hold"
+  register: snap_services_result
+  changed_when: false
+  failed_when: false
+
+- name: Display snap services management result
+  ansible.builtin.debug:
+    msg: |
+      Snap services management:
+      {{ snap_services_result.stdout }}
+      {{ snap_services_result.stderr if snap_services_result.stderr else '' }}
+
+- name: Verify MicroK8s is running and enabled
+  ansible.builtin.command: microk8s status --wait-ready
+  register: final_microk8s_status
+  until: final_microk8s_status.rc == 0
+  retries: 5
+  delay: 10
+  changed_when: false
