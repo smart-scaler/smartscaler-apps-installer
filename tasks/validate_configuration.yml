@@ -8,17 +8,7 @@
 
 - name: Debug configuration loading
   ansible.builtin.debug:
-    var: config_type
-  
-- name: Debug microk8s_deployment existence
-  ansible.builtin.debug:
-    msg: "microk8s_deployment section exists in user_config"
-  when: "'microk8s_deployment' in user_config"
-
-- name: Debug microk8s_deployment missing
-  ansible.builtin.debug:
-    msg: "microk8s_deployment section NOT found in user_config"
-  when: "'microk8s_deployment' not in user_config"
+    msg: "Starting validation for config_type: {{ config_type | default('UNDEFINED') }}"
 
 - name: Validate deployment configuration exists
   ansible.builtin.assert:
