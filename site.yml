@@ -62,10 +62,10 @@
           Avesha Docker Username: {{ 'set' if avesha_docker_username else 'not set' }}
           Avesha Docker Password: {{ 'set' if avesha_docker_password else 'not set' }}
 
-    - name: Verify required variables
+    - name: Verify required credentials are available
       fail:
         msg: |
-          The following required variables are not set:
+          The following required credentials are not set:
           {% if not ngc_api_key %}
           - NGC_API_KEY
           {% endif %}
@@ -79,10 +79,17 @@
           - AVESHA_DOCKER_PASSWORD
           {% endif %}
           
-          Please set these variables using one of:
-          1. Environment variables
-          2. Command line arguments (-e)
-          3. Vault file (group_vars/all/vault.yml)
+          Please set these credentials using one of:
+          1. Environment variables: export NGC_API_KEY="your-key"
+          2. Command line arguments: ansible-playbook ... -e ngc_api_key="your-key"
+          3. Vault file: Edit group_vars/all/vault.yml and set vault_ngc_api_key="your-key"
+          
+          📋 Quick setup: Run 'source ./set-credentials.sh' for interactive setup
+          
+          Current credential sources:
+          {%- if ngc_api_key == lookup('env', 'NGC_API_KEY') %} environment variables
+          {%- elif vault_ngc_api_key %} vault file
+          {%- else %} command line arguments{%- endif %}
       when: not ngc_api_key or not ngc_docker_api_key or not avesha_docker_username or not avesha_docker_password
 
     - name: Show credential source
