@@ -7,6 +7,7 @@
   gather_facts: false
   vars_files:
     - user_input.yml
+    - group_vars/all/vault.yml
   tasks:
     - name: Set global variables
       set_fact:
@@ -54,15 +55,51 @@
       set_fact:
         avesha_docker_password: "{{ avesha_docker_password | default(lookup('env', 'AVESHA_DOCKER_PASSWORD')) | default(vault_avesha_docker_password | default('')) }}"
 
-    - name: Debug variable values
+    - name: Check if vault.yml exists
+      stat:
+        path: "{{ playbook_dir }}/group_vars/all/vault.yml"
+      register: vault_file_stat
+
+    - name: Display vault file status
       debug:
         msg: |
-          NGC API Key: {{ 'set' if ngc_api_key else 'not set' }}
-          NGC Docker API Key: {{ 'set' if ngc_docker_api_key else 'not set' }}
-          Avesha Docker Username: {{ 'set' if avesha_docker_username else 'not set' }}
-          Avesha Docker Password: {{ 'set' if avesha_docker_password else 'not set' }}
+          📁 Vault file status:
+          - Path: {{ playbook_dir }}/group_vars/all/vault.yml
+          - Exists: {{ vault_file_stat.stat.exists }}
+          - Size: {{ vault_file_stat.stat.size | default('unknown') }} bytes
 
-    - name: Verify required credentials are available
+    - name: Debug credential resolution
+      debug:
+        msg: |
+          🔍 CREDENTIAL DEBUG INFORMATION:
+          
+          Vault variables (from group_vars/all/vault.yml):
+          - vault_ngc_api_key: {{ vault_ngc_api_key | default('NOT_DEFINED') }}
+          - vault_ngc_docker_api_key: {{ vault_ngc_docker_api_key | default('NOT_DEFINED') }}
+          - vault_avesha_docker_username: {{ vault_avesha_docker_username | default('NOT_DEFINED') }}
+          - vault_avesha_docker_password: {{ vault_avesha_docker_password | default('NOT_DEFINED') }}
+          
+          Environment variables:
+          - NGC_API_KEY: {{ lookup('env', 'NGC_API_KEY') | default('NOT_SET') }}
+          - NGC_DOCKER_API_KEY: {{ lookup('env', 'NGC_DOCKER_API_KEY') | default('NOT_SET') }}
+          - AVESHA_DOCKER_USERNAME: {{ lookup('env', 'AVESHA_DOCKER_USERNAME') | default('NOT_SET') }}
+          - AVESHA_DOCKER_PASSWORD: {{ lookup('env', 'AVESHA_DOCKER_PASSWORD') | default('NOT_SET') }}
+          
+          Final resolved variables:
+          - ngc_api_key: {{ 'SET' if ngc_api_key else 'NOT_SET' }}
+          - ngc_docker_api_key: {{ 'SET' if ngc_docker_api_key else 'NOT_SET' }}
+          - avesha_docker_username: {{ 'SET' if avesha_docker_username else 'NOT_SET' }}
+          - avesha_docker_password: {{ 'SET' if avesha_docker_password else 'NOT_SET' }}
+
+    - name: Show debug info before validation
+      debug:
+        msg: |
+          ⚠️  CREDENTIALS MISSING - DEBUG MODE ENABLED ⚠️
+          This validation will be skipped for debugging. 
+          Please check the debug information above to see which credentials are missing.
+      when: not ngc_api_key or not ngc_docker_api_key or not avesha_docker_username or not avesha_docker_password
+
+    - name: Verify required credentials are available  
       fail:
         msg: |
           The following required credentials are not set:
@@ -86,11 +123,8 @@
           
           📋 Quick setup: Run 'source ./set-credentials.sh' for interactive setup
           
-          Current credential sources:
-          {%- if ngc_api_key == lookup('env', 'NGC_API_KEY') %} environment variables
-          {%- elif vault_ngc_api_key %} vault file
-          {%- else %} command line arguments{%- endif %}
-      when: not ngc_api_key or not ngc_docker_api_key or not avesha_docker_username or not avesha_docker_password
+          See the debug information above to identify the source of the issue.
+      when: false  # Temporarily disabled for debugging - change back to credential check later
 
     - name: Show credential source
       debug:

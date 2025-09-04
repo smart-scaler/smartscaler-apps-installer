@@ -6,6 +6,7 @@
   become_method: sudo
   vars_files:
     - user_input.yml
+    - group_vars/all/vault.yml
   vars:
     inventory_dir: "{{ playbook_dir }}/inventory"
     microk8s_dir: "{{ playbook_dir }}/microk8s"
