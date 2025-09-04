@@ -413,31 +413,32 @@
           echo "Major version: $major"
           echo "Minor version: $minor"
           if [ "$major" -gt 21 ] || ([ "$major" -eq 21 ] && [ "$minor" -ge 3 ]); then
-            echo "supported"
+            exit 0
           else
-            echo "not_supported"
+            exit 1
           fi
         else
-          echo "unknown"
+          exit 2
         fi
       register: pip3_break_support
       changed_when: false
+      failed_when: false
       
     - name: Set fact for pip3 break system packages support
       set_fact:
-        pip3_supports_break_system: "{{ 'supported' in pip3_break_support.stdout }}"
+        pip3_supports_break_system: "{{ pip3_break_support.rc == 0 }}"
       
     - name: Debug pip3 version check results
       debug:
         msg: |
+          pip3_break_support return code: {{ pip3_break_support.rc }}
           Full pip3_break_support.stdout:
           "{{ pip3_break_support.stdout }}"
           
           pip3_supports_break_system variable:
           "{{ pip3_supports_break_system }}"
           
-          Raw pip3_break_support output:
-          "{{ pip3_break_support }}"
+          Expected: rc=0 means supported, rc=1 means not supported, rc=2 means unknown
       
     - name: Clean up get-pip.py temporary file
       file:
