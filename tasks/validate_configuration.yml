@@ -10,17 +10,29 @@
   ansible.builtin.debug:
     msg: "Starting validation for config_type: {{ config_type | default('UNDEFINED') }}"
 
+- name: Test direct key access
+  ansible.builtin.debug:
+    msg: "Direct microk8s_deployment check: {{ user_config.microk8s_deployment is defined }}"
+
+- name: Test dynamic key access
+  ansible.builtin.debug:
+    msg: "Dynamic key access: {{ user_config[config_type + '_deployment'] is defined }}"
+
+- name: Show microk8s_deployment content if it exists
+  ansible.builtin.debug:
+    msg: "microk8s_deployment content: {{ user_config.microk8s_deployment }}"
+  when: user_config.microk8s_deployment is defined
+
 - name: Validate deployment configuration exists
   ansible.builtin.assert:
     that:
       - config_type is defined
       - config_type != ''
-      - user_config[config_type + '_deployment'] is defined
-      - user_config[config_type + '_deployment'].enabled is defined
+      - user_config.microk8s_deployment is defined
+      - user_config.microk8s_deployment.enabled is defined
     fail_msg: |
-      {{ config_type | default('UNDEFINED') }}_deployment section not found or incomplete in user_input.yml
-      DEBUG: config_type={{ config_type | default('UNDEFINED') }}, 
-      looking for '{{ (config_type | default('UNDEFINED')) + '_deployment' }}' key
+      microk8s_deployment section not found or incomplete in user_input.yml
+      DEBUG: config_type={{ config_type | default('UNDEFINED') }}
 
 - name: Check if deployment is enabled
   ansible.builtin.assert:
