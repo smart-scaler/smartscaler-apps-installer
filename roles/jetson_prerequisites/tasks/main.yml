@@ -425,7 +425,7 @@
       
     - name: Set fact for pip3 break system packages support
       set_fact:
-        pip3_supports_break_system: "{{ pip3_break_support.stdout == 'supported' }}"
+        pip3_supports_break_system: "{{ pip3_break_support.stdout_lines[-1] == 'supported' }}"
       
     - name: Debug pip3 version check results
       debug:
