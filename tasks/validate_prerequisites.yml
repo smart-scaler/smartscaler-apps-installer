@@ -62,14 +62,14 @@
             method: GET
             return_content: yes
           register: kubectl_stable_version
-          when: kubectl_version.failed | default(false)
+          when: kubectl_version.rc != 0
 
         - name: Download kubectl binary
           get_url:
             url: "https://dl.k8s.io/release/{{ kubectl_stable_version.content.strip() }}/bin/linux/{{ kubectl_arch }}/kubectl"
             dest: /tmp/kubectl
             mode: '0755'
-          when: kubectl_version.failed | default(false)
+          when: kubectl_version.rc != 0
 
         - name: Install kubectl binary
           copy:
@@ -78,18 +78,18 @@
             mode: '0755'
             remote_src: yes
           become: yes
-          when: kubectl_version.failed | default(false)
+          when: kubectl_version.rc != 0
 
         - name: Verify kubectl installation
-          shell: kubectl version --client
+          shell: /usr/local/bin/kubectl version --client
           register: kubectl_verify
-          when: kubectl_version.failed | default(false)
+          when: kubectl_version.rc != 0
 
         - name: Cleanup kubectl temp file
           file:
             path: /tmp/kubectl
             state: absent
-          when: kubectl_version.failed | default(false)
+          when: kubectl_version.rc != 0
       delegate_to: localhost
 
     - name: Install Helm if missing
@@ -100,26 +100,26 @@
             method: GET
             return_content: yes
           register: helm_latest_version
-          when: helm_version.failed | default(false)
+          when: helm_version.rc != 0
 
         - name: Extract Helm version number
           set_fact:
             helm_version_number: "{{ helm_latest_version.json.tag_name }}"
-          when: helm_version.failed | default(false)
+          when: helm_version.rc != 0
 
         - name: Download Helm binary
           get_url:
             url: "https://get.helm.sh/helm-{{ helm_version_number }}-linux-{{ helm_arch }}.tar.gz"
             dest: /tmp/helm.tar.gz
             mode: '0644'
-          when: helm_version.failed | default(false)
+          when: helm_version.rc != 0
 
         - name: Extract Helm binary
           unarchive:
             src: /tmp/helm.tar.gz
             dest: /tmp/
             remote_src: yes
-          when: helm_version.failed | default(false)
+          when: helm_version.rc != 0
 
         - name: Install Helm binary
           copy:
@@ -128,12 +128,12 @@
             mode: '0755'
             remote_src: yes
           become: yes
-          when: helm_version.failed | default(false)
+          when: helm_version.rc != 0
 
         - name: Verify Helm installation
-          shell: helm version --short
+          shell: /usr/local/bin/helm version --short
           register: helm_verify
-          when: helm_version.failed | default(false)
+          when: helm_version.rc != 0
 
         - name: Cleanup Helm temp files
           file:
@@ -142,7 +142,13 @@
           loop:
             - /tmp/helm.tar.gz
             - "/tmp/linux-{{ helm_arch }}"
-          when: helm_version.failed | default(false)
+          when: helm_version.rc != 0
+      delegate_to: localhost
+
+    - name: Update PATH for newly installed tools
+      set_fact:
+        ansible_env: "{{ ansible_env | combine({'PATH': ansible_env.PATH + ':/usr/local/bin'}) }}"
+      when: kubectl_version.rc != 0 or helm_version.rc != 0
       delegate_to: localhost
 
     - name: Display installation results
@@ -151,8 +157,8 @@
           Tool installation status:
           - Python: {{ 'OK' if not python_version.failed | default(false) else 'FAILED' }}
           - Ansible: {{ 'OK' if not ansible_version.failed | default(false) else 'FAILED' }}
-          - kubectl: {{ 'INSTALLED' if kubectl_version.failed | default(false) else 'OK' }}
-          - Helm: {{ 'INSTALLED' if helm_version.failed | default(false) else 'OK' }}
+          - kubectl: {{ 'INSTALLED' if kubectl_version.rc != 0 else 'OK' }}
+          - Helm: {{ 'INSTALLED' if helm_version.rc != 0 else 'OK' }}
           - Architecture detected: {{ system_arch }}
       delegate_to: localhost
   become: false
@@ -307,7 +313,9 @@
     success_msg: "Kubernetes deployment check passed - applications can be installed"
 
 - name: Check if helm diff plugin is already installed
-  shell: helm plugin list | grep -q "^diff"
+  shell: |
+    export PATH=$PATH:/usr/local/bin
+    helm plugin list | grep -q "^diff"
   register: helm_diff_check
   changed_when: false
   failed_when: false
@@ -317,7 +325,9 @@
     - prerequisites
 
 - name: Install helm diff plugin for better idempotency checks
-  shell: helm plugin install https://github.com/databus23/helm-diff
+  shell: |
+    export PATH=$PATH:/usr/local/bin
+    helm plugin install https://github.com/databus23/helm-diff
   ignore_errors: true
   changed_when: false
   register: helm_diff_install
@@ -408,7 +418,9 @@
         - kubernetes_deployment.enabled | bool
 
     - name: Check Kubernetes cluster access
-      shell: KUBECONFIG={{ global_kubeconfig }} kubectl --context {{ global_kubecontext }} cluster-info
+      shell: |
+        export PATH=$PATH:/usr/local/bin
+        KUBECONFIG={{ global_kubeconfig }} kubectl --context {{ global_kubecontext }} cluster-info
       register: cluster_info
       changed_when: false
       failed_when: false
