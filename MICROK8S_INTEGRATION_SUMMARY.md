@@ -1,273 +1,171 @@
-# MicroK8s Integration Summary
+# MicroK8s Installation Guide
 
 ## Overview
 
-This document summarizes the successful integration of MicroK8s deployment capability into the existing Ansible project that previously supported only K3s and Kubespray deployments.
+This guide provides step-by-step instructions for installing MicroK8s using the smartscaler-apps-installer. MicroK8s is a lightweight Kubernetes distribution that's perfect for edge computing, development, and production workloads on cloud instances.
 
-## What Was Added
+## Features
 
-### 1. Main MicroK8s Playbook
-- **File**: `microk8s.yml`
-- **Purpose**: Main entry point for MicroK8s-only deployments
-- **Features**: 
-  - Loads and validates user configuration
-  - Imports MicroK8s-specific playbook
-  - Generates deployment summaries
-  - Provides post-deployment instructions
+- **External Access**: Configured for access via public IP
+- **ARM64 Support**: Optimized for ARM-based systems including NVIDIA Jetson
+- **GPU Support**: Automatic NVIDIA GPU detection and configuration
+- **Snap-based**: Easy installation and management via snap packages
+- **Add-ons**: Rich ecosystem of add-ons (DNS, storage, ingress, dashboard, etc.)
 
-### 2. MicroK8s Ansible Collection
-- **Directory**: `microk8s-ansible/`
-- **Structure**: Complete Ansible collection with roles and playbooks
-- **Components**:
-  - `site.yml` - Main orchestration playbook
-  - `roles/` - Custom Ansible roles for MicroK8s
-  - `inventory/` - Generated inventory files
+## Installation Steps
 
-### 3. Ansible Roles Created
+Follow these steps in order to install MicroK8s on your remote machine:
 
-#### `prereq` Role
-- System prerequisites and preparation
-- Network configuration (IPv4/IPv6 forwarding)
-- Firewall configuration for MicroK8s ports
-- SELinux and AppArmor handling
-- Swap disabling
+### 1. SSH into the Machine
 
-#### `snapd` Role
-- Snapd installation and configuration
-- Snap core updates
-- Verification of snap functionality
-- Cross-platform support (Ubuntu, RHEL, SUSE)
+```bash
+ssh root@<your-public-ip>
+```
 
-#### `microk8s_install` Role
-- MicroK8s installation via snap
-- Version/channel management
-- User group management
-- Installation verification
+### 2. Configure SSH Access
 
-#### `microk8s_configure` Role
-- Add-on management (dns, storage, ingress)
-- kubectl alias configuration
-- Kubeconfig generation
-- GPU add-on enablement (automatic NVIDIA detection)
-- Service configuration
+Set up SSH keys for local Ansible access:
 
-#### `microk8s_cluster_setup` Role
-- Multi-node cluster formation
-- Join token generation and management
-- Cluster health verification
-- Kubeconfig export to local machine
+```bash
+# Generate SSH key if it doesn't exist
+ssh-keygen -t rsa -b 4096 -f /root/.ssh/id_rsa -N ""
 
-### 4. Configuration Integration
-- **File**: `user_input.yml` - Added comprehensive `microk8s_deployment` section
-- **Features**:
-  - Channel selection (latest/stable, version-specific)
-  - Add-on configuration
-  - Network settings
-  - Multi-node clustering options
-  - High availability settings
-  - NVIDIA GPU support configuration
+# Add the public key to authorized_keys for root access
+cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
+chmod 600 /root/.ssh/authorized_keys
+chmod 700 /root/.ssh
+```
 
-### 5. Setup and Management Scripts
+### 3. Clone the Repository
 
-#### `setup_microk8s.sh`
-- Automated deployment script
-- Configuration validation
-- SSH connectivity testing
-- Ansible collection installation
-- Role verification and copying
-- Complete deployment orchestration
+```bash
+git clone https://github.com/your-org/smartscaler-apps-installer.git
+cd smartscaler-apps-installer
+```
 
-#### `files/microk8s/generate_microk8s_config.py`
-- Inventory generation from user configuration
-- Group variables creation
-- Multi-node cluster configuration
-- Integration with existing node definitions
+### 4. Initialize Python Virtual Environment
 
-#### `files/microk8s/test_ssh_connectivity.py`
-- SSH connectivity verification
-- Key validation
-- Error reporting and troubleshooting guidance
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
 
-### 6. Documentation
-- **File**: `docs/MICROK8S_DEPLOYMENT.md`
-- **Content**: Comprehensive deployment guide
-- **Topics**: Prerequisites, configuration, deployment, troubleshooting
+### 5. Install Ansible
 
-## Key Integration Features
+```bash
+pip install ansible
+```
 
-### 1. Seamless Node Configuration Reuse
-- Uses existing `kubernetes_deployment` section for node definitions
-- Same SSH configuration and node management
-- Consistent user experience across deployment types
+### 6. Run the Setup Script
 
-### 2. Jetson Device Support
-- **Integration**: Automatic detection and configuration
-- **Role**: `jetson_prerequisites` (existing role reused)
-- **Features**:
-  - Jetson device detection
-  - jetson-stats installation
-  - jtop socket verification
-  - Hardware monitoring setup
-
-### 3. NVIDIA GPU Support
-- **Integration**: Automatic GPU detection and configuration
-- **Role**: `nvidia_prerequisites` (existing role reused)
-- **Features**:
-  - NVIDIA driver detection
-  - Container runtime configuration
-  - Automatic GPU add-on enablement in MicroK8s
-  - GPU resource verification
-
-### 4. Multi-Node Clustering
-- Automatic cluster formation
-- Primary node selection
-- Join token management
-- High availability support (3+ nodes)
-
-### 5. Add-on Management
-- Essential add-ons: dns, storage, ingress
-- Optional add-ons: dashboard, metrics-server, prometheus, gpu
-- Automatic GPU add-on enablement for NVIDIA systems
-
-## Installation Methods
-
-### Method 1: Setup Script (Recommended)
 ```bash
 ./setup_microk8s.sh
 ```
 
-### Method 2: Direct Ansible Playbook
+This script will:
+- Validate your configuration
+- Check SSH connectivity
+- Install required Ansible collections
+- Prepare the deployment environment
+
+### 7. Deploy MicroK8s
+
 ```bash
 ansible-playbook microk8s.yml
 ```
 
-### Method 3: Manual Configuration
+This will:
+- Install and configure MicroK8s
+- Set up external access via your public IP
+- Enable essential add-ons (DNS, storage, ingress)
+- Generate a kubeconfig file for external access
+
+## Post-Installation
+
+### External Access
+
+After installation, you can access your cluster externally:
+
+1. **Copy the kubeconfig** to your local machine:
+   ```bash
+   scp root@<your-public-ip>:/root/smartscaler-apps-installer/output/kubeconfig ~/.kube/microk8s-config
+   ```
+
+2. **Test external access**:
+   ```bash
+   export KUBECONFIG=~/.kube/microk8s-config
+   kubectl get nodes
+   kubectl get pods --all-namespaces
+   ```
+
+### Firewall Configuration
+
+**Important**: Ensure port 16443 is open in your cloud security group/firewall for external API access.
+
+### Verification Commands
+
 ```bash
-python3 files/microk8s/generate_microk8s_config.py
-ansible-playbook microk8s-ansible/site.yml -i inventory/microk8s/inventory.yml
+# Check cluster status
+kubectl get nodes
+
+# Check system pods
+kubectl get pods -n kube-system
+
+# Check cluster info
+kubectl cluster-info
+
+# Check available add-ons (run on the server)
+microk8s status
 ```
 
-## Configuration Example
+## Configuration
+
+The installation uses configuration from `user_input.yml`. Key MicroK8s settings:
 
 ```yaml
 microk8s_deployment:
   enabled: true
   microk8s_channel: "latest/stable"
-  
   microk8s_config:
-    addons:
-      - dns
-      - storage
-      - ingress
-    
-    additional_addons:
-      - dashboard
-      - metrics-server
-      - gpu  # Automatic for NVIDIA systems
-    
-    cluster_setup:
-      enable_clustering: true
-      join_timeout: 300
-    
+    addons: ['dns', 'storage', 'ingress']
+    additional_addons: []
     container_runtime:
       enable_nvidia_support: true
 ```
 
-## Architecture Differences
-
-| Feature | K3s | MicroK8s |
-|---------|-----|-----------|
-| Installation | Binary download | Snap package |
-| API Port | 6443 | 16443 |
-| Service CIDR | 10.43.0.0/16 | 10.152.183.0/24 |
-| Pod CIDR | 10.42.0.0/16 | 10.1.0.0/16 |
-| CNI Default | Flannel | Calico |
-| Add-ons | Limited | Extensive ecosystem |
-| HA Datastore | etcd/external | dqlite |
-
-## Verification and Testing
-
-### Cluster Health Verification
-```bash
-export KUBECONFIG=$PWD/output/kubeconfig
-kubectl get nodes
-kubectl get pods -n kube-system
-kubectl cluster-info
-```
-
-### GPU Support Verification
-```bash
-kubectl get nodes -o custom-columns="NAME:.metadata.name,GPU:.status.allocatable.nvidia\.com/gpu"
-```
-
-### Add-on Status
-```bash
-microk8s status  # Run on cluster nodes
-```
-
-## Benefits of MicroK8s Integration
-
-### 1. Snap-based Installation
-- **Advantages**: Easy installation, automatic updates, dependency management
-- **ARM Support**: Excellent support for ARM64 architecture
-- **Isolation**: Snap confinement provides security benefits
-
-### 2. Rich Add-on Ecosystem
-- **Available**: 50+ add-ons including GPU, monitoring, service mesh
-- **Management**: Simple enable/disable commands
-- **Integration**: Seamless with existing infrastructure
-
-### 3. Edge Computing Optimization
-- **Resource Efficiency**: Lower resource requirements than full Kubernetes
-- **ARM Optimization**: Designed for ARM devices including Jetson
-- **Offline Capability**: Can work in disconnected environments
-
-### 4. Development and Testing
-- **Rapid Deployment**: Fast cluster setup for development
-- **Reset Capability**: Easy cluster reset and reconfiguration
-- **Local Development**: Perfect for laptop/workstation development
-
-## Troubleshooting Resources
+## Troubleshooting
 
 ### Common Issues
-1. **Snap Installation**: Service management, channel issues
-2. **Node Joining**: Network connectivity, token expiration
-3. **GPU Support**: Driver compatibility, add-on configuration
-4. **Add-on Failures**: Dependencies, resource constraints
+
+1. **Port 16443 blocked**: Check your cloud security group/firewall
+2. **SSH connectivity**: Ensure SSH keys are properly configured
+3. **Permission denied**: Make sure you're running as root or have sudo access
 
 ### Log Locations
-- Ansible: `output/ansible.log`
-- MicroK8s: `sudo journalctl -u snap.microk8s.*`
-- Kubelet: `microk8s kubectl logs -n kube-system`
+
+- Ansible logs: `output/ansible.log`
+- MicroK8s logs: `sudo journalctl -u snap.microk8s.*`
 
 ### Support Resources
+
 - [MicroK8s Documentation](https://microk8s.io/docs)
 - [Ubuntu MicroK8s Tutorial](https://ubuntu.com/tutorials/install-a-local-kubernetes-with-microk8s)
-- [Canonical MicroK8s GitHub](https://github.com/canonical/microk8s)
 
-## Future Enhancements
+## What Gets Installed
 
-### Potential Additions
-1. **Custom CNI Support**: Additional CNI plugin options
-2. **External Datastore**: Support for external databases in HA mode
-3. **Backup Integration**: Automated backup and restore procedures
-4. **Monitoring Stack**: Pre-configured monitoring and alerting
-5. **Service Mesh**: Istio/Linkerd integration options
+- **MicroK8s**: Latest stable version via snap
+- **Essential Add-ons**: DNS, storage, ingress
+- **NVIDIA Support**: GPU add-on (if NVIDIA GPU detected)
+- **External Access**: API server configured for public IP access
+- **kubectl**: Command-line tool with alias configuration
 
-### Smart Scaler Integration
-- Application deployment on MicroK8s clusters
-- GPU workload optimization
-- Edge computing scenarios
-- Multi-cluster management
+## Next Steps
 
-## Conclusion
+After successful installation:
 
-The MicroK8s integration provides a comprehensive, production-ready alternative to K3s and Kubespray deployments, specifically optimized for:
+1. Deploy your applications using `kubectl`
+2. Configure additional add-ons as needed
+3. Set up monitoring and logging
+4. Consider adding more nodes for high availability
 
-- **ARM-based systems** (including NVIDIA Jetson devices)
-- **Edge computing** scenarios
-- **Development and testing** environments
-- **NVIDIA GPU workloads**
-- **Snap-based environments**
-
-The integration maintains consistency with existing configuration patterns while providing MicroK8s-specific optimizations and features. Users can now choose the most appropriate Kubernetes distribution for their specific use case while maintaining a unified deployment experience.
+Your MicroK8s cluster is now ready for production workloads with external access capabilities!
