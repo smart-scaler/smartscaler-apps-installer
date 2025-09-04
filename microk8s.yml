@@ -34,7 +34,7 @@
             msg: |
               Loaded configuration:
               - MicroK8s enabled: {{ microk8s_deployment.enabled }}
-              - MicroK8s version: {{ microk8s_deployment.microk8s_version }}
+              - MicroK8s channel: {{ microk8s_deployment.microk8s_channel }}
               - API Server: {{ kubernetes_deployment.api_server.host }}
 
     - name: Check if MicroK8s deployment is enabled
