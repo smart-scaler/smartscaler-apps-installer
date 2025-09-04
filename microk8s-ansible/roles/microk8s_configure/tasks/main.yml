@@ -28,7 +28,7 @@
 
 - name: Check if NVIDIA GPU support should be enabled
   ansible.builtin.set_fact:
-    should_enable_gpu: "{{ enable_nvidia_support | default(false) | bool and (hostvars[inventory_hostname]['is_jetson'] | default(false) or ansible_facts.get('nvidia_gpu_detected', false)) }}"
+    should_enable_gpu: "{{ microk8s_deployment.microk8s_config.container_runtime.enable_nvidia_support | default(false) | bool and (hostvars[inventory_hostname]['is_jetson'] | default(false) or ansible_facts.get('nvidia_gpu_detected', false)) }}"
 
 - name: Enable GPU add-on for NVIDIA support
   ansible.builtin.command: microk8s enable gpu
@@ -45,7 +45,7 @@
   ansible.builtin.debug:
     msg: |
       GPU Add-on Status:
-      - NVIDIA Support Enabled: {{ enable_nvidia_support | default(false) }}
+      - NVIDIA Support Enabled: {{ microk8s_deployment.microk8s_config.container_runtime.enable_nvidia_support | default(false) }}
       - Jetson Device Detected: {{ hostvars[inventory_hostname]['is_jetson'] | default(false) }}
       - Should Enable GPU: {{ should_enable_gpu | default(false) }}
       {% if should_enable_gpu | bool %}
