@@ -122,13 +122,22 @@
       delegate_to: localhost
       become: false
 
-    - name: Fix kubeconfig server IP to use actual node IP
+    - name: Fix kubeconfig server IP to use public/external IP
       ansible.builtin.replace:
         path: "{{ playbook_dir }}/../output/kubeconfig"
         regexp: 'server: https://127\.0\.0\.1:16443'
-        replace: "server: https://{{ ansible_default_ipv4.address }}:16443"
+        replace: "server: https://{{ inventory_hostname }}:16443"
       delegate_to: localhost
       become: false
+
+    - name: Also fix any private IP references in kubeconfig
+      ansible.builtin.replace:
+        path: "{{ playbook_dir }}/../output/kubeconfig"
+        regexp: 'server: https://{{ ansible_default_ipv4.address }}:16443'
+        replace: "server: https://{{ inventory_hostname }}:16443"
+      delegate_to: localhost
+      become: false
+      failed_when: false
 
   run_once: true
 
@@ -140,12 +149,17 @@
       Cluster Details:
       - Nodes: {{ groups['microk8s_cluster'] | length }}
       - Primary Node: {{ groups['microk8s_cluster'][0] }}
-      - API Endpoint: https://{{ hostvars[groups['microk8s_cluster'][0]]['ansible_default_ipv4']['address'] }}:16443
+      - Public API Endpoint: https://{{ groups['microk8s_cluster'][0] }}:16443
+      - Private IP: {{ hostvars[groups['microk8s_cluster'][0]]['ansible_default_ipv4']['address'] }}
       
       Kubeconfig saved to: {{ playbook_dir }}/../output/kubeconfig
+      📡 External Access: Configured for public IP {{ groups['microk8s_cluster'][0] }}
       
       Next steps:
       1. Export kubeconfig: export KUBECONFIG={{ playbook_dir }}/../output/kubeconfig
-      2. Test access: kubectl get nodes
-      3. Check pods: kubectl get pods --all-namespaces
+      2. Test external access: kubectl get nodes
+      3. Check cluster status: kubectl get pods --all-namespaces
+      4. Verify external connectivity from your local machine
+      
+      🔥 Important: Ensure port 16443 is open in your cloud security group/firewall!
   run_once: true
