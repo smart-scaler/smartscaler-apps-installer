@@ -72,6 +72,9 @@ if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
     echo "   echo 'export NGC_DOCKER_API_KEY=\"$NGC_DOCKER_API_KEY\"' >> ~/.bashrc"  
     echo "   echo 'export AVESHA_DOCKER_USERNAME=\"$AVESHA_DOCKER_USERNAME\"' >> ~/.bashrc"
     echo "   echo 'export AVESHA_DOCKER_PASSWORD=\"$AVESHA_DOCKER_PASSWORD\"' >> ~/.bashrc"
+    echo ""
+    echo "💡 Or edit the vault file directly:"
+    echo "   group_vars/all/vault.yml - set vault_ngc_api_key=\"$NGC_API_KEY\""
 fi
 
 # Validation section (always runs)

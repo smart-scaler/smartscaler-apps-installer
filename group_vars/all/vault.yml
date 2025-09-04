@@ -5,22 +5,33 @@
 
 # NGC (NVIDIA GPU Cloud) API credentials
 # Get these from: https://catalog.ngc.nvidia.com/
-ngc_api_key: ""              # Your NGC API key for accessing NVIDIA models
-ngc_docker_api_key: ""       # Your NGC Docker API key for pulling containers
+vault_ngc_api_key: ""              # Your NGC API key for accessing NVIDIA models
+vault_ngc_docker_api_key: ""       # Your NGC Docker API key for pulling containers
 
 # Avesha Docker Registry credentials  
 # Contact Avesha support for these credentials
-avesha_docker_username: ""   # Your Avesha Docker registry username
-avesha_docker_password: ""   # Your Avesha Docker registry password
+vault_avesha_docker_username: ""   # Your Avesha Docker registry username
+vault_avesha_docker_password: ""   # Your Avesha Docker registry password
+
+# Alternative naming for direct access (if needed)
+ngc_api_key: "{{ vault_ngc_api_key }}"
+ngc_docker_api_key: "{{ vault_ngc_docker_api_key }}"
+avesha_docker_username: "{{ vault_avesha_docker_username }}"  
+avesha_docker_password: "{{ vault_avesha_docker_password }}"
 
 # ============================================================================
 # INSTRUCTIONS:
 # ============================================================================
-# 1. Replace empty strings above with your actual credentials
+# 1. Replace empty strings in vault_* variables above with your actual credentials
+#    Example: vault_ngc_api_key: "your-actual-ngc-api-key-here"
+#
 # 2. Keep this file secure and don't commit real credentials to git
+#
 # 3. Alternative: Set environment variables instead:
 #    export NGC_API_KEY="your-ngc-api-key"
 #    export NGC_DOCKER_API_KEY="your-ngc-docker-api-key"  
 #    export AVESHA_DOCKER_USERNAME="your-avesha-username"
 #    export AVESHA_DOCKER_PASSWORD="your-avesha-password"
+#
+# 4. Quick setup: Run 'source ./set-credentials.sh' for interactive setup
 # ============================================================================ 

@@ -357,28 +357,37 @@
     var: user_input
     verbosity: 1
 
-- name: Validate required environment variables
+- name: Resolve credentials from all sources (environment, vault, command line)
+  set_fact:
+    resolved_ngc_api_key: "{{ ngc_api_key | default(lookup('env', 'NGC_API_KEY')) | default(vault_ngc_api_key | default('')) }}"
+    resolved_ngc_docker_api_key: "{{ ngc_docker_api_key | default(lookup('env', 'NGC_DOCKER_API_KEY')) | default(vault_ngc_docker_api_key | default('')) }}"
+    resolved_avesha_docker_username: "{{ avesha_docker_username | default(lookup('env', 'AVESHA_DOCKER_USERNAME')) | default(vault_avesha_docker_username | default('')) }}"
+    resolved_avesha_docker_password: "{{ avesha_docker_password | default(lookup('env', 'AVESHA_DOCKER_PASSWORD')) | default(vault_avesha_docker_password | default('')) }}"
+
+- name: Validate required credentials are available
   fail:
     msg: |
-      The following required variables are not set:
-      {% if not ngc_api_key %}
+      The following required credentials are not set:
+      {% if not resolved_ngc_api_key %}
       - NGC_API_KEY
       {% endif %}
-      {% if not ngc_docker_api_key %}
+      {% if not resolved_ngc_docker_api_key %}
       - NGC_DOCKER_API_KEY
       {% endif %}
-      {% if not avesha_docker_username %}
+      {% if not resolved_avesha_docker_username %}
       - AVESHA_DOCKER_USERNAME
       {% endif %}
-      {% if not avesha_docker_password %}
+      {% if not resolved_avesha_docker_password %}
       - AVESHA_DOCKER_PASSWORD
       {% endif %}
       
-      Please set these variables using one of:
-      1. Environment variables
-      2. Command line arguments (-e)
-      3. Vault file (group_vars/all/vault.yml)
-  when: not ngc_api_key or not ngc_docker_api_key or not avesha_docker_username or not avesha_docker_password
+      Please set these credentials using one of:
+      1. Environment variables: export NGC_API_KEY="your-key"
+      2. Command line arguments: ansible-playbook ... -e ngc_api_key="your-key"  
+      3. Vault file: Edit group_vars/all/vault.yml and set vault_ngc_api_key="your-key"
+      
+      📋 Quick setup: Run 'source ./set-credentials.sh' for interactive setup
+  when: not resolved_ngc_api_key or not resolved_ngc_docker_api_key or not resolved_avesha_docker_username or not resolved_avesha_docker_password
 
 - name: Validate kubeconfig settings
   block:
