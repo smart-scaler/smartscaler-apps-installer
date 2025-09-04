@@ -11,9 +11,9 @@
     msg: |
       DEBUG INFO:
       - config_type variable: {{ config_type | default('NOT SET') }}
-      - Looking for key: {{ config_type + '_deployment' }}
-      - Available keys in user_input.yml: {{ user_config.keys() | list }}
+      - Looking for key: {{ (config_type | default('UNDEFINED')) + '_deployment' }}
       - microk8s_deployment exists: {{ 'microk8s_deployment' in user_config }}
+      - microk8s_deployment.enabled: {{ user_config.get('microk8s_deployment', {}).get('enabled', 'NOT FOUND') }}
 
 - name: Validate deployment configuration exists
   ansible.builtin.assert:
@@ -23,10 +23,9 @@
       - user_config[config_type + '_deployment'] is defined
       - user_config[config_type + '_deployment'].enabled is defined
     fail_msg: |
-      {{ config_type }}_deployment section not found or incomplete in user_input.yml
+      {{ config_type | default('UNDEFINED') }}_deployment section not found or incomplete in user_input.yml
       DEBUG: config_type={{ config_type | default('UNDEFINED') }}, 
-      looking for '{{ config_type + '_deployment' }}' key,
-      available keys: {{ user_config.keys() | list }}
+      looking for '{{ (config_type | default('UNDEFINED')) + '_deployment' }}' key
 
 - name: Check if deployment is enabled
   ansible.builtin.assert:
