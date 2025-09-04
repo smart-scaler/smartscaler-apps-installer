@@ -42,7 +42,7 @@
       
     - name: Set Jetson detection facts
       set_fact:
-        is_jetson: "{{ 'jetson' in dt_model_content.stdout.lower() or 'jetson' in dt_compatible_content.stdout.lower() or 'tegra' in dt_model_content.stdout.lower() or 'tegra' in dt_compatible_content.stdout.lower() or 'tegra' in tegra_release_content.stdout.lower() or nv_tegra_release.stat.exists }}"
+        is_jetson: "{{ ('jetson' in dt_model_content.stdout.lower() and dt_model_content.stdout.lower() != 'not_jetson') or ('jetson' in dt_compatible_content.stdout.lower() and dt_compatible_content.stdout.lower() != 'not_jetson') or ('tegra' in dt_model_content.stdout.lower() and dt_model_content.stdout.lower() != 'not_jetson') or ('tegra' in dt_compatible_content.stdout.lower() and dt_compatible_content.stdout.lower() != 'not_jetson') or ('tegra' in tegra_release_content.stdout.lower() and tegra_release_content.stdout.lower() != 'not_jetson' and tegra_release_content.stdout.strip() != '') or nv_tegra_release.stat.exists }}"
         
     - name: Initialize jetson_gpu_info for non-Jetson devices
       set_fact:
@@ -425,7 +425,7 @@
       
     - name: Set fact for pip3 break system packages support
       set_fact:
-        pip3_supports_break_system: "{{ pip3_break_support.stdout == 'supported' }}"
+        pip3_supports_break_system: "{{ 'supported' in pip3_break_support.stdout }}"
       
     - name: Debug pip3 version check results
       debug:
@@ -487,6 +487,8 @@
         executable: pip3
       register: jetson_stats_check
       become: true
+      failed_when: false
+      ignore_errors: true
       when: not pip3_supports_break_system
       
     - name: Install/Upgrade jetson-stats (with --break-system-packages)
@@ -507,9 +509,26 @@
         extra_args: --upgrade
         executable: pip3
       become: true
+      register: jetson_stats_install_no_break
+      failed_when: false
+      ignore_errors: true
       when: 
         - not pip3_supports_break_system
         - jetson_stats_check.changed or jetson_stats_check.installed is not defined
+        
+    - name: Fallback - Install jetson-stats with --break-system-packages if PEP 668 error
+      pip:
+        name: jetson-stats
+        state: latest
+        extra_args: --upgrade --break-system-packages
+        executable: pip3
+      become: true
+      register: jetson_stats_install_fallback
+      when: 
+        - not pip3_supports_break_system
+        - jetson_stats_install_no_break is defined
+        - jetson_stats_install_no_break.failed | default(false)
+        - "'externally-managed-environment' in (jetson_stats_install_no_break.msg | default('') | string)"
       
     - name: Verify jetson-stats installation
       shell: |
