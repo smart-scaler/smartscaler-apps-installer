@@ -32,27 +32,128 @@
       changed_when: false
       delegate_to: localhost
 
-    - name: Validate all required tools
+    - name: Validate Python and Ansible versions
       assert:
         that:
           - not python_version.failed | default(false)
           - not ansible_version.failed | default(false)
-          - not kubectl_version.failed | default(false)
-          - not helm_version.failed | default(false)
         fail_msg: |
-          Missing required tools on local machine. Please install:
+          Missing required core tools on local machine. Please install:
           {% if python_version.failed | default(false) %}
           - Python 3.10 or higher (Current: {{ python_version.stdout | default('not installed') }})
           {% endif %}
           {% if ansible_version.failed | default(false) %}
           - Ansible 2.9 or higher (Current: {{ ansible_version.stdout | default('not installed') }})
           {% endif %}
-          {% if kubectl_version.failed | default(false) %}
-          - kubectl (Current: {{ kubectl_version.stdout | default('not installed') }})
-          {% endif %}
-          {% if helm_version.failed | default(false) %}
-          - helm (Current: {{ helm_version.stdout | default('not installed') }})
-          {% endif %}
+      delegate_to: localhost
+
+    - name: Detect system architecture for tools installation
+      set_fact:
+        system_arch: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
+        kubectl_arch: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
+        helm_arch: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
+      delegate_to: localhost
+
+    - name: Install kubectl if missing
+      block:
+        - name: Get kubectl stable version
+          uri:
+            url: https://dl.k8s.io/release/stable.txt
+            method: GET
+            return_content: yes
+          register: kubectl_stable_version
+          when: kubectl_version.failed | default(false)
+
+        - name: Download kubectl binary
+          get_url:
+            url: "https://dl.k8s.io/release/{{ kubectl_stable_version.content.strip() }}/bin/linux/{{ kubectl_arch }}/kubectl"
+            dest: /tmp/kubectl
+            mode: '0755'
+          when: kubectl_version.failed | default(false)
+
+        - name: Install kubectl binary
+          copy:
+            src: /tmp/kubectl
+            dest: /usr/local/bin/kubectl
+            mode: '0755'
+            remote_src: yes
+          become: yes
+          when: kubectl_version.failed | default(false)
+
+        - name: Verify kubectl installation
+          shell: kubectl version --client
+          register: kubectl_verify
+          when: kubectl_version.failed | default(false)
+
+        - name: Cleanup kubectl temp file
+          file:
+            path: /tmp/kubectl
+            state: absent
+          when: kubectl_version.failed | default(false)
+      delegate_to: localhost
+
+    - name: Install Helm if missing
+      block:
+        - name: Get Helm latest version
+          uri:
+            url: https://api.github.com/repos/helm/helm/releases/latest
+            method: GET
+            return_content: yes
+          register: helm_latest_version
+          when: helm_version.failed | default(false)
+
+        - name: Extract Helm version number
+          set_fact:
+            helm_version_number: "{{ helm_latest_version.json.tag_name }}"
+          when: helm_version.failed | default(false)
+
+        - name: Download Helm binary
+          get_url:
+            url: "https://get.helm.sh/helm-{{ helm_version_number }}-linux-{{ helm_arch }}.tar.gz"
+            dest: /tmp/helm.tar.gz
+            mode: '0644'
+          when: helm_version.failed | default(false)
+
+        - name: Extract Helm binary
+          unarchive:
+            src: /tmp/helm.tar.gz
+            dest: /tmp/
+            remote_src: yes
+          when: helm_version.failed | default(false)
+
+        - name: Install Helm binary
+          copy:
+            src: "/tmp/linux-{{ helm_arch }}/helm"
+            dest: /usr/local/bin/helm
+            mode: '0755'
+            remote_src: yes
+          become: yes
+          when: helm_version.failed | default(false)
+
+        - name: Verify Helm installation
+          shell: helm version --short
+          register: helm_verify
+          when: helm_version.failed | default(false)
+
+        - name: Cleanup Helm temp files
+          file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - /tmp/helm.tar.gz
+            - "/tmp/linux-{{ helm_arch }}"
+          when: helm_version.failed | default(false)
+      delegate_to: localhost
+
+    - name: Display installation results
+      debug:
+        msg: |
+          Tool installation status:
+          - Python: {{ 'OK' if not python_version.failed | default(false) else 'FAILED' }}
+          - Ansible: {{ 'OK' if not ansible_version.failed | default(false) else 'FAILED' }}
+          - kubectl: {{ 'INSTALLED' if kubectl_version.failed | default(false) else 'OK' }}
+          - Helm: {{ 'INSTALLED' if helm_version.failed | default(false) else 'OK' }}
+          - Architecture detected: {{ system_arch }}
       delegate_to: localhost
   become: false
   delegate_to: localhost
