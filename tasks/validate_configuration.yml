@@ -6,6 +6,14 @@
     file: user_input.yml
     name: user_config
 
+- name: Debug YAML loading
+  ansible.builtin.debug:
+    msg: "Loaded {{ user_config.keys() | length }} keys from user_input.yml"
+
+- name: Debug first few keys
+  ansible.builtin.debug:
+    msg: "First few keys: {{ user_config.keys() | list | first if user_config.keys() | list else 'NO KEYS' }}"
+
 - name: Debug configuration loading
   ansible.builtin.debug:
     msg: "Starting validation for config_type: {{ config_type | default('UNDEFINED') }}"
