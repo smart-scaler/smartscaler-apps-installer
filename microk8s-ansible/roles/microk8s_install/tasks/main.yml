@@ -50,64 +50,64 @@
   delay: 10
   changed_when: false
 
-- name: Configure MicroK8s API server for external access
-  block:
-    - name: Create MicroK8s API server configuration directory
-      ansible.builtin.file:
-        path: /var/snap/microk8s/current/args
-        state: directory
-        mode: '0755'
-      ignore_errors: true
-
-    - name: Configure kube-apiserver for external access
-      ansible.builtin.lineinfile:
-        path: /var/snap/microk8s/current/args/kube-apiserver
-        line: '--bind-address=0.0.0.0'
-        create: true
-        backup: true
-      ignore_errors: true
-
-    - name: Add public IP to API server advertise address
-      ansible.builtin.lineinfile:
-        path: /var/snap/microk8s/current/args/kube-apiserver
-        line: '--advertise-address={{ inventory_hostname }}'
-        create: true
-      ignore_errors: true
-
-    - name: Add external IP to API server certificate SAN
-      ansible.builtin.lineinfile:
-        path: /var/snap/microk8s/current/args/kube-apiserver
-        line: '--apiserver-cert-extra-sans={{ inventory_hostname }}'
-        create: true
-      ignore_errors: true
-
-    - name: Restart MicroK8s to apply configuration changes
-      ansible.builtin.command: microk8s stop
-      register: microk8s_stop_result
-      failed_when: false
-      ignore_errors: true
-
-    - name: Start MicroK8s with new configuration
-      ansible.builtin.command: microk8s start
-      register: microk8s_start_result
-      failed_when: false
-      ignore_errors: true
-
-    - name: Refresh MicroK8s certificates with external IP
-      ansible.builtin.command: microk8s refresh-certs --cert ca.crt
-      register: refresh_certs_result
-      failed_when: false
-      ignore_errors: true
-
-    - name: Display configuration changes result
-      ansible.builtin.debug:
-        msg: |
-          MicroK8s configuration for external access:
-          - Stop result: {{ 'Success' if microk8s_stop_result.rc == 0 else 'Failed' }}
-          - Start result: {{ 'Success' if microk8s_start_result.rc == 0 else 'Failed' }}
-          - Certificate refresh: {{ 'Success' if refresh_certs_result.rc == 0 else 'Failed' }}
-          {{ refresh_certs_result.stdout if refresh_certs_result.stdout else '' }}
-          {{ refresh_certs_result.stderr if refresh_certs_result.stderr else '' }}
+# Temporarily disabled external access configuration due to flag compatibility issues
+# - name: Configure MicroK8s API server for external access
+#   block:
+#    - name: Create MicroK8s API server configuration directory
+#      ansible.builtin.file:
+#        path: /var/snap/microk8s/current/args
+#        state: directory
+#        mode: '0755'
+#      ignore_errors: true
+#
+#    - name: Configure kube-apiserver for external access
+#      ansible.builtin.lineinfile:
+#        path: /var/snap/microk8s/current/args/kube-apiserver
+#        line: '--bind-address=0.0.0.0'
+#        create: true
+#        backup: true
+#      ignore_errors: true
+#
+#    - name: Add public IP to API server advertise address
+#      ansible.builtin.lineinfile:
+#        path: /var/snap/microk8s/current/args/kube-apiserver
+#        line: '--advertise-address={{ inventory_hostname }}'
+#        create: true
+#      ignore_errors: true
+#
+#    - name: Add external IP to API server certificate SAN (MicroK8s method)
+#      ansible.builtin.command: microk8s refresh-certs --cert ca.crt --cert server.crt --cert front-proxy-ca.crt --cert front-proxy-client.crt --extra-sans {{ inventory_hostname }}
+#      register: refresh_certs_san_result
+#      failed_when: false
+#      ignore_errors: true
+#
+#    - name: Restart MicroK8s to apply configuration changes
+#      ansible.builtin.command: microk8s stop
+#      register: microk8s_stop_result
+#      failed_when: false
+#      ignore_errors: true
+#
+#    - name: Start MicroK8s with new configuration
+#      ansible.builtin.command: microk8s start
+#      register: microk8s_start_result
+#      failed_when: false
+#      ignore_errors: true
+#
+#    - name: Refresh MicroK8s certificates with external IP
+#      ansible.builtin.command: microk8s refresh-certs --cert ca.crt
+#      register: refresh_certs_result
+#      failed_when: false
+#      ignore_errors: true
+#
+#    - name: Display configuration changes result
+#      ansible.builtin.debug:
+#        msg: |
+#          MicroK8s configuration for external access:
+#          - Stop result: {{ 'Success' if microk8s_stop_result.rc == 0 else 'Failed' }}
+#          - Start result: {{ 'Success' if microk8s_start_result.rc == 0 else 'Failed' }}
+#          - Certificate refresh: {{ 'Success' if refresh_certs_result.rc == 0 else 'Failed' }}
+#          {{ refresh_certs_result.stdout if refresh_certs_result.stdout else '' }}
+#          {{ refresh_certs_result.stderr if refresh_certs_result.stderr else '' }}
 
 - name: Wait for MicroK8s to be ready after configuration
   ansible.builtin.command: microk8s status --wait-ready
