@@ -1,19 +1,16 @@
 ---
 microk8s_cluster:
-  children:
-    all:
-      hosts:
-
-        13.222.96.239:
-          ansible_user: root
-          ansible_become: True
-          ansible_become_method: sudo
-          ansible_become_user: root
-          ansible_ssh_private_key_file: /root/.ssh/id_rsa
-          ansible_python_interpreter: /usr/bin/python3
-          private_ip: 13.222.96.239
-          node_name: master-1
-          node_role: primary-master
+  hosts:
+    44.200.223.171:
+      ansible_user: root
+      ansible_become: True
+      ansible_become_method: sudo
+      ansible_become_user: root
+      ansible_ssh_private_key_file: /root/.ssh/id_rsa
+      ansible_python_interpreter: /root/smartscaler-apps-installer/venv/bin/python
+      private_ip: 44.200.223.171
+      node_name: master-1
+      node_role: primary-master
 
 
 
@@ -23,4 +20,4 @@ microk8s_cluster:
     microk8s_additional_addons: []
     smart_scaler_namespace: smart-scaler
     enable_nvidia_support: True
-    ansible_python_interpreter: /usr/bin/python3
+    ansible_python_interpreter: /root/smartscaler-apps-installer/venv/bin/python
