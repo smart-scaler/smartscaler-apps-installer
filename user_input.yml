@@ -309,7 +309,7 @@ microk8s_deployment:
     
     # Container Configuration
     container_runtime:
-      enable_nvidia_support: true             # Enable NVIDIA GPU support if detected
+      enable_nvidia_support: false            # Enable NVIDIA GPU support if detected
       configure_registry: false               # Configure private registry (if needed)
     
     # Storage Configuration
