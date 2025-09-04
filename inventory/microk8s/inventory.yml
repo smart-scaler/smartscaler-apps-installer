@@ -1,14 +1,15 @@
+
 ---
 microk8s_cluster:
   hosts:
-    44.200.223.171:
+    3.235.58.66:
       ansible_user: root
       ansible_become: True
       ansible_become_method: sudo
       ansible_become_user: root
       ansible_ssh_private_key_file: /root/.ssh/id_rsa
       ansible_python_interpreter: /root/smartscaler-apps-installer/venv/bin/python
-      private_ip: 44.200.223.171
+      private_ip: 3.235.58.66
       node_name: master-1
       node_role: primary-master
 
