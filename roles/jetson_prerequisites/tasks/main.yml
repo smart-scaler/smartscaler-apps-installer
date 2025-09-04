@@ -412,12 +412,18 @@
           minor=$(echo $pip3_version | cut -d. -f2)
           echo "Major version: $major"
           echo "Minor version: $minor"
-          if [ "$major" -gt 21 ] || ([ "$major" -eq 21 ] && [ "$minor" -ge 3 ]); then
+          if [ "$major" -gt 21 ]; then
+            echo "Version check: major ($major) > 21 = SUPPORTED"
+            exit 0
+          elif [ "$major" -eq 21 ] && [ "$minor" -ge 3 ]; then
+            echo "Version check: major ($major) = 21 AND minor ($minor) >= 3 = SUPPORTED"
             exit 0
           else
+            echo "Version check: major ($major) <= 21 and minor ($minor) < 3 = NOT SUPPORTED"
             exit 1
           fi
         else
+          echo "Could not determine pip3 version = UNKNOWN"
           exit 2
         fi
       register: pip3_break_support
