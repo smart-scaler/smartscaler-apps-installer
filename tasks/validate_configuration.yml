@@ -5,6 +5,7 @@
   ansible.builtin.include_vars:
     file: user_input.yml
     name: user_config
+    no_log: true
 
 - name: Debug YAML loading
   ansible.builtin.debug:
