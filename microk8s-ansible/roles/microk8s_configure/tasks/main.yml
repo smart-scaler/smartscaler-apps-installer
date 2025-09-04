@@ -139,6 +139,28 @@
     mode: '0600'
     owner: root
 
+- name: Generate external kubeconfig with public IP
+  ansible.builtin.shell: |
+    microk8s config | sed "s|server: https://.*:16443|server: https://{{ inventory_hostname }}:16443|g"
+  register: external_kubeconfig
+  changed_when: false
+
+- name: Create output directory for external kubeconfig
+  ansible.builtin.file:
+    path: /root/smartscaler-apps-installer/output
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  run_once: true
+
+- name: Save external kubeconfig to output directory
+  ansible.builtin.copy:
+    content: "{{ external_kubeconfig.stdout }}"
+    dest: /root/smartscaler-apps-installer/output/kubeconfig
+    mode: '0600'
+  delegate_to: localhost
+  run_once: true
+
 - name: Test kubectl connectivity
   ansible.builtin.command: microk8s kubectl get nodes
   register: kubectl_test
@@ -149,6 +171,29 @@
     msg: |
       kubectl connectivity test:
       {{ kubectl_test.stdout }}
+
+- name: Display external access information
+  ansible.builtin.debug:
+    msg: |
+      🎉 MicroK8s External Access Configuration Complete!
+      
+      📋 Access Information:
+      - Public IP: {{ inventory_hostname }}
+      - API Server Port: 16443
+      - API Server URL: https://{{ inventory_hostname }}:16443
+      
+      📁 Kubeconfig File:
+      - Location: /root/smartscaler-apps-installer/output/kubeconfig
+      - Usage: export KUBECONFIG=/root/smartscaler-apps-installer/output/kubeconfig
+      
+      🔧 Test Connection:
+      kubectl get nodes
+      kubectl get namespaces
+      
+      ⚠️  Security Note:
+      - Ensure port 16443 is accessible from your client
+      - The kubeconfig contains cluster admin credentials
+      - Store and share securely
 
 - name: List available MicroK8s snap services
   ansible.builtin.shell: systemctl list-units --type=service --state=loaded | grep "snap\.microk8s\." || echo "No MicroK8s services found"
