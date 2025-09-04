@@ -63,6 +63,7 @@
       ansible.builtin.lineinfile:
         path: /var/snap/microk8s/current/args/kube-apiserver
         line: '--bind-address=0.0.0.0'
+        regexp: '^--bind-address='
         create: true
         backup: true
       ignore_errors: true
@@ -71,6 +72,7 @@
       ansible.builtin.lineinfile:
         path: /var/snap/microk8s/current/args/kube-apiserver
         line: '--advertise-address={{ inventory_hostname }}'
+        regexp: '^--advertise-address='
         create: true
       ignore_errors: true
 
@@ -95,26 +97,26 @@
       changed_when: false
       failed_when: false
 
-    - name: Backup current CSR configuration
+    - name: Backup current CSR template
       ansible.builtin.copy:
-        src: /var/snap/microk8s/current/certs/csr.conf
-        dest: /var/snap/microk8s/current/certs/csr.conf.backup
+        src: /var/snap/microk8s/current/certs/csr.conf.template
+        dest: /var/snap/microk8s/current/certs/csr.conf.template.backup
         remote_src: true
       ignore_errors: true
 
-    - name: Add public IP to CSR configuration for certificate SAN
-      ansible.builtin.lineinfile:
-        path: /var/snap/microk8s/current/certs/csr.conf
-        insertafter: '^IP\.3 = .*'
-        line: 'IP.4 = {{ inventory_hostname }}'
+    - name: Add public IP to CSR template for certificate SAN
+      ansible.builtin.replace:
+        path: /var/snap/microk8s/current/certs/csr.conf.template
+        regexp: '^#MOREIPS$'
+        replace: 'IP.3 = {{ inventory_hostname }}\n#MOREIPS'
         backup: true
-      register: csr_modified
+      register: csr_template_modified
       ignore_errors: true
 
     - name: Regenerate server certificate with public IP in SAN
       ansible.builtin.command: microk8s refresh-certs --cert server.crt
       register: refresh_certs_result
-      when: csr_modified.changed
+      when: csr_template_modified.changed
       failed_when: false
       ignore_errors: true
 
@@ -131,7 +133,7 @@
           - Stop result: {{ 'Success' if microk8s_stop_result.rc == 0 else 'Failed' }}
           - Start result: {{ 'Success' if microk8s_start_result.rc == 0 else 'Failed' }}
           - Ready after restart: {{ 'Success' if microk8s_ready_after_restart.rc == 0 else 'Failed' }}
-          - CSR configuration: {{ 'Modified' if csr_modified.changed else 'No change needed' }}
+          - CSR template: {{ 'Modified' if csr_template_modified.changed else 'No change needed' }}
           - Certificate refresh: {{ 'Success' if refresh_certs_result.rc == 0 else 'Failed' if refresh_certs_result is defined else 'Skipped' }}
           
           Certificate Subject Alternative Names:
