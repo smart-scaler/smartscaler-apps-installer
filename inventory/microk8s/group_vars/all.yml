@@ -15,7 +15,7 @@ pod_cidr: 10.1.0.0/16
 api_port: 16443
 
 # MicroK8s API Configuration
-api_endpoint: "44.200.233.168"
+api_endpoint: "44.193.201.202"
 kubeconfig: ~/.kube/config
 
 # Cluster Configuration
