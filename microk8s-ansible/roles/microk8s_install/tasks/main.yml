@@ -95,9 +95,32 @@
       changed_when: false
       failed_when: false
 
-    - name: Refresh MicroK8s certificates with external IP in SAN
-      ansible.builtin.command: microk8s refresh-certs --extra-sans {{ inventory_hostname }}
+    - name: Backup current CSR configuration
+      ansible.builtin.copy:
+        src: /var/snap/microk8s/current/certs/csr.conf
+        dest: /var/snap/microk8s/current/certs/csr.conf.backup
+        remote_src: true
+      ignore_errors: true
+
+    - name: Add public IP to CSR configuration for certificate SAN
+      ansible.builtin.lineinfile:
+        path: /var/snap/microk8s/current/certs/csr.conf
+        insertafter: '^IP\.3 = .*'
+        line: 'IP.4 = {{ inventory_hostname }}'
+        backup: true
+      register: csr_modified
+      ignore_errors: true
+
+    - name: Regenerate server certificate with public IP in SAN
+      ansible.builtin.command: microk8s refresh-certs --cert server.crt
       register: refresh_certs_result
+      when: csr_modified.changed
+      failed_when: false
+      ignore_errors: true
+
+    - name: Verify certificate includes public IP
+      ansible.builtin.shell: openssl x509 -in /var/snap/microk8s/current/certs/server.crt -text -noout | grep -A 10 "Subject Alternative Name"
+      register: cert_san_check
       failed_when: false
       ignore_errors: true
 
@@ -108,9 +131,18 @@
           - Stop result: {{ 'Success' if microk8s_stop_result.rc == 0 else 'Failed' }}
           - Start result: {{ 'Success' if microk8s_start_result.rc == 0 else 'Failed' }}
           - Ready after restart: {{ 'Success' if microk8s_ready_after_restart.rc == 0 else 'Failed' }}
-          - Certificate refresh: {{ 'Success' if refresh_certs_result.rc == 0 else 'Failed' }}
-          {{ refresh_certs_result.stdout if refresh_certs_result.stdout else '' }}
-          {{ refresh_certs_result.stderr if refresh_certs_result.stderr else '' }}
+          - CSR configuration: {{ 'Modified' if csr_modified.changed else 'No change needed' }}
+          - Certificate refresh: {{ 'Success' if refresh_certs_result.rc == 0 else 'Failed' if refresh_certs_result is defined else 'Skipped' }}
+          
+          Certificate Subject Alternative Names:
+          {{ cert_san_check.stdout if cert_san_check.rc == 0 else 'Failed to check certificate' }}
+          
+          {% if refresh_certs_result.stdout %}
+          Certificate refresh output: {{ refresh_certs_result.stdout }}
+          {% endif %}
+          {% if refresh_certs_result.stderr %}
+          Certificate refresh error: {{ refresh_certs_result.stderr }}
+          {% endif %}
 
 - name: Wait for MicroK8s to be ready after configuration
   ansible.builtin.command: microk8s status --wait-ready
