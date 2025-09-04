@@ -1,11 +1,14 @@
 ---
 # Configuration Validation - Validate user_input.yml for deployment type
 
-- name: Load user_input.yml
-  ansible.builtin.include_vars:
-    file: user_input.yml
-    name: user_config
-    no_log: true
+- name: Read user_input.yml as raw content
+  ansible.builtin.slurp:
+    src: user_input.yml
+  register: user_input_raw
+
+- name: Parse YAML content
+  ansible.builtin.set_fact:
+    user_config: "{{ user_input_raw.content | b64decode | from_yaml }}"
 
 - name: Debug YAML loading
   ansible.builtin.debug:
