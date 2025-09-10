@@ -18,7 +18,7 @@ microk8s_cluster:
 
     workers:
       hosts:
-        WORKER_PUBLIC_IP:
+        3.239.211.83:
           ansible_user: root
           ansible_become: True
           ansible_become_method: sudo

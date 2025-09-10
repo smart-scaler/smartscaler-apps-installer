@@ -312,7 +312,7 @@ microk8s_deployment:
   # Example worker node configuration:
   worker_nodes:
     - name: "microk8s-worker-1"
-      ansible_host: "WORKER_PUBLIC_IP"
+      ansible_host: "3.239.211.83"
       ansible_user: "root"
       ansible_become: true
       ansible_become_method: "sudo"
