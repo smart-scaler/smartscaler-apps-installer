@@ -35,7 +35,6 @@
     - role: microk8s_install
   vars:
     microk8s_node_role: worker
-  when: groups['workers'] is defined or groups['microk8s_cluster'] | length > 1
 
 - name: Configure Multi-Node MicroK8s Cluster
   hosts: primary_master:microk8s_cluster[0]  # Only run on primary master
