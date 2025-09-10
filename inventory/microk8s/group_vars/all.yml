@@ -35,7 +35,7 @@ enable_rbac: True
 enable_pod_security: True
 
 # NVIDIA Support
-enable_nvidia_support: True
+enable_nvidia_support: False
 
 # Storage Configuration
 default_storage_class: microk8s-hostpath

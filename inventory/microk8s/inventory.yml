@@ -1,24 +1,46 @@
-
 ---
+# MicroK8s Cluster Inventory
+# Generated from user_input.yml configuration
 microk8s_cluster:
-  hosts:
-    44.211.118.140:
-      ansible_user: root
-      ansible_become: True
-      ansible_become_method: sudo
-      ansible_become_user: root
-      ansible_ssh_private_key_file: /root/.ssh/id_rsa
-      ansible_python_interpreter: /root/smartscaler-apps-installer/venv/bin/python
-      private_ip: 44.211.118.140
-      node_name: master-1
-      node_role: primary-master
+  children:
+    primary_master:
+      hosts:
+        44.211.118.140:
+          ansible_user: root
+          ansible_become: True
+          ansible_become_method: sudo
+          ansible_become_user: root
+          ansible_ssh_private_key_file: /root/.ssh/id_rsa
+          ansible_python_interpreter: /usr/bin/python3
+          private_ip: 10.0.102.254
+          node_name: microk8s-master-1
+          node_role: primary-master
 
-
+    workers:
+      hosts:
+        WORKER_PUBLIC_IP:
+          ansible_user: root
+          ansible_become: True
+          ansible_become_method: sudo
+          ansible_become_user: root
+          ansible_ssh_private_key_file: /root/.ssh/id_rsa
+          ansible_python_interpreter: /usr/bin/python3
+          private_ip: 10.0.102.11
+          node_name: microk8s-worker-1
+          node_role: worker
 
   vars:
     microk8s_channel: latest/stable
-    microk8s_addons: ['dns', 'storage', 'ingress']
+    microk8s_addons: [
+    "dns",
+    "storage",
+    "ingress"
+]
     microk8s_additional_addons: []
     smart_scaler_namespace: smart-scaler
-    enable_nvidia_support: True
-    ansible_python_interpreter: /root/smartscaler-apps-installer/venv/bin/python
+    enable_nvidia_support: False
+    ansible_python_interpreter: /usr/bin/python3
+    
+    # Multi-node cluster configuration
+    enable_clustering: true
+    join_timeout: 300
