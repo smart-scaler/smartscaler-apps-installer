@@ -57,9 +57,13 @@
 
     - name: Ensure inventory directory exists
       file:
-        path: "{{ inventory_dir }}"
+        path: "{{ inventory_dir }}/microk8s"
         state: directory
         mode: '0755'
+      when: microk8s_deployment.enabled | default(false)
+
+    - name: Generate MicroK8s inventory from user_input.yml
+      include_tasks: "tasks/generate_microk8s_inventory.yml"
       when: microk8s_deployment.enabled | default(false)
 
   tasks:

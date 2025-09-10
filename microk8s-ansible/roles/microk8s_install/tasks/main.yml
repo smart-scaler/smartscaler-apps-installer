@@ -1,4 +1,17 @@
 ---
+- name: Determine node role and configuration
+  ansible.builtin.set_fact:
+    current_node_role: "{{ microk8s_node_role | default(node_role | default('primary-master')) }}"
+    is_worker_node: "{{ (microk8s_node_role | default(node_role | default('primary-master'))) == 'worker' }}"
+
+- name: Display node role information
+  ansible.builtin.debug:
+    msg: |
+      Node Configuration:
+      - Hostname: {{ inventory_hostname }}
+      - Role: {{ current_node_role }}
+      - Is Worker: {{ is_worker_node }}
+
 - name: Check if MicroK8s is already installed
   ansible.builtin.command: microk8s version
   register: microk8s_version_check

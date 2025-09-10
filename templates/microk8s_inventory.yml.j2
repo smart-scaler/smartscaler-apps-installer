@@ -1,0 +1,73 @@
+---
+# MicroK8s Cluster Inventory
+# Generated from user_input.yml configuration
+microk8s_cluster:
+{% if worker_nodes | length > 0 %}
+  children:
+    primary_master:
+      hosts:
+{% for node in control_plane_nodes %}
+        {{ node.ansible_host }}:
+          ansible_user: {{ node.ansible_user | default(default_user) }}
+          ansible_become: {{ node.ansible_become | default(true) }}
+          ansible_become_method: {{ node.ansible_become_method | default('sudo') }}
+          ansible_become_user: {{ node.ansible_become_user | default('root') }}
+          ansible_ssh_private_key_file: {{ ssh_key_path }}
+          ansible_python_interpreter: {{ python_interpreter }}
+          private_ip: {{ node.private_ip | default(node.ansible_host) }}
+          node_name: {{ node.name }}
+          node_role: {{ node.node_role | default('primary-master') }}
+{% endfor %}
+
+    workers:
+      hosts:
+{% for node in worker_nodes %}
+        {{ node.ansible_host }}:
+          ansible_user: {{ node.ansible_user | default(default_user) }}
+          ansible_become: {{ node.ansible_become | default(true) }}
+          ansible_become_method: {{ node.ansible_become_method | default('sudo') }}
+          ansible_become_user: {{ node.ansible_become_user | default('root') }}
+          ansible_ssh_private_key_file: {{ ssh_key_path }}
+          ansible_python_interpreter: {{ python_interpreter }}
+          private_ip: {{ node.private_ip | default(node.ansible_host) }}
+          node_name: {{ node.name }}
+          node_role: {{ node.node_role | default('worker') }}
+{% endfor %}
+
+  vars:
+    microk8s_channel: {{ microk8s_channel }}
+    microk8s_addons: {{ microk8s_addons | to_nice_json }}
+    microk8s_additional_addons: {{ microk8s_additional_addons | to_nice_json }}
+    smart_scaler_namespace: smart-scaler
+    enable_nvidia_support: {{ enable_nvidia_support }}
+    ansible_python_interpreter: {{ python_interpreter }}
+    
+    # Multi-node cluster configuration
+    enable_clustering: true
+    join_timeout: 300
+{% else %}
+  hosts:
+{% for node in control_plane_nodes %}
+    {{ node.ansible_host }}:
+      ansible_user: {{ node.ansible_user | default(default_user) }}
+      ansible_become: {{ node.ansible_become | default(true) }}
+      ansible_become_method: {{ node.ansible_become_method | default('sudo') }}
+      ansible_become_user: {{ node.ansible_become_user | default('root') }}
+      ansible_ssh_private_key_file: {{ ssh_key_path }}
+      ansible_python_interpreter: {{ python_interpreter }}
+      private_ip: {{ node.private_ip | default(node.ansible_host) }}
+      node_name: {{ node.name }}
+      node_role: {{ node.node_role | default('primary-master') }}
+{% endfor %}
+
+  vars:
+    microk8s_channel: {{ microk8s_channel }}
+    microk8s_addons: {{ microk8s_addons | to_nice_json }}
+    microk8s_additional_addons: {{ microk8s_additional_addons | to_nice_json }}
+    smart_scaler_namespace: smart-scaler
+    enable_nvidia_support: {{ enable_nvidia_support }}
+    ansible_python_interpreter: {{ python_interpreter }}
+    
+    # Single-node cluster configuration
+    enable_clustering: false
+{% endif %}

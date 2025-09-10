@@ -13,7 +13,7 @@
   roles:
     - role: nvidia_prerequisites
 
-- name: Cluster preparation
+- name: Cluster preparation (All Nodes)
   hosts: microk8s_cluster
   gather_facts: true
   become: true
@@ -21,15 +21,26 @@
     - role: prereq
     - role: snapd
 
-- name: Setup MicroK8s cluster
-  hosts: microk8s_cluster
+- name: Setup MicroK8s on Primary Master
+  hosts: primary_master:microk8s_cluster[0]  # Primary master or first node
   become: true
   roles:
     - role: microk8s_install
     - role: microk8s_configure
 
-- name: Configure MicroK8s cluster
-  hosts: microk8s_cluster[0]  # Only run on first node for cluster-wide operations
+- name: Setup MicroK8s on Worker Nodes
+  hosts: workers:microk8s_cluster[1:]  # Worker nodes or additional nodes
+  become: true
+  roles:
+    - role: microk8s_install
+  vars:
+    microk8s_node_role: worker
+  when: groups['workers'] is defined or groups['microk8s_cluster'] | length > 1
+
+- name: Configure Multi-Node MicroK8s Cluster
+  hosts: primary_master:microk8s_cluster[0]  # Only run on primary master
   become: true
   roles:
     - role: microk8s_cluster_setup
+  vars:
+    enable_clustering: "{{ hostvars[inventory_hostname]['enable_clustering'] | default(false) }}"

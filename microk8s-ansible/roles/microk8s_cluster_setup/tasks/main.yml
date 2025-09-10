@@ -7,27 +7,51 @@
   delay: 10
   changed_when: false
 
-- name: Check if this is a multi-node setup
+- name: Determine cluster configuration
   ansible.builtin.set_fact:
-    is_multinode: "{{ groups['microk8s_cluster'] | length > 1 }}"
+    is_multinode: "{{ (groups['workers'] is defined and groups['workers'] | length > 0) or (groups['microk8s_cluster'] | length > 1) }}"
+    primary_master_node: "{{ groups['primary_master'][0] if groups['primary_master'] is defined else groups['microk8s_cluster'][0] }}"
+    worker_nodes: "{{ groups['workers'] | default([]) if groups['workers'] is defined else groups['microk8s_cluster'][1:] }}"
+    total_nodes: "{{ (groups['primary_master'] | default([]) | length) + (groups['workers'] | default([]) | length) if groups['primary_master'] is defined else (groups['microk8s_cluster'] | length) }}"
+
+- name: Display cluster configuration
+  ansible.builtin.debug:
+    msg: |
+      MicroK8s Cluster Configuration:
+      - Multi-node setup: {{ is_multinode }}
+      - Primary master: {{ primary_master_node }}
+      - Worker nodes: {{ worker_nodes | length }}
+      - Total nodes: {{ total_nodes }}
+      - Current node: {{ inventory_hostname }}
+      - Node role: {{ node_role | default('primary-master') }}
 
 - name: Multi-node cluster setup
   when: is_multinode | bool
   block:
-    - name: Generate join token on primary node
+    - name: Generate join token on primary master
       ansible.builtin.command: microk8s add-node
       register: join_token_output
       changed_when: true
       run_once: true
+      delegate_to: "{{ primary_master_node }}"
 
     - name: Extract join command from token output
       ansible.builtin.set_fact:
         join_command: "{{ join_token_output.stdout_lines | select('match', '^microk8s join .*') | first }}"
       run_once: true
+      delegate_to: "{{ primary_master_node }}"
 
-    - name: Join additional nodes to cluster
-      ansible.builtin.command: "{{ hostvars[groups['microk8s_cluster'][0]]['join_command'] }}"
-      when: inventory_hostname != groups['microk8s_cluster'][0]
+    - name: Distribute join command to all nodes
+      ansible.builtin.set_fact:
+        cluster_join_command: "{{ hostvars[primary_master_node]['join_command'] }}"
+      when: worker_nodes | length > 0
+
+    - name: Join worker nodes to cluster
+      ansible.builtin.command: "{{ cluster_join_command }}"
+      when: 
+        - inventory_hostname != primary_master_node
+        - cluster_join_command is defined
+        - inventory_hostname in (worker_nodes + groups['microk8s_cluster'][1:])
       register: join_result
       changed_when: true
       retries: 3
@@ -38,7 +62,7 @@
       register: nodes_status
       until: 
         - nodes_status.rc == 0
-        - (nodes_status.stdout_lines | select('search', 'Ready') | list | length) == (groups['microk8s_cluster'] | length)
+        - (nodes_status.stdout_lines | select('search', 'Ready') | list | length) == total_nodes
       retries: 30
       delay: 15
       changed_when: false
@@ -147,13 +171,19 @@
       🎉 MicroK8s cluster setup completed successfully!
       
       Cluster Details:
-      - Nodes: {{ groups['microk8s_cluster'] | length }}
-      - Primary Node: {{ groups['microk8s_cluster'][0] }}
-      - Public API Endpoint: https://{{ groups['microk8s_cluster'][0] }}:16443
-      - Private IP: {{ hostvars[groups['microk8s_cluster'][0]]['ansible_default_ipv4']['address'] }}
+      - Total Nodes: {{ total_nodes }}
+      - Multi-node Setup: {{ is_multinode }}
+      - Primary Master: {{ primary_master_node }}
+      {% if worker_nodes | length > 0 %}
+      - Worker Nodes: {{ worker_nodes | length }}
+        {% for worker in worker_nodes %}
+        - {{ worker }}
+        {% endfor %}
+      {% endif %}
+      - Public API Endpoint: https://{{ primary_master_node }}:16443
       
       Kubeconfig saved to: {{ playbook_dir }}/../output/kubeconfig
-      📡 External Access: Configured for public IP {{ groups['microk8s_cluster'][0] }}
+      📡 External Access: Configured for public IP {{ primary_master_node }}
       
       Next steps:
       1. Export kubeconfig: export KUBECONFIG={{ playbook_dir }}/../output/kubeconfig

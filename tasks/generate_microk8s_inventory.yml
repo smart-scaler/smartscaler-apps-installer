@@ -1,0 +1,63 @@
+---
+# tasks/generate_microk8s_inventory.yml
+# Generate MicroK8s inventory from user_input.yml configuration
+
+- name: Set facts from microk8s_deployment configuration
+  set_fact:
+    microk8s_control_plane_nodes: "{{ microk8s_deployment.control_plane_nodes | default([]) }}"
+    microk8s_worker_nodes: "{{ microk8s_deployment.worker_nodes | default([]) }}"
+    microk8s_ssh_key_path: "{{ microk8s_deployment.ssh_key_path | default('/root/.ssh/id_rsa') }}"
+    microk8s_default_user: "{{ microk8s_deployment.default_ansible_user | default('root') }}"
+    microk8s_python_interpreter: "{{ microk8s_deployment.python_config.interpreter_path | default('/usr/bin/python3') }}"
+
+- name: Validate that at least one control plane node is defined
+  fail:
+    msg: |
+      No control plane nodes defined in microk8s_deployment.control_plane_nodes.
+      At least one control plane node is required for MicroK8s deployment.
+      
+      Please add at least one node to microk8s_deployment.control_plane_nodes in user_input.yml:
+      
+      microk8s_deployment:
+        control_plane_nodes:
+          - name: "microk8s-master-1"
+            ansible_host: "YOUR_MASTER_IP"
+            ansible_user: "root"
+            # ... other configuration
+  when: microk8s_control_plane_nodes | length == 0
+
+- name: Debug MicroK8s node configuration
+  debug:
+    msg: |
+      MicroK8s Node Configuration:
+      - Control plane nodes: {{ microk8s_control_plane_nodes | length }}
+      - Worker nodes: {{ microk8s_worker_nodes | length }}
+      - SSH key path: {{ microk8s_ssh_key_path }}
+      - Default user: {{ microk8s_default_user }}
+      - Python interpreter: {{ microk8s_python_interpreter }}
+
+- name: Generate MicroK8s inventory file
+  template:
+    src: templates/microk8s_inventory.yml.j2
+    dest: "{{ inventory_dir }}/microk8s/inventory.yml"
+    mode: '0644'
+    backup: true
+  vars:
+    control_plane_nodes: "{{ microk8s_control_plane_nodes }}"
+    worker_nodes: "{{ microk8s_worker_nodes }}"
+    ssh_key_path: "{{ microk8s_ssh_key_path }}"
+    default_user: "{{ microk8s_default_user }}"
+    python_interpreter: "{{ microk8s_python_interpreter }}"
+    microk8s_channel: "{{ microk8s_deployment.microk8s_channel }}"
+    microk8s_addons: "{{ microk8s_deployment.microk8s_config.addons }}"
+    microk8s_additional_addons: "{{ microk8s_deployment.microk8s_config.additional_addons | default([]) }}"
+    enable_nvidia_support: "{{ microk8s_deployment.microk8s_config.container_runtime.enable_nvidia_support | default(false) }}"
+
+- name: Display generated inventory path
+  debug:
+    msg: |
+      ✅ MicroK8s inventory generated successfully:
+      📁 File: {{ inventory_dir }}/microk8s/inventory.yml
+      🖥️  Control plane nodes: {{ microk8s_control_plane_nodes | length }}
+      👷 Worker nodes: {{ microk8s_worker_nodes | length }}
+      🔑 SSH key: {{ microk8s_ssh_key_path }}
