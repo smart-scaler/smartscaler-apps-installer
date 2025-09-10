@@ -466,7 +466,7 @@ execution_order_enabled: true                # Required: Must be enabled for ord
 # Required Kubeconfig Settings
 global_control_plane_ip: "44.211.118.140"         # Provide the public IP for metallb/Nginx
 global_kubeconfig: "output/kubeconfig"        # Required: Path to kubeconfig file
-global_kubecontext: "default"  # Required: Kubernetes context
+global_kubecontext: "microk8s"  # Required: Kubernetes context
 use_global_context: true                     # Required: Use global context
 
 # Required Helm Settings
