@@ -243,10 +243,10 @@ global_repo_password: ""                     # Required: Repo password if using 
 readd_helm_repos: true                       # Required: Re-add Helm repos
 
 # Required Credentials
-ngc_api_key: "{{ lookup('env', 'NGC_API_KEY') }}"              # Required for NGC access
-ngc_docker_api_key: "{{ lookup('env', 'NGC_DOCKER_API_KEY') }}" # Required for NGC Docker registry
-avesha_docker_username: "{{ lookup('env', 'AVESHA_DOCKER_USERNAME') }}" # Required for Avesha images
-avesha_docker_password: "{{ lookup('env', 'AVESHA_DOCKER_PASSWORD') }}" # Required for Avesha images
+#ngc_api_key: "{{ lookup('env', 'NGC_API_KEY') }}"              # Required for NGC access
+#ngc_docker_api_key: "{{ lookup('env', 'NGC_DOCKER_API_KEY') }}" # Required for NGC Docker registry
+#avesha_docker_username: "{{ lookup('env', 'AVESHA_DOCKER_USERNAME') }}" # Required for Avesha images
+#avesha_docker_password: "{{ lookup('env', 'AVESHA_DOCKER_PASSWORD') }}" # Required for Avesha images
 
 # Required Execution Order
 execution_order:
@@ -951,24 +951,24 @@ manifests:
           memory: "512Mi"
 
  # NIM 1B Components
-	vllm_service_manifest_1b:
-	    name: "vllm-service-setup-1b"
-	    manifest_file: "files/vllm-service-1b.yaml.j2"
-	    namespace: "vllm"
-	    kubeconfig: "{{ global_kubeconfig }}"
-	    kubecontext: "{{ global_kubecontext }}"
-	    wait: true
-	    wait_timeout: 600
-	    wait_condition:
-	      type: "Available"
-	      status: "True"
-	    variables:
-	      vllm_service_name: "meta-llama3-1b-instruct"
-	      vllm_model: "meta-llama/Meta-Llama-3-1B-Instruct"
-	      vllm_image: "vllm/vllm-openai:latest"
-	      vllm_replicas: 1
-	      vllm_gpu_limit: 1
-	      vllm_service_port: 8000
+    vllm_service_manifest_1b:
+        name: "vllm-service-setup-1b"
+        manifest_file: "files/vllm-service-1b.yaml.j2"
+        namespace: "vllm"
+        kubeconfig: "{{ global_kubeconfig }}"
+        kubecontext: "{{ global_kubecontext }}"
+        wait: true
+        wait_timeout: 600
+        wait_condition:
+          type: "Available"
+          status: "True"
+        variables:
+          vllm_service_name: "meta-llama3-1b-instruct"
+          vllm_model: "meta-llama/Meta-Llama-3-1B-Instruct"
+          vllm_image: "vllm/vllm-openai:latest"
+          vllm_replicas: 1
+          vllm_gpu_limit: 1
+          vllm_service_port: 8000
 
   keda_scaled_object_manifest_1b:
     name: "keda-scaled-object-setup-1b"
@@ -1067,24 +1067,24 @@ manifests:
       locust_configmap_name: "locustfile-1b"
 
  # NIM 1B Components
-	vllm_service_manifest_8b:
-	    name: "vllm-service-setup-8b"
-	    manifest_file: "files/vllm-service-8b.yaml.j2"
-	    namespace: "vllm"
-	    kubeconfig: "{{ global_kubeconfig }}"
-	    kubecontext: "{{ global_kubecontext }}"
-	    wait: true
-	    wait_timeout: 600
-	    wait_condition:
-	      type: "Available"
-	      status: "True"
-	    variables:
-	      vllm_service_name: "meta-llama3-8b-instruct"
-	      vllm_model: "meta-llama/Meta-Llama-3-8B-Instruct"
-	      vllm_image: "vllm/vllm-openai:latest"
-	      vllm_replicas: 1
-	      vllm_gpu_limit: 1
-	      vllm_service_port: 8000
+    vllm_service_manifest_8b:
+        name: "vllm-service-setup-8b"
+        manifest_file: "files/vllm-service-8b.yaml.j2"
+        namespace: "vllm"
+        kubeconfig: "{{ global_kubeconfig }}"
+        kubecontext: "{{ global_kubecontext }}"
+        wait: true
+        wait_timeout: 600
+        wait_condition:
+          type: "Available"
+          status: "True"
+        variables:
+          vllm_service_name: "meta-llama3-8b-instruct"
+          vllm_model: "meta-llama/Meta-Llama-3-8B-Instruct"
+          vllm_image: "vllm/vllm-openai:latest"
+          vllm_replicas: 1
+          vllm_gpu_limit: 1
+          vllm_service_port: 8000
   keda_scaled_object_manifest_8b:
     name: "keda-scaled-object-setup-8b"
     manifest_file: "files/keda-scaled-object-8b.yaml.j2"
@@ -1183,24 +1183,24 @@ manifests:
 
 
    # OPTIONAL: NIM Cache Manifest
-	vllm_service_manifest_70b:
-	    name: "vllm-service-setup-70b"
-	    manifest_file: "files/vllm-service-70b.yaml.j2"
-	    namespace: "vllm"
-	    kubeconfig: "{{ global_kubeconfig }}"
-	    kubecontext: "{{ global_kubecontext }}"
-	    wait: true
-	    wait_timeout: 600
-	    wait_condition:
-	      type: "Available"
-	      status: "True"
-	    variables:
-	      vllm_service_name: "meta-llama3-70b-instruct"
-	      vllm_model: "meta-llama/Meta-Llama-3-70B-Instruct"
-	      vllm_image: "vllm/vllm-openai:latest"
-	      vllm_replicas: 1
-	      vllm_gpu_limit: 8
-	      vllm_service_port: 8000
+    vllm_service_manifest_70b:
+        name: "vllm-service-setup-70b"
+        manifest_file: "files/vllm-service-70b.yaml.j2"
+        namespace: "vllm"
+        kubeconfig: "{{ global_kubeconfig }}"
+        kubecontext: "{{ global_kubecontext }}"
+        wait: true
+        wait_timeout: 600
+        wait_condition:
+          type: "Available"
+          status: "True"
+        variables:
+          vllm_service_name: "meta-llama3-70b-instruct"
+          vllm_model: "meta-llama/Meta-Llama-3-70B-Instruct"
+          vllm_image: "vllm/vllm-openai:latest"
+          vllm_replicas: 1
+          vllm_gpu_limit: 8
+          vllm_service_port: 8000
   keda_scaled_object_manifest_70b:
     name: "keda-scaled-object-setup-70b"
     manifest_file: "files/keda-scaled-object-70b.yaml.j2"
