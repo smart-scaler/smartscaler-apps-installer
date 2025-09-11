@@ -293,14 +293,9 @@ execution_order:
   # - kubeslice_worker_egs_worker_1 # Install worker after fetching secret
 
   # NIM 70B Components
-  - nim_cache_manifest_70b
-  - wait_for_nim_cache_70b
-  - nim_cache_wait_job_70b
-  - nim_service_manifest_70b
+  - vllm_service_manifest_70b
   - keda_scaled_object_manifest_70b
-  - create_inference_pod_configmap_70b
   - smart_scaler_inference_70b
-  - create_locust_configmap_70b
   - locust_manifest_70b
   - smart_scaler_mcp_server_manifest
 
@@ -956,90 +951,24 @@ manifests:
           memory: "512Mi"
 
  # NIM 1B Components
-  nim_cache_manifest_1b:
-    name: "nim-cache-setup-1b"
-    manifest_file: "files/nim-cache-1b.yaml.j2"
-    namespace: "nim"
-    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
-    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
-    wait: true
-    wait_timeout: 600
-    wait_condition:
-      type: "Available"
-      status: "True"
-    validate: false
-    strict_validation: false
-    variables:
-      nim_cache_name: "meta-llama3-1b-instruct"
-      nim_cache_namespace: "nim"
-      nim_cache_runtime_class: "nvidia"
-      nim_cache_tolerations:
-        - key: "nvidia.com/gpu"
-          operator: "Exists"
-          effect: "NoSchedule"
-      nim_cache_model_puller: "nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8.5"
-      nim_cache_pull_secret: "ngc-secret"
-      nim_cache_auth_secret: "ngc-api-secret"
-      nim_cache_model_engine: "tensorrt_llm"
-      nim_cache_tensor_parallelism: "1"
-      nim_cache_qos_profile: "throughput"
-      nim_cache_model_profiles:
-        - "4f904d571fe60ff24695b5ee2aa42da58cb460787a968f1e8a09f5a7e862728d"
-      nim_cache_pvc_create: true
-      nim_cache_storage_class: "local-path"
-      nim_cache_pvc_size: "200Gi"
-      nim_cache_volume_access_mode: "ReadWriteOnce"
-      nim_cache_resources: {}
-
-  nim_service_manifest_1b:
-    name: "nim-service-setup-1b"
-    manifest_file: "files/nim-service-1b.yaml.j2"
-    namespace: "nim"
-    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
-    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
-    wait: true
-    wait_timeout: 600
-    wait_condition:
-      type: "Available"
-      status: "True"
-    validate: false
-    strict_validation: false
-    variables:
-      nim_service_name: "meta-llama3-1b-instruct"
-      nim_service_namespace: "nim"
-      nim_service_runtime_class: "nvidia"
-      nim_service_env:
-        - name: "LOG_LEVEL"
-          value: "INFO"
-        - name: "VLLM_LOG_LEVEL"
-          value: "INFO"
-        - name: "NIM_LOG_LEVEL"
-          value: "INFO"
-        - name: "OMP_NUM_THREADS"
-          value: "8"
-      nim_service_tolerations:
-        - key: "nvidia.com/gpu"
-          operator: "Exists"
-          effect: "NoSchedule"
-      nim_service_image_repository: "nvcr.io/nim/meta/llama-3.2-1b-instruct"  # Test value to verify variable passing
-      nim_service_image_tag: "1.8.5"
-      nim_service_image_pull_policy: "IfNotPresent"
-      nim_service_image_pull_secrets:
-        - "ngc-secret"
-      nim_service_auth_secret: "ngc-api-secret"
-      nim_service_metrics:
-        enabled: true
-        service_monitor:
-          additional_labels:
-            release: "prometheus"
-      nim_service_storage_cache_name: "meta-llama3-1b-instruct"
-      nim_service_storage_cache_profile: "" #TODO: change to 1b profile
-      nim_service_replicas: 1
-      nim_service_resources:
-        limits:
-          nvidia.com/gpu: 1
-      nim_service_expose_type: "ClusterIP"
-      nim_service_expose_port: 8000
+	vllm_service_manifest_1b:
+	    name: "vllm-service-setup-1b"
+	    manifest_file: "files/vllm-service-1b.yaml.j2"
+	    namespace: "vllm"
+	    kubeconfig: "{{ global_kubeconfig }}"
+	    kubecontext: "{{ global_kubecontext }}"
+	    wait: true
+	    wait_timeout: 600
+	    wait_condition:
+	      type: "Available"
+	      status: "True"
+	    variables:
+	      vllm_service_name: "meta-llama3-1b-instruct"
+	      vllm_model: "meta-llama/Meta-Llama-3-1B-Instruct"
+	      vllm_image: "vllm/vllm-openai:latest"
+	      vllm_replicas: 1
+	      vllm_gpu_limit: 1
+	      vllm_service_port: 8000
 
   keda_scaled_object_manifest_1b:
     name: "keda-scaled-object-setup-1b"
@@ -1138,91 +1067,24 @@ manifests:
       locust_configmap_name: "locustfile-1b"
 
  # NIM 1B Components
-  nim_cache_manifest_8b:
-    name: "nim-cache-setup-8b"
-    manifest_file: "files/nim-cache-8b.yaml.j2"
-    namespace: "nim"
-    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
-    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
-    wait: true
-    wait_timeout: 600
-    wait_condition:
-      type: "Available"
-      status: "True"
-    validate: false
-    strict_validation: false
-    variables:
-      nim_cache_name: "meta-llama3-8b-instruct"
-      nim_cache_namespace: "nim"
-      nim_cache_runtime_class: "nvidia"
-      nim_cache_tolerations:
-        - key: "nvidia.com/gpu"
-          operator: "Exists"
-          effect: "NoSchedule"
-      nim_cache_model_puller: "nvcr.io/nim/meta/llama-3.1-8b-instruct:1.8.4"
-      nim_cache_pull_secret: "ngc-secret"
-      nim_cache_auth_secret: "ngc-api-secret"
-      nim_cache_model_engine: "vllm"
-      nim_cache_tensor_parallelism: "1"
-      nim_cache_qos_profile: "throughput"
-      nim_cache_model_profiles:
-        - "4f904d571fe60ff24695b5ee2aa42da58cb460787a968f1e8a09f5a7e862728d"
-      nim_cache_pvc_create: true
-      nim_cache_storage_class: "local-path"
-      nim_cache_pvc_size: "200Gi"
-      nim_cache_volume_access_mode: "ReadWriteOnce"
-      nim_cache_resources: {}
-
-  nim_service_manifest_8b:
-    name: "nim-service-setup-8b"
-    manifest_file: "files/nim-service-8b.yaml.j2"
-    namespace: "nim"
-    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
-    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
-    wait: true
-    wait_timeout: 600
-    wait_condition:
-      type: "Available"
-      status: "True"
-    validate: false
-    strict_validation: false
-    variables:
-      nim_service_name: "meta-llama3-8b-instruct"
-      nim_service_namespace: "nim"
-      nim_service_runtime_class: "nvidia"
-      nim_service_env:
-        - name: "LOG_LEVEL"
-          value: "INFO"
-        - name: "VLLM_LOG_LEVEL"
-          value: "INFO"
-        - name: "NIM_LOG_LEVEL"
-          value: "INFO"
-        - name: "OMP_NUM_THREADS"
-          value: "8"
-      nim_service_tolerations:
-        - key: "nvidia.com/gpu"
-          operator: "Exists"
-          effect: "NoSchedule"
-      nim_service_image_repository: "nvcr.io/nim/meta/llama-3.1-8b-instruct"  # Test value to verify variable passing
-      nim_service_image_tag: "1.8.4"
-      nim_service_image_pull_policy: "IfNotPresent"
-      nim_service_image_pull_secrets:
-        - "ngc-secret"
-      nim_service_auth_secret: "ngc-api-secret"
-      nim_service_metrics:
-        enabled: true
-        service_monitor:
-          additional_labels:
-            release: "prometheus"
-      nim_service_storage_cache_name: "meta-llama3-8b-instruct"
-      nim_service_storage_cache_profile: "4f904d571fe60ff24695b5ee2aa42da58cb460787a968f1e8a09f5a7e862728d"
-      nim_service_replicas: 1
-      nim_service_resources:
-        limits:
-          nvidia.com/gpu: 1
-      nim_service_expose_type: "ClusterIP"
-      nim_service_expose_port: 8000
-
+	vllm_service_manifest_8b:
+	    name: "vllm-service-setup-8b"
+	    manifest_file: "files/vllm-service-8b.yaml.j2"
+	    namespace: "vllm"
+	    kubeconfig: "{{ global_kubeconfig }}"
+	    kubecontext: "{{ global_kubecontext }}"
+	    wait: true
+	    wait_timeout: 600
+	    wait_condition:
+	      type: "Available"
+	      status: "True"
+	    variables:
+	      vllm_service_name: "meta-llama3-8b-instruct"
+	      vllm_model: "meta-llama/Meta-Llama-3-8B-Instruct"
+	      vllm_image: "vllm/vllm-openai:latest"
+	      vllm_replicas: 1
+	      vllm_gpu_limit: 1
+	      vllm_service_port: 8000
   keda_scaled_object_manifest_8b:
     name: "keda-scaled-object-setup-8b"
     manifest_file: "files/keda-scaled-object-8b.yaml.j2"
@@ -1321,113 +1183,24 @@ manifests:
 
 
    # OPTIONAL: NIM Cache Manifest
-  nim_cache_manifest_70b:
-    name: "nim-cache-setup-70b"
-    manifest_file: "files/nim-cache-70b.yaml.j2"
-    namespace: "nim"
-    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
-    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
-    wait: true
-    wait_timeout: 600
-    wait_condition:
-      type: "Available"
-      status: "True"
-    validate: false
-    strict_validation: false
-    variables:
-      nim_cache_name: "meta-llama3-70b-instruct"
-      nim_cache_namespace: "nim"
-      nim_cache_runtime_class: "nvidia"
-      nim_cache_tolerations:
-        - key: "nvidia.com/gpu"
-          operator: "Exists"
-          effect: "NoSchedule"
-      nim_cache_model_puller: "nvcr.io/nim/meta/llama-3.1-70b-instruct:1.8.5"
-      nim_cache_pull_secret: "ngc-secret"
-      nim_cache_auth_secret: "ngc-api-secret"
-      nim_cache_model_engine: "tensorrt_llm"
-      nim_cache_tensor_parallelism: "1"
-      nim_cache_qos_profile: "throughput"
-      nim_cache_model_profiles:
-        - "8b87146e39b0305ae1d73bc053564d1b4b4c565f81aa5abe3e84385544ca9b60"
-      nim_cache_pvc_create: true
-      nim_cache_storage_class: "local-path"
-      nim_cache_pvc_size: "200Gi"
-      nim_cache_volume_access_mode: "ReadWriteOnce"
-      nim_cache_resources: {}
-
-
-  nim_cache_wait_job_70b:
-    name: "wait-for-nimcache-70b"
-    manifest_file: "files/wait-job-70b.yaml.j2"
-    namespace: "nim"
-    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
-    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
-    wait: true
-    wait_timeout: 1200
-    wait_condition:
-      type: "Succeeded"
-      status: "True"
-    validate: false
-    strict_validation: false
-    variables:
-      wait_job_name: "wait-for-nimcache-70b"
-      wait_job_namespace: "nim"
-      wait_job_target_cache: "meta-llama3-70b-instruct"
-      wait_job_timeout: 1200
-      wait_job_check_interval: 10
-      wait_job_service_account: "nim-job-reader"
-
-  nim_service_manifest_70b:
-    name: "nim-service-setup-70b"
-    manifest_file: "files/nim-service-70b.yaml.j2"
-    namespace: "nim"
-    kubeconfig: "{{ kubeconfig | default(global_kubeconfig) }}"
-    kubecontext: "{{ kubecontext | default(global_kubecontext) }}"
-    wait: true
-    wait_timeout: 600
-    wait_condition:
-      type: "Available"
-      status: "True"
-    validate: false
-    strict_validation: false
-    variables:
-      nim_service_name: "meta-llama3-70b-instruct"
-      nim_service_namespace: "nim"
-      nim_service_runtime_class: "nvidia"
-      nim_service_env:
-        - name: "LOG_LEVEL"
-          value: "INFO"
-        - name: "VLLM_LOG_LEVEL"
-          value: "INFO"
-        - name: "NIM_LOG_LEVEL"
-          value: "INFO"
-        - name: "OMP_NUM_THREADS"
-          value: "8"
-      nim_service_tolerations:
-        - key: "nvidia.com/gpu"
-          operator: "Exists"
-          effect: "NoSchedule"
-      nim_service_image_repository: "nvcr.io/nim/meta/llama-3.1-70b-instruct"  # Test value to verify variable passing
-      nim_service_image_tag: "1.8.5"
-      nim_service_image_pull_policy: "IfNotPresent"
-      nim_service_image_pull_secrets:
-        - "ngc-secret"
-      nim_service_auth_secret: "ngc-api-secret"
-      nim_service_metrics:
-        enabled: true
-        service_monitor:
-          additional_labels:
-            release: "prometheus"
-      nim_service_storage_cache_name: "meta-llama3-70b-instruct"
-      nim_service_storage_cache_profile: "8b87146e39b0305ae1d73bc053564d1b4b4c565f81aa5abe3e84385544ca9b60"
-      nim_service_replicas: 1
-      nim_service_resources:
-        limits:
-          nvidia.com/gpu: 1
-      nim_service_expose_type: "ClusterIP"
-      nim_service_expose_port: 8000
-
+	vllm_service_manifest_70b:
+	    name: "vllm-service-setup-70b"
+	    manifest_file: "files/vllm-service-70b.yaml.j2"
+	    namespace: "vllm"
+	    kubeconfig: "{{ global_kubeconfig }}"
+	    kubecontext: "{{ global_kubecontext }}"
+	    wait: true
+	    wait_timeout: 600
+	    wait_condition:
+	      type: "Available"
+	      status: "True"
+	    variables:
+	      vllm_service_name: "meta-llama3-70b-instruct"
+	      vllm_model: "meta-llama/Meta-Llama-3-70B-Instruct"
+	      vllm_image: "vllm/vllm-openai:latest"
+	      vllm_replicas: 1
+	      vllm_gpu_limit: 8
+	      vllm_service_port: 8000
   keda_scaled_object_manifest_70b:
     name: "keda-scaled-object-setup-70b"
     manifest_file: "files/keda-scaled-object-70b.yaml.j2"
