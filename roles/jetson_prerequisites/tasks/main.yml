@@ -42,7 +42,12 @@
       
     - name: Set Jetson detection facts
       set_fact:
-        is_jetson: "{{ 'jetson' in dt_model_content.stdout.lower() or 'jetson' in dt_compatible_content.stdout.lower() or 'tegra' in dt_model_content.stdout.lower() or 'tegra' in dt_compatible_content.stdout.lower() or 'tegra' in tegra_release_content.stdout.lower() or nv_tegra_release.stat.exists }}"
+        is_jetson: "{{ 
+          (dt_model_content.stdout != 'not_jetson' and ('jetson' in dt_model_content.stdout.lower() or 'tegra' in dt_model_content.stdout.lower())) or
+          (dt_compatible_content.stdout != 'not_jetson' and ('jetson' in dt_compatible_content.stdout.lower() or 'tegra' in dt_compatible_content.stdout.lower())) or
+          (tegra_release_content.stdout != 'not_jetson' and tegra_release_content.stdout != '' and 'tegra' in tegra_release_content.stdout.lower()) or
+          nv_tegra_release.stat.exists
+        }}"
         
     - name: Initialize jetson_gpu_info for non-Jetson devices
       set_fact:

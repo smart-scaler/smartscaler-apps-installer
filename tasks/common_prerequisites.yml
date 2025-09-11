@@ -107,16 +107,24 @@
       changed_when: false
       delegate_to: localhost
 
-    - name: Check required Python packages
-      pip:
-        name: "{{ item }}"
-        state: present
-        virtualenv: "{{ ansible_env.VIRTUAL_ENV | default(omit) }}"
-      loop:
-        - kubernetes>=12.0.0
-        - openshift>=0.12.0
-        - PyYAML>=6.0.1
-        - jinja2>=2.11
+    - name: Create virtual environment for prerequisites
+      shell: |
+        python3 -m venv {{ local_environment.venv_directory }}
+      args:
+        creates: "{{ local_environment.venv_directory }}"
+      delegate_to: localhost
+
+    - name: Install required Python packages in venv
+      shell: |
+        source {{ local_environment.venv_directory }}/bin/activate
+        pip install kubernetes>=12.0.0 openshift>=0.12.0 PyYAML>=6.0.1 jinja2>=2.11
+      delegate_to: localhost
+      
+    - name: Verify required Python packages are available
+      shell: |
+        source {{ local_environment.venv_directory }}/bin/activate
+        python -c "import kubernetes, openshift, yaml, jinja2; print('All required packages available')"
+      register: python_packages_check
       delegate_to: localhost
 
     - name: Check system resources

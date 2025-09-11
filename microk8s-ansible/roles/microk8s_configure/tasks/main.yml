@@ -147,19 +147,21 @@
 
 - name: Create output directory for external kubeconfig
   ansible.builtin.file:
-    path: /root/smartscaler-apps-installer/output
+    path: "{{ local_environment.output_directory }}"
     state: directory
     mode: '0755'
   delegate_to: localhost
   run_once: true
+  become: false
 
 - name: Save external kubeconfig to output directory
   ansible.builtin.copy:
     content: "{{ external_kubeconfig.stdout }}"
-    dest: /root/smartscaler-apps-installer/output/kubeconfig
+    dest: "{{ global_kubeconfig }}"
     mode: '0600'
   delegate_to: localhost
   run_once: true
+  become: false
 
 - name: Test kubectl connectivity
   ansible.builtin.command: microk8s kubectl get nodes
@@ -183,8 +185,8 @@
       - API Server URL: https://{{ inventory_hostname }}:16443
       
       📁 Kubeconfig File:
-      - Location: /root/smartscaler-apps-installer/output/kubeconfig
-      - Usage: export KUBECONFIG=/root/smartscaler-apps-installer/output/kubeconfig
+      - Location: {{ global_kubeconfig }}
+      - Usage: export KUBECONFIG={{ global_kubeconfig }}
       
       🔧 Test Connection:
       kubectl get nodes

@@ -1,11 +1,11 @@
 ---
-- name: Deploy MicroK8s Cluster Only
+# Test MicroK8s deployment only (without Smart Scaler components)
+- name: Test MicroK8s Deployment Only
   hosts: localhost
   gather_facts: true
   become: false
   vars_files:
     - user_input.yml
-    - group_vars/all/vault.yml
   vars:
     inventory_dir: "{{ playbook_dir }}/inventory"
     microk8s_dir: "{{ playbook_dir }}/microk8s"
@@ -35,24 +35,28 @@
               Loaded configuration:
               - MicroK8s enabled: {{ microk8s_deployment.enabled }}
               - MicroK8s channel: {{ microk8s_deployment.microk8s_channel }}
-              - API Server: {{ kubernetes_deployment.api_server.host }}
+              - API Server: {{ microk8s_deployment.api_server.host }}
+              - Worker nodes: {{ microk8s_deployment.worker_nodes | length }}
 
     - name: Check if MicroK8s deployment is enabled
       debug:
         msg: "MicroK8s deployment is disabled in user_input.yml. Skipping all tasks."
       when: not microk8s_deployment.enabled | default(false)
 
-    - name: Validate prerequisites
-      include_tasks: "tasks/common_prerequisites.yml"
-      when: 
-        - microk8s_deployment.enabled | default(false)
-        - not (skip_prerequisites | default(false) | bool)
+    - name: Create virtual environment for prerequisites
+      shell: |
+        python3 -m venv {{ local_environment.project_root }}/{{ local_environment.venv_directory }}
+      args:
+        creates: "{{ local_environment.project_root }}/{{ local_environment.venv_directory }}"
+      delegate_to: localhost
+      when: microk8s_deployment.enabled | default(false)
 
-    - name: Validate MicroK8s-specific prerequisites
-      include_tasks: "tasks/validate_prerequisites.yml"
-      when: 
-        - microk8s_deployment.enabled | default(false)
-        - not (skip_prerequisites | default(false) | bool)
+    - name: Install required Python packages in venv
+      shell: |
+        source {{ local_environment.project_root }}/{{ local_environment.venv_directory }}/bin/activate
+        pip install kubernetes>=12.0.0 openshift>=0.12.0 PyYAML>=6.0.1 jinja2>=2.11
+      delegate_to: localhost
+      when: microk8s_deployment.enabled | default(false)
 
     - name: Ensure inventory directory exists
       file:
@@ -121,10 +125,18 @@
           ✅ Cluster installation: {{ 'SUCCESS' if microk8s_deployment_result.rc == 0 else 'FAILED' }}
           ✅ Return code: {{ microk8s_deployment_result.rc }}
           
-          💡 Next step: Verify cluster status with 'microk8s status'
+          💡 Next step: Test cluster connectivity
+          📄 Kubeconfig saved to: ./output/kubeconfig
+          🌐 External endpoint: https://{{ microk8s_deployment.api_server.host }}:16443
+          
+          Test commands:
+          export KUBECONFIG=./output/kubeconfig
+          kubectl --context=microk8s get nodes
+          kubectl --context=microk8s get pods --all-namespaces
       when: 
         - microk8s_deployment.enabled | default(false)
         - microk8s_deployment_result is defined
+        - microk8s_deployment_result.rc == 0
         
     - name: Handle MicroK8s deployment failure
       fail:
@@ -139,47 +151,3 @@
         - microk8s_deployment.enabled | default(false)
         - microk8s_deployment_result is defined
         - microk8s_deployment_result.rc != 0
-
-  post_tasks:
-    - name: Initialize summary tracking
-      include_tasks: "tasks/summary_tracker.yml"
-      when: 
-        - summary_enabled | default(true)
-        - microk8s_deployment.enabled | default(false)
-
-    - name: Collect and generate MicroK8s cluster summary
-      include_tasks: "tasks/summary_tracker.yml"
-      vars:
-        generate_summary_report: false  # Don't show app summary for MicroK8s-only deployment
-        generate_microk8s_summary_report: true
-        should_save_summary: "{{ save_summary_to_file | default(true) }}"
-      when: 
-        - summary_enabled | default(true)
-        - microk8s_deployment.enabled | default(false)
-
-    - name: Display MicroK8s deployment completion message
-      debug:
-        msg: |
-          
-          🎉 MicroK8s cluster deployment completed!
-          
-          {% if save_summary_to_file | default(true) %}
-          📄 Summary report saved to: output/installation_summary_{{ ansible_date_time.epoch }}.md
-          {% endif %}
-          
-          🔍 Check the cluster summary above for detailed results.
-          
-          💡 Next steps:
-          • Verify cluster is ready: microk8s kubectl get nodes
-          • Check system pods: microk8s kubectl get pods -n kube-system
-          • Test cluster access: microk8s kubectl cluster-info
-          • Get kubeconfig: microk8s config > output/kubeconfig
-          • Export kubeconfig: export KUBECONFIG=$PWD/output/kubeconfig
-          • All output files are saved in the ./output/ directory
-          
-          📋 To install Smart Scaler applications on this cluster:
-          • Ensure global_kubeconfig in user_input.yml points to output/kubeconfig
-          • Run: ansible-playbook site.yml
-      when: 
-        - summary_enabled | default(true)
-        - microk8s_deployment.enabled | default(false)
