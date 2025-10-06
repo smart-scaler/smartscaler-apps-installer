@@ -519,7 +519,7 @@ sudo ansible-playbook site.yml \
 
 ## 🧾 EGS License Setup
 
-1. Complete the registration process at [Avesha EGS Registration](https://avesha.io/egs-registration) to receive the required access credentials and product license for running the script.
+1. Complete the registration process at [Avesha EGS Registration](https://avesha.io/egs-registration) to receive the required access credentials
 
 2. After successful registration, Avesha will process your license request and send the **license YAML file** to your registered email address.
 
@@ -529,7 +529,7 @@ sudo ansible-playbook site.yml \
 4. Apply the license secret to your controller cluster:
    **kubectl apply -f egs-license.yaml**
 
-5. For detailed license setup instructions, refer to [📋 **EGS License Setup**](docs/EGS-License-Setup.md).
+5. For detailed license setup instructions, refer to **[📋 EGS License Setup](docs/EGS-License-Setup.md)**.
 
 # Execute EGS installation
 sudo ansible-playbook site.yml \
