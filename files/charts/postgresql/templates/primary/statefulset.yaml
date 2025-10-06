@@ -47,6 +47,11 @@ spec:
         {{- end }}
       {{- end }}
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       {{- if .Values.primary.extraPodSpec }}
       {{- include "common.tplvalues.render" (dict "value" .Values.primary.extraPodSpec "context" $) | nindent 6 }}
       {{- end }}

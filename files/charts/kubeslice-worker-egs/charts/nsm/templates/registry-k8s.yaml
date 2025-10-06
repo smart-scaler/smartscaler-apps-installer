@@ -29,6 +29,11 @@ spec:
       {{ toYaml .Values.registryK8s.labels | nindent 8 }}
       {{- end }}
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       {{- if .Values.registryK8s.affinity }}
       affinity:
       {{ toYaml .Values.registryK8s.affinity | nindent 8 }}

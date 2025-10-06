@@ -23,6 +23,11 @@ spec:
         app.kubernetes.io/name: modelmesh-controller
         control-plane: modelmesh-controller
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       {{- with .Values.kserve.modelmesh.controller.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

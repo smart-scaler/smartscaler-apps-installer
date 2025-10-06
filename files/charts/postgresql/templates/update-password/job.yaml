@@ -27,6 +27,11 @@ spec:
       annotations: {{- include "common.tplvalues.render" (dict "value" .Values.passwordUpdateJob.podAnnotations "context" $) | nindent 8 }}
       {{- end }}
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       {{- include "postgresql.v1.imagePullSecrets" . | nindent 6 }}
       restartPolicy: OnFailure
       {{- if .Values.passwordUpdateJob.podSecurityContext.enabled }}

@@ -29,6 +29,11 @@ spec:
       {{ toYaml .Values.forwardingPlane.labels | nindent 8 }}
       {{- end }}
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       {{- if .Values.forwardingPlane.affinity }}
       affinity:
       {{ toYaml .Values.forwardingPlane.affinity | nindent 8 }}

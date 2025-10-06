@@ -60,6 +60,11 @@ spec:
       {{- end }}
         kubeslice.io/pod-type: dns
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       serviceAccount: kubeslice-dns
       {{- if .Values.dns.affinity }}
       affinity:

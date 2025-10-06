@@ -56,6 +56,11 @@ spec:
       {{ toYaml .Values.kubeslice.ui.labels | nindent 8 }}
       {{- end }}
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       {{- if .Values.kubeslice.ui.affinity }}
       affinity:
       {{ toYaml .Values.kubeslice.ui.affinity | nindent 8 }}

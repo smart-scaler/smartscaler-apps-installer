@@ -88,6 +88,11 @@ spec:
       {{ toYaml .Values.kubeslice.egsCoreApis.labels | nindent 8 }}
       {{- end }}
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       {{- if.Values.kubeslice.egsCoreApis.affinity }}
       affinity:
       {{ toYaml .Values.kubeslice.egsCoreApis.affinity | nindent 8 }}
