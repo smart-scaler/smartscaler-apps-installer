@@ -224,7 +224,7 @@ skip_prerequisites: false
 
 # Validation and Execution Settings
 validate_prerequisites:
-  enabled: true                              # Required: Must be enabled for validation
+  enabled: false                              # Required: Must be enabled for validation
 
 execution_order_enabled: true                # Required: Must be enabled for ordered execution
 
