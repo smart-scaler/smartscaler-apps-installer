@@ -59,7 +59,7 @@ spec:
             - --upstream=http://127.0.0.1:8080/
             - --logtostderr=true
             - --v=0
-          image: '{{ .Values.kubeslice.rbacproxy.imageRegistry }}/{{ .Values.kubeslice.rbacproxy.image }}:{{ .Values.kubeslice.rbacproxy.tag }}'
+          image: '{{ .Values.global.imageRegistry }}/{{ .Values.kubeslice.rbacproxy.image }}:{{ .Values.kubeslice.rbacproxy.tag }}'
           name: kube-rbac-proxy
           securityContext:
           {{- if .Values.kubeslice.rbacproxy.containerSecurityContext }}
@@ -78,11 +78,8 @@ spec:
             - --project-namespace-prefix={{ required "A valid value is required!" .Values.kubeslice.controller.projectnsPrefix }}
             - --controller-end-point={{ required "A valid value is required!" .Values.kubeslice.controller.endpoint }}
             - --prometheus-service-endpoint={{ required "A valid value is required!" .Values.global.kubeTally.prometheusUrl }}
-            - --license-mode={{ .Values.kubeslice.license.mode }}
-            - --license-customer-name={{ .Values.kubeslice.license.customerName }}
-            - --license-type={{.Values.kubeslice.license.type }}
-            - --license-image={{ .Values.kubeslice.controller.imageRegistry }}/{{ .Values.kubeslice.controller.image }}:{{ .Values.kubeslice.controller.tag }}
             - --metrics-cleanup-interval={{ .Values.kubeslice.controller.kubeTally.metricsCleanupInterval }}
+            - --ovpn-job-image={{ .Values.global.imageRegistry }}/{{ .Values.kubeslice.ovpnJob.image }}:{{ .Values.kubeslice.ovpnJob.tag }}          
           command:
             - /manager
           env:
@@ -90,9 +87,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: INVMGR_GRPC_ADDRESS
+              value: {{ .Values.kubeslice.controller.invmgrGrpcAddress }}
             - name: WEBHOOK_CA_BUNDLE
               value: {{ $ca.Cert | b64enc }}
-          image: '{{ .Values.kubeslice.controller.imageRegistry }}/{{ .Values.kubeslice.controller.image }}:{{ .Values.kubeslice.controller.tag }}'
+          image: '{{ .Values.global.imageRegistry }}/{{ .Values.kubeslice.controller.image }}:{{ .Values.kubeslice.controller.tag }}'
           imagePullPolicy: '{{ .Values.kubeslice.controller.pullPolicy }}'
           livenessProbe:
             httpGet:

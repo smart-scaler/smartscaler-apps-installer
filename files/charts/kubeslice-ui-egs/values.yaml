@@ -2,7 +2,7 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 global:
-  imageRegistry: &defaultRegistry docker.io/aveshasystems
+  imageRegistry: harbor.saas1.smart-scaler.io/avesha/aveshasystems
   profile:
     openshift: false
   gpr:
@@ -32,9 +32,8 @@ kubeslice:
   productName: egs
 
   ui:
-    imageRegistry: *defaultRegistry
     image: kubeslice-ui-ent-egs
-    tag: 1.14.2
+    tag: 1.15.2
     pullPolicy: IfNotPresent
     service:
       type: ClusterIP
@@ -69,9 +68,8 @@ kubeslice:
                   - key: "node.kubernetes.io/gpu"
                     operator: "DoesNotExist"
   uiv2:
-    imageRegistry: *defaultRegistry
     image: kubeslice-ui-v2-ent-egs
-    tag: 1.14.3
+    tag: 1.15.2
     pullPolicy: IfNotPresent
     service:
       type: ClusterIP
@@ -108,7 +106,6 @@ kubeslice:
   dashboard:
     enabled: false
     pullPolicy: IfNotPresent
-    imageRegistry: *defaultRegistry
     proxy:
       image: kubeslice-kong
       tag: 3.7
@@ -125,7 +122,6 @@ kubeslice:
       image: kubeslice-dashboard-web
       tag: 7.5.1
   uiproxy:
-    imageRegistry: *defaultRegistry
     image: kubeslice-ui-proxy
     tag: 1.12.0
     pullPolicy: IfNotPresent
@@ -212,10 +208,12 @@ kubeslice:
                     operator: "DoesNotExist"
 
   apigw:
-    imageRegistry: *defaultRegistry
     image: kubeslice-api-gw-ent-egs
-    tag: 1.14.1
+    tag: 1.15.2
     pullPolicy: IfNotPresent
+    env:
+      - name: DCGM_METRIC_JOB_VALUE
+        value: nvidia-dcgm-exporter
     service:
       type: ClusterIP
     labels:
@@ -258,12 +256,11 @@ kubeslice:
 
   egsCoreApis:
     enabled: true
-    imageRegistry: *defaultRegistry
     image: egs-core-apis
-    tag: 1.13.1
+    tag: 1.14.2
     pullPolicy: IfNotPresent
     service:
-      type: LoadBalancer
+      type: ClusterIP
     labels:
       app: egs-core-apis
       version: v1
@@ -302,9 +299,8 @@ kubeslice:
                     operator: "DoesNotExist"
 
   workerinstaller:
-    imageRegistry: *defaultRegistry
     image: worker-installer
-    tag: 1.5.0
+    tag: 1.8.0
     pullPolicy: IfNotPresent
 
   prometheus:

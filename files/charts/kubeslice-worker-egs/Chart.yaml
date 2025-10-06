@@ -1,10 +1,18 @@
 apiVersion: v2
-appVersion: 1.14.3
+appVersion: 1.15.2
 dependencies:
 - condition: kserve.enabled
   name: kserve
   repository: file://./charts/kserve
   version: v0.14.0
+- name: nsm
+  repository: file://./charts/nsm
+  version: 0.6.4
+  condition: kubesliceNetworking.enabled
+- name: netop
+  repository: file://./charts/netop
+  version: 0.2.0
+  condition: kubesliceNetworking.enabled  
 description: KubeSlice operator - A Helm chart for managing life-cycle management
   of KubeSlice
 home: https://avesha.io/products/product-slice
@@ -35,4 +43,4 @@ maintainers:
   name: Avesha
 name: kubeslice-worker-egs
 type: application
-version: 1.14.3
+version: 1.15.2
