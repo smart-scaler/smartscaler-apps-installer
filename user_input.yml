@@ -243,10 +243,12 @@ global_repo_password: ""                     # Required: Repo password if using 
 readd_helm_repos: true                       # Required: Re-add Helm repos
 
 # Required Credentials
-ngc_api_key: "{{ lookup('env', 'NGC_API_KEY') }}"              # Required for NGC access
-ngc_docker_api_key: "{{ lookup('env', 'NGC_DOCKER_API_KEY') }}" # Required for NGC Docker registry
-avesha_docker_username: "{{ lookup('env', 'AVESHA_DOCKER_USERNAME') }}" # Required for Avesha images
-avesha_docker_password: "{{ lookup('env', 'AVESHA_DOCKER_PASSWORD') }}" # Required for Avesha images
+# These will use environment variables if available, otherwise fall back to 'not-set'
+# You can override these values directly in this file or use environment variables
+ngc_api_key: "{{ lookup('env', 'NGC_API_KEY') | default('not-set') }}"              # Required for NGC access
+ngc_docker_api_key: "{{ lookup('env', 'NGC_DOCKER_API_KEY') | default('not-set') }}" # Required for NGC Docker registry
+avesha_docker_username: "{{ lookup('env', 'AVESHA_DOCKER_USERNAME') | default('not-set') }}" # Required for Avesha images
+avesha_docker_password: "{{ lookup('env', 'AVESHA_DOCKER_PASSWORD') | default('not-set') }}" # Required for Avesha images
 
 # Required Execution Order
 execution_order:
