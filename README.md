@@ -427,6 +427,23 @@ kubectl get events --all-namespaces
 For additional support, please refer to the detailed documentation in the `docs/` folder or create an issue in the repository.
 
 ---
+## 🧾 EGS License Setup
+
+1. Complete the registration process at [Avesha EGS Registration](https://avesha.io/egs-registration) to receive the required access credentials
+
+2. After successful registration, Avesha will process your license request and send the **license YAML file** to your registered email address.
+
+3. Before applying the license, ensure that the **kubeslice-controller** namespace exists:
+```bash
+kubectl create namespace kubeslice-controller
+```
+5. Apply the license secret to your controller cluster:
+```bash
+kubectl apply -f egs-license.yaml
+```
+6. For detailed license setup instructions, refer to **[📋 EGS License Setup](docs/EGS-License-Setup.md)**.
+
+---
 
 ## Execution Order Control
 
