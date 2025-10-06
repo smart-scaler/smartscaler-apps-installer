@@ -246,28 +246,64 @@
     var: user_input
     verbosity: 1
 
-- name: Validate required environment variables
+- name: Determine which credentials are needed based on execution order
+  set_fact:
+    needs_ngc_credentials: "{{ 'create_ngc_secrets' in execution_order or 'verify_ngc_secrets' in execution_order }}"
+    needs_avesha_credentials: "{{ 'create_avesha_secret' in execution_order }}"
+    missing_credentials: []
+
+
+- name: Check NGC API key (only if needed)
+  set_fact:
+    missing_credentials: "{{ missing_credentials + ['NGC_API_KEY'] }}"
+  when: 
+    - needs_ngc_credentials | default(false)
+    - (not ngc_api_key or ngc_api_key == 'not-set')
+
+- name: Check NGC Docker API key (only if needed)
+  set_fact:
+    missing_credentials: "{{ missing_credentials + ['NGC_DOCKER_API_KEY'] }}"
+  when: 
+    - needs_ngc_credentials | default(false)
+    - (not ngc_docker_api_key or ngc_docker_api_key == 'not-set')
+
+- name: Check Avesha Docker username (only if needed)
+  set_fact:
+    missing_credentials: "{{ missing_credentials + ['AVESHA_DOCKER_USERNAME'] }}"
+  when: 
+    - needs_avesha_credentials | default(false)
+    - (not avesha_docker_username or avesha_docker_username == 'not-set')
+
+- name: Check Avesha Docker password (only if needed)
+  set_fact:
+    missing_credentials: "{{ missing_credentials + ['AVESHA_DOCKER_PASSWORD'] }}"
+  when: 
+    - needs_avesha_credentials | default(false)
+    - (not avesha_docker_password or avesha_docker_password == 'not-set')
+
+- name: Validate required environment variables (only for components in execution order)
   fail:
     msg: |
-      The following required variables are not set:
-      {% if not ngc_api_key %}
-      - NGC_API_KEY
+      The following required variables are not set for components in your execution order:
+      {% for cred in missing_credentials %}
+      - {{ cred }}
+      {% endfor %}
+      
+      Components requiring these credentials:
+      {% if needs_ngc_credentials | default(false) %}
+      - create_ngc_secrets, verify_ngc_secrets (NGC credentials)
       {% endif %}
-      {% if not ngc_docker_api_key %}
-      - NGC_DOCKER_API_KEY
-      {% endif %}
-      {% if not avesha_docker_username %}
-      - AVESHA_DOCKER_USERNAME
-      {% endif %}
-      {% if not avesha_docker_password %}
-      - AVESHA_DOCKER_PASSWORD
+      {% if needs_avesha_credentials | default(false) %}
+      - create_avesha_secret (Avesha credentials)
       {% endif %}
       
       Please set these variables using one of:
-      1. Environment variables
-      2. Command line arguments (-e)
+      1. Environment variables (export {{ missing_credentials | join('=') }})
+      2. Command line arguments (-e {{ missing_credentials | map('regex_replace', '^', '') | map('lower') | map('regex_replace', '_', '_') | join('=') }})
       3. Vault file (group_vars/all/vault.yml)
-  when: not ngc_api_key or not ngc_docker_api_key or not avesha_docker_username or not avesha_docker_password
+      4. Direct values in user_input.yml
+      5. Remove the credential-requiring components from execution_order
+  when: missing_credentials | length > 0
 
 - name: Validate kubeconfig settings
   block:
