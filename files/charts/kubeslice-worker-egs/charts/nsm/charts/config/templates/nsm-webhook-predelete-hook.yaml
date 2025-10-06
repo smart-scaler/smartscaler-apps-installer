@@ -111,6 +111,11 @@ spec:
       name: nsm-delete-webhooks
       namespace: {{ .Release.Namespace }}
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       serviceAccountName: nsm-delete-webhooks
       imagePullSecrets:
       - name: {{ template "imagePullSecrets.secretName" . }}

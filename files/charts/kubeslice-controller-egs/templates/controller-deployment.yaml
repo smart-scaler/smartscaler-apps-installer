@@ -53,6 +53,11 @@ spec:
       affinity:
       {{ toYaml .Values.kubeslice.controller.affinity | nindent 8 }}
       {{- end }}
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       containers:
         - args:
             - --secure-listen-address=0.0.0.0:8443

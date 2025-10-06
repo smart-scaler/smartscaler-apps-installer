@@ -30,6 +30,11 @@ spec:
       {{ toYaml .Values.egsAgent.labels | nindent 8 }}
       {{- end }}
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       {{- if .Values.egsAgent.affinity }}
       affinity:
       {{ toYaml .Values.egsAgent.affinity | nindent 8 }}
