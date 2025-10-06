@@ -517,6 +517,23 @@ sudo ansible-playbook site.yml \
   -e "avesha_docker_password=$AVESHA_DOCKER_PASSWORD" \
   -vv
 
+# EGS License Setup
+   - Complete the registration process at [Avesha EGS Registration](https://avesha.io/egs-registration) to receive the required access credentials and product license for running the script.
+   - After successful registration, Avesha will process your license request and send the license YAML file to your registered email address
+   - Before applying the license, ensure the kubeslice-controller namespace exists
+   ```bash
+# Create the kubeslice-controller namespace
+kubectl create namespace kubeslice-controller
+```
+   - Apply the license secret to your controller cluster:
+
+```bash
+# Apply the license secret
+kubectl apply -f egs-license.yaml
+```
+   - For detailed license setup instructions, refer to **[📋 EGS License Setup](docs/EGS-License-Setup.md)**.
+
+
 # Execute EGS installation
 sudo ansible-playbook site.yml \
   --extra-vars "execution_order=['cert_manager','kubeslice_controller_egs','kubeslice_ui_egs','egs_project_manifest','egs_cluster_registration_worker_1','fetch_worker_secret_worker_1','kubeslice_worker_egs_worker_1']" \
