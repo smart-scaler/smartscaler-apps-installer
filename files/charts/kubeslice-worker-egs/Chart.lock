@@ -2,5 +2,15 @@ dependencies:
 - name: kserve
   repository: file://./charts/kserve
   version: v0.14.0
+
+- name: nsm
+  repository: file://./charts/nsm
+  version: 0.6.4
+
+- name: netop
+  repository: file://./charts/netop
+  version: 0.2.0
+
+
 digest: sha256:bf2dbe24390cfd3756a2a907bbbe92f059742e2cbc0728c04c659c367c53cc40
 generated: "2025-06-11T09:10:00.377393506Z"
