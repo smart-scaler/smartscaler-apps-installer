@@ -49,6 +49,11 @@ spec:
       {{ toYaml .Values.kubeslice.controller.labels | nindent 8 }}
       {{- end }}
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       {{- if .Values.kubeslice.controller.affinity }}
       affinity:
       {{ toYaml .Values.kubeslice.controller.affinity | nindent 8 }}
@@ -78,6 +83,7 @@ spec:
             - --project-namespace-prefix={{ required "A valid value is required!" .Values.kubeslice.controller.projectnsPrefix }}
             - --controller-end-point={{ required "A valid value is required!" .Values.kubeslice.controller.endpoint }}
             - --prometheus-service-endpoint={{ required "A valid value is required!" .Values.global.kubeTally.prometheusUrl }}
+            - --precheckjob-image={{ .Values.global.imageRegistry }}/{{ .Values.kubeslice.controller.image }}:{{ .Values.kubeslice.controller.tag }}
             - --metrics-cleanup-interval={{ .Values.kubeslice.controller.kubeTally.metricsCleanupInterval }}
             - --ovpn-job-image={{ .Values.global.imageRegistry }}/{{ .Values.kubeslice.ovpnJob.image }}:{{ .Values.kubeslice.ovpnJob.tag }}          
           command:
@@ -165,9 +171,9 @@ webhooks:
       service:
         name: kubeslice-controller-webhook-service
         namespace: kubeslice-controller
-        path: /validate-controller-kubeslice-io-v1alpha1-migrationjobconfig
+        path: /validate-controller-kubeslice-io-v1alpha1-replicationjobconfig
     failurePolicy: Fail
-    name: vmigrationjobconfig.kb.io
+    name: vreplicationjobconfig.kb.io
     rules:
       - apiGroups:
           - controller.kubeslice.io
@@ -178,7 +184,7 @@ webhooks:
           - UPDATE
           - DELETE
         resources:
-          - migrationjobconfigs
+          - replicationjobconfigs
     sideEffects: None
   - admissionReviewVersions:
       - v1
@@ -187,9 +193,9 @@ webhooks:
       service:
         name: kubeslice-controller-webhook-service
         namespace: kubeslice-controller
-        path: /validate-controller-kubeslice-io-v1alpha1-migrationslice
+        path: /validate-controller-kubeslice-io-v1alpha1-replicationslice
     failurePolicy: Fail
-    name: vmigrationslice.kb.io
+    name: vreplicationslice.kb.io
     rules:
       - apiGroups:
           - controller.kubeslice.io
@@ -200,7 +206,7 @@ webhooks:
           - UPDATE
           - DELETE
         resources:
-          - migrationslice
+          - replicationslice
     sideEffects: None
   - admissionReviewVersions:
       - v1

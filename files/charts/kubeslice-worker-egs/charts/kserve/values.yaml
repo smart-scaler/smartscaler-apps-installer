@@ -184,7 +184,25 @@ kserve:
     #     operator: Equal
     #     value: master
     #     effect: NoSchedule
-    tolerations: []
+    tolerations:
+    - key: "kubeslice.io/egs"
+      operator: "Equal"
+      value: "dedicated-node"
+      effect: "NoSchedule"
+    - key: "node.kubernetes.io/not-ready"
+      operator: "Exists"
+      effect: "NoExecute"
+      tolerationSeconds: 300
+    - key: "node.kubernetes.io/unreachable"
+      operator: "Exists"
+      effect: "NoExecute"
+      tolerationSeconds: 300
+    - key: "node.kubernetes.io/memory-pressure"
+      operator: "Exists"
+      effect: "NoSchedule"
+    - key: "node-role.kubernetes.io/control-plane"
+      operator: "Exists"
+      effect: "NoSchedule"
 
     # -- A list of Kubernetes TopologySpreadConstraints, if required. For more information, see [Topology spread constraint v1 core](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#topologyspreadconstraint-v1-core
     #
@@ -268,7 +286,25 @@ kserve:
         readOnlyRootFilesystem: true
         runAsNonRoot: true
       nodeSelector: {}
-      tolerations: []
+      tolerations:
+      - key: "kubeslice.io/egs"
+        operator: "Equal"
+        value: "dedicated-node"
+        effect: "NoSchedule"
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 300
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 300
+      - key: "node.kubernetes.io/memory-pressure"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
       topologySpreadConstraints: []
       affinity:
         podAntiAffinity:

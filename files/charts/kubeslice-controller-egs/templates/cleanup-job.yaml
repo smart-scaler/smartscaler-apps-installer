@@ -11,6 +11,11 @@ metadata:
 spec:
   template:
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       serviceAccountName: kubeslice-controller-controller-manager
       containers:
         - name: cleanup
