@@ -16,6 +16,11 @@ spec:
       labels:
         app.kubernetes.io/name: spiffe-csi-driver
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       serviceAccountName: spiffe-csi-driver
       {{- with .Values.nodeSelector }}
       nodeSelector:

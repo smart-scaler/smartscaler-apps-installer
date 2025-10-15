@@ -16,6 +16,11 @@ spec:
       labels:
         app: spire-agent
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       hostPID: true
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet

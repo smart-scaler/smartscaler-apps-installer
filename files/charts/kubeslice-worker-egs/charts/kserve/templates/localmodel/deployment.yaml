@@ -23,6 +23,11 @@ spec:
       annotations:
         kubectl.kubernetes.io/default-container: manager
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       serviceAccountName: kserve-localmodel-controller-manager
       securityContext:
         runAsNonRoot: true

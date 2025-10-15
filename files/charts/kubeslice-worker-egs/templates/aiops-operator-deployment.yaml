@@ -30,6 +30,11 @@ spec:
       {{ toYaml .Values.aiops.labels | nindent 8 }}
       {{- end }}
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       {{- if .Values.aiops.affinity }}
       affinity:
       {{ toYaml .Values.aiops.affinity | nindent 8 }}

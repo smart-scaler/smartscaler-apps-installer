@@ -18,6 +18,11 @@ spec:
       labels:
         app: spire-server
     spec:
+      tolerations:
+        - key: "kubeslice.io/egs"
+          operator: "Equal"
+          value: "dedicated-node"
+          effect: "NoSchedule"
       serviceAccountName: spire-server
       shareProcessNamespace: true
       {{- if .Values.priorityClassName }}

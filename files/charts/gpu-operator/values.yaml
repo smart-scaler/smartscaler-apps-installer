@@ -300,7 +300,7 @@ devicePlugin:
 # standalone dcgm hostengine
 dcgm:
   # disabled by default to use embedded nv-hostengine by exporter
-  enabled: false
+  enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: dcgm
   version: 4.1.1-2-ubuntu22.04
